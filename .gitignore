@@ -15,6 +15,7 @@ cocoa/tags
 *.json
 *.png
 *.pdf
+*.pt
 cl*.sh
 aws_config.json
 *.DS_Store
