@@ -1,7 +1,7 @@
 from cocoa.neural.utterance import Utterance
 from cocoa.neural.utterance import UtteranceBuilder as BaseUtteranceBuilder
 
-from symbols import markers, category_markers
+from .symbols import markers, category_markers
 from core.price_tracker import PriceScaler
 from cocoa.core.entity import is_entity
 

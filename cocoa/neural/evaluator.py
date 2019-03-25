@@ -4,8 +4,8 @@ from itertools import count
 
 from onmt.Utils import use_gpu
 
-from utterance import UtteranceBuilder
-from symbols import markers
+from .utterance import UtteranceBuilder
+from .symbols import markers
 
 
 class Evaluator(object):

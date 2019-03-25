@@ -4,9 +4,9 @@ from torch.autograd import Variable
 import onmt.io
 from onmt.Utils import aeq
 
-from symbols import markers
-from beam import Beam
-from utterance import UtteranceBuilder
+from .symbols import markers
+from .beam import Beam
+from .utterance import UtteranceBuilder
 
 
 class Generator(object):

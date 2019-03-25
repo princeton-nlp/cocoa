@@ -82,6 +82,6 @@ def detokenize(tokens):
 
 # ========= TEST ===========
 if __name__ == '__main__':
-    print tokenize("i have 10,000$!..")
-    print tokenize("i haven't $10,000")
+    print(tokenize("i have 10,000$!.."))
+    print(tokenize("i haven't $10,000"))
 

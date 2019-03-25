@@ -5,7 +5,7 @@ import torch.nn as nn
 from onmt.Loss import LossComputeBase
 from onmt.Utils import aeq
 
-from symbols import markers
+from .symbols import markers
 #from utterance import UtteranceBuilder
 
 class SimpleLossCompute(LossComputeBase):

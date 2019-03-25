@@ -14,8 +14,8 @@ from torch.autograd import Variable
 from onmt.Trainer import Statistics as BaseStatistics
 
 from core.controller import Controller
-from utterance import UtteranceBuilder
-from trainer import Trainer
+from .utterance import UtteranceBuilder
+from .trainer import Trainer
 
 
 class Statistics(BaseStatistics):

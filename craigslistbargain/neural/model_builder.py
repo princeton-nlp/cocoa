@@ -14,11 +14,11 @@ from onmt.Utils import use_gpu
 
 from cocoa.neural.models import MeanEncoder, StdRNNEncoder, StdRNNDecoder, \
               MultiAttnDecoder, NMTModel
-from models import NegotiationModel
+from .models import NegotiationModel
 
 from cocoa.io.utils import read_pickle
 
-from symbols import markers
+from .symbols import markers
 from neural import make_model_mappings
 
 

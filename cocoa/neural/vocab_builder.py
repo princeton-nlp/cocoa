@@ -33,5 +33,5 @@ def build_utterance_vocab(dialogues, special_symbols=[], entity_forms=[]):
     # Add special symbols
     vocab.add_words(special_symbols, special=True)
     vocab.finish(size_threshold=10000)
-    print 'Utterance vocab size:', vocab.size
+    print('Utterance vocab size:', vocab.size)
     return vocab

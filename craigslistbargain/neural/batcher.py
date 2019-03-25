@@ -1,17 +1,17 @@
 import numpy as np
-from itertools import izip_longest, izip
+from itertools import zip_longest
 
 import torch
 from torch.autograd import Variable
 
-from symbols import markers
+from .symbols import markers
 
 def pad_list_to_array(l, fillvalue, dtype):
     '''
     l: list of lists with unequal length
     return: np array with minimal padding
     '''
-    return np.array(list(izip_longest(*l, fillvalue=fillvalue)), dtype=dtype).T
+    return np.array(list(zip_longest(*l, fillvalue=fillvalue)), dtype=dtype).T
 
 class Batch(object):
     def __init__(self, encoder_args, decoder_args, context_data, vocab,
@@ -38,7 +38,7 @@ class Batch(object):
         self.lengths, sorted_ids = self.sort_by_length(self.encoder_inputs)
         self.tgt_lengths, _ = self.sort_by_length(self.decoder_inputs)
         if sort_by_length:
-            for k, v in self.context_data.iteritems():
+            for k, v in self.context_data.items():
                 if v is not None:
                     self.context_data[k] = self.order_by_id(v, sorted_ids)
             for attr in unsorted_attributes:
@@ -129,7 +129,7 @@ class DialogueBatcher(object):
         pad = self.mappings['utterance_vocab'].to_ind(markers.PAD)
         if i is None:
             # Return all turns
-            return [self._get_turn_batch_at(dialogues, STAGE, i) for i in xrange(dialogues[0].num_turns)]
+            return [self._get_turn_batch_at(dialogues, STAGE, i) for i in range(dialogues[0].num_turns)]
         else:
             turns = [d.turns[STAGE][i] for d in dialogues]
             turn_arr = pad_list_to_array(turns, pad, np.int32)
@@ -138,16 +138,16 @@ class DialogueBatcher(object):
     def _create_turn_batches(self):
         turn_batches = []
         pad = self.mappings['utterance_vocab'].to_ind(markers.PAD)
-        for i in xrange(Dialogue.num_stages):
+        for i in range(Dialogue.num_stages):
             try:
-                for j in xrange(self.num_turns):
+                for j in range(self.num_turns):
                     one_turn = [d.turns[i][j] for d in self.dialogues]
                     turn_batch = pad_list_to_array(one_turn, pad, np.int32)
                     turn_batches.append([turn_batch])
             except IndexError:
-                print 'num_turns:', self.num_turns
+                print('num_turns:', self.num_turns)
                 for dialogue in self.dialogues:
-                    print len(dialogue.turns[0]), len(dialogue.roles)
+                    print(len(dialogue.turns[0]), len(dialogue.roles))
                 import sys; sys.exit()
         return turn_batches
 
@@ -173,8 +173,8 @@ class DialogueBatcher(object):
     def _remove_last(self, array, value, pad):
         array = np.copy(array)
         nrows, ncols = array.shape
-        for i in xrange(nrows):
-            for j in xrange(ncols-1, -1, -1):
+        for i in range(nrows):
+            for j in range(ncols-1, -1, -1):
                 if array[i][j] == value:
                     array[i][j] = pad
                     break
@@ -199,7 +199,7 @@ class DialogueBatcher(object):
         if len(encoder_context) < num_context:
             batch_size = encoder_turns[0].shape[0]
             empty_context = np.full([batch_size, 1], self.pad, np.int32)
-            for i in xrange(num_context - len(encoder_context)):
+            for i in range(num_context - len(encoder_context)):
                 encoder_context.insert(0, empty_context)
         return encoder_context
 
@@ -263,17 +263,17 @@ class DialogueBatcher(object):
 
     def print_batch(self, batch, example_id, textint_map, preds=None):
         i = example_id
-        print '-------------- Example {} ----------------'.format(example_id)
+        print('-------------- Example {} ----------------'.format(example_id))
         if len(batch['decoder_tokens'][i]) == 0:
-            print 'PADDING'
+            print('PADDING')
             return False
-        print 'RAW INPUT:\n {}'.format(self.list_to_text(batch['encoder_tokens'][i]))
-        print 'RAW TARGET:\n {}'.format(self.list_to_text(batch['decoder_tokens'][i]))
-        print 'ENC INPUT:\n {}'.format(self.int_to_text(batch['encoder_args']['inputs'][i], textint_map, 'encoding'))
-        print 'DEC INPUT:\n {}'.format(self.int_to_text(batch['decoder_args']['inputs'][i], textint_map, 'decoding'))
-        print 'TARGET:\n {}'.format(self.int_to_text(batch['decoder_args']['targets'][i], textint_map, 'target'))
+        print('RAW INPUT:\n {}'.format(self.list_to_text(batch['encoder_tokens'][i])))
+        print('RAW TARGET:\n {}'.format(self.list_to_text(batch['decoder_tokens'][i])))
+        print('ENC INPUT:\n {}'.format(self.int_to_text(batch['encoder_args']['inputs'][i], textint_map, 'encoding')))
+        print('DEC INPUT:\n {}'.format(self.int_to_text(batch['decoder_args']['inputs'][i], textint_map, 'decoding')))
+        print('TARGET:\n {}'.format(self.int_to_text(batch['decoder_args']['targets'][i], textint_map, 'target')))
         if preds is not None:
-            print 'PRED:\n {}'.format(self.int_to_text(preds[i], textint_map, 'target'))
+            print('PRED:\n {}'.format(self.int_to_text(preds[i], textint_map, 'target')))
         return True
 
     def _get_token_turns_at(self, dialogues, i):

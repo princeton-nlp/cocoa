@@ -10,7 +10,7 @@ from torch.nn.utils.rnn import pad_packed_sequence as unpack
 import onmt
 from onmt.Utils import aeq
 
-from attention import MultibankGlobalAttention, GlobalAttention, MultibankConcatGlobalAttention
+from .attention import MultibankGlobalAttention, GlobalAttention, MultibankConcatGlobalAttention
 
 def rnn_factory(rnn_type, **kwargs):
     # Use pytorch version when available.

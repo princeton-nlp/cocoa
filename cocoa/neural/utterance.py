@@ -1,4 +1,4 @@
-from symbols import markers
+from .symbols import markers
 from cocoa.core.entity import is_entity
 
 class Utterance(object):

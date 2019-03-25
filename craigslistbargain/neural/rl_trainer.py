@@ -13,7 +13,7 @@ from cocoa.neural.rl_trainer import Statistics
 
 from core.controller import Controller
 from neural.trainer import Trainer
-from utterance import UtteranceBuilder
+from .utterance import UtteranceBuilder
 
 
 class RLTrainer(Trainer):

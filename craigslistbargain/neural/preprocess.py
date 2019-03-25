@@ -7,7 +7,6 @@ import re
 import time
 import os
 import numpy as np
-from itertools import izip
 
 from cocoa.core.util import read_pickle, write_pickle, read_json
 from cocoa.core.entity import Entity, CanonicalEntity, is_entity
@@ -15,9 +14,9 @@ from cocoa.model.vocab import Vocabulary
 
 from core.price_tracker import PriceTracker, PriceScaler
 from core.tokenizer import tokenize
-from batcher import DialogueBatcherFactory, Batch
-from symbols import markers
-from vocab_builder import create_mappings
+from .batcher import DialogueBatcherFactory, Batch
+from .symbols import markers
+from .vocab_builder import create_mappings
 from neural import make_model_mappings
 
 category_to_marker = {
@@ -69,7 +68,7 @@ class TextIntMap(object):
         toks = [self.vocab.to_word(ind) for ind in inds]
         if prices is not None:
             assert len(inds) == len(prices)
-            toks = [CanonicalEntity(value=p, type='price') if price_filler(x) else x for x, p in izip(toks, prices)]
+            toks = [CanonicalEntity(value=p, type='price') if price_filler(x) else x for x, p in zip(toks, prices)]
         return toks
 
 class Dialogue(object):
@@ -222,7 +221,7 @@ class Dialogue(object):
             # self.turns starts out as [[], [], []], so
             #   each portion is a list holding the tokens of either the
             #   encoding portion, decoding portion, or the target portion
-            for portion, stage in izip(self.turns, ('encoding', 'decoding', 'target')):
+            for portion, stage in zip(self.turns, ('encoding', 'decoding', 'target')):
                 portion.append(self.textint_map.text_to_int(turn, stage))
 
         self.kb_context_to_int()
@@ -231,7 +230,7 @@ class Dialogue(object):
         self.is_int = True
 
     def _pad_list(self, l, size, pad):
-        for i in xrange(len(l), size):
+        for i in range(len(l), size):
             l.append(pad)
         return l
 
@@ -408,7 +407,7 @@ class DataGenerator(object):
             ignore_cache=False, num_context=1, batch_size=1,
             model='seq2seq'):
         examples = {'train': train_examples, 'dev': dev_examples, 'test': test_examples}
-        self.num_examples = {k: len(v) if v else 0 for k, v in examples.iteritems()}
+        self.num_examples = {k: len(v) if v else 0 for k, v in examples.items()}
         self.num_context = num_context
         self.model = model
 
@@ -416,13 +415,13 @@ class DataGenerator(object):
         self.ignore_cache = ignore_cache
         if (not os.path.exists(cache)) or ignore_cache:
             # NOTE: each dialogue is made into two examples from each agent's perspective
-            self.dialogues = {k: preprocessor.preprocess(v)  for k, v in examples.iteritems() if v}
+            self.dialogues = {k: preprocessor.preprocess(v)  for k, v in examples.items() if v}
 
-            for fold, dialogues in self.dialogues.iteritems():
-                print '%s: %d dialogues out of %d examples' % (fold, len(dialogues), self.num_examples[fold])
+            for fold, dialogues in self.dialogues.items():
+                print('%s: %d dialogues out of %d examples' % (fold, len(dialogues), self.num_examples[fold]))
         else:
-            self.dialogues = {k: None  for k, v in examples.iteritems() if v}
-            print 'Using cached data from', cache
+            self.dialogues = {k: None  for k, v in examples.items() if v}
+            print('Using cached data from', cache)
 
         self.mappings = self.load_mappings(model, mappings_path, schema, preprocessor)
         self.textint_map = TextIntMap(self.mappings['utterance_vocab'], preprocessor)
@@ -436,22 +435,22 @@ class DataGenerator(object):
                         kb_pad=self.mappings['kb_vocab'].to_ind(markers.PAD),
                         mappings=self.mappings, num_context=num_context)
 
-        self.batches = {k: self.create_batches(k, dialogues, batch_size) for k, dialogues in self.dialogues.iteritems()}
+        self.batches = {k: self.create_batches(k, dialogues, batch_size) for k, dialogues in self.dialogues.items()}
 
     def load_mappings(self, model_type, mappings_path, schema, preprocessor):
         vocab_path = os.path.join(mappings_path, 'vocab.pkl')
         if not os.path.exists(vocab_path):
-            print 'Vocab not found at', vocab_path
+            print('Vocab not found at', vocab_path)
             mappings = create_mappings(self.dialogues['train'], schema,
                 preprocessor.entity_forms.values())
             write_pickle(mappings, vocab_path)
             print('Wrote mappings to {}.'.format(vocab_path))
         else:
-            print 'Loading vocab from', vocab_path
+            print('Loading vocab from', vocab_path)
             mappings = read_pickle(vocab_path)
 
-        for k, v in mappings.iteritems():
-            print k, v.size
+        for k, v in mappings.items():
+            print(k, v.size)
         mappings = make_model_mappings(model_type, mappings)
         return mappings
 
@@ -459,7 +458,7 @@ class DataGenerator(object):
         '''
         Convert tokens to integers.
         '''
-        for fold, dialogues in self.dialogues.iteritems():
+        for fold, dialogues in self.dialogues.items():
             for dialogue in dialogues:
                 dialogue.convert_to_int()
 
@@ -487,7 +486,7 @@ class DataGenerator(object):
         dialogues = self.dialogues[name]
         responses = {'seller': [], 'buyer': []}
         for dialogue in dialogues:
-            for turn, role in izip(dialogue.token_turns, dialogue.roles):
+            for turn, role in zip(dialogue.token_turns, dialogue.roles):
                 responses[role].extend(turn)
         return responses
 
@@ -500,21 +499,21 @@ class DataGenerator(object):
                 dialogue.convert_to_int()
 
             dialogue_batches = self.create_dialogue_batches(dialogues, batch_size)
-            print 'Write %d batches to cache %s' % (len(dialogue_batches), cache_file)
+            print('Write %d batches to cache %s' % (len(dialogue_batches), cache_file))
             start_time = time.time()
             write_pickle(dialogue_batches, cache_file)
-            print '[%d s]' % (time.time() - start_time)
+            print('[%d s]' % (time.time() - start_time))
         else:
             start_time = time.time()
             dialogue_batches = read_pickle(cache_file)
-            print 'Read %d batches from cache %s' % (len(dialogue_batches), cache_file)
-            print '[%d s]' % (time.time() - start_time)
+            print('Read %d batches from cache %s' % (len(dialogue_batches), cache_file))
+            print('[%d s]' % (time.time() - start_time))
         return dialogue_batches
 
     def generator(self, name, shuffle=True, cuda=True):
         dialogue_batches = self.batches[name]
         yield sum([len(b) for b in dialogue_batches])
-        inds = range(len(dialogue_batches))
+        inds = list(range(len(dialogue_batches)))
         if shuffle:
             random.shuffle(inds)
         for ind in inds:

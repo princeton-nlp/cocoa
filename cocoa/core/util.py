@@ -1,7 +1,7 @@
 import random
 import ujson as json
 import string
-import cPickle as pickle
+import pickle
 import numpy as np
 
 def random_multinomial(probs):

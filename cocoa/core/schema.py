@@ -3,7 +3,6 @@ A schema specifies information about a domain (types, entities, relations).
 '''
 
 import json
-from itertools import izip
 
 
 class Attribute(object):

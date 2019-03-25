@@ -132,7 +132,7 @@ class Trainer(object):
         true_batchs = []
         accum = 0
         normalization = 0
-        num_batches = train_iter.next()
+        num_batches = next(train_iter)
         self.cuda = use_gpu(opt)
 
         for batch_idx, batch in enumerate(train_iter):
@@ -168,7 +168,7 @@ class Trainer(object):
 
         stats = Statistics()
 
-        num_val_batches = valid_iter.next()
+        num_val_batches = next(valid_iter)
         dec_state = None
         for batch in valid_iter:
             if batch is None:
@@ -220,7 +220,7 @@ class Trainer(object):
         path = self.checkpoint_path(epoch, opt, valid_stats)
         create_path(path)
         if not opt.best_only:
-            print 'Save checkpoint {path}'.format(path=path)
+            print('Save checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
         self.save_best_checkpoint(checkpoint, opt, valid_stats)
@@ -232,7 +232,7 @@ class Trainer(object):
                         root=opt.model_path,
                         model=opt.model_filename)
 
-            print 'Save best checkpoint {path}'.format(path=path)
+            print('Save best checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
     def checkpoint_path(self, epoch, opt, stats):

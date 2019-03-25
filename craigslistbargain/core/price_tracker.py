@@ -6,7 +6,7 @@ from itertools import chain
 from cocoa.core.entity import Entity, CanonicalEntity
 from cocoa.core.util import read_json, write_pickle, read_pickle
 
-from tokenizer import tokenize
+from .tokenizer import tokenize
 
 
 class PriceScaler(object):

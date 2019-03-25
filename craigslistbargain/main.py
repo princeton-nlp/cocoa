@@ -6,7 +6,6 @@ import argparse
 import random
 import os
 import time as tm
-from itertools import chain
 import torch
 import torch.nn as nn
 from torch import cuda
@@ -26,7 +25,7 @@ from neural.trainer import Trainer
 import options
 
 def build_model(model_opt, opt, mappings, checkpoint):
-    print 'Building model...'
+    print('Building model...')
     model = model_builder.make_base_model(model_opt, mappings,
                                     use_gpu(opt), checkpoint=checkpoint)
 

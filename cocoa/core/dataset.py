@@ -2,9 +2,9 @@
 Data structures for events, examples, and datasets.
 '''
 
-from util import read_json
-from event import Event
-from kb import KB
+from .util import read_json
+from .event import Event
+from .kb import KB
 
 class Example(object):
     '''
@@ -29,7 +29,7 @@ class Example(object):
             scenario = Scenario.from_dict(None, raw['scenario'])
         # Compatible with old data formats (to be removed)
         elif scenario_db:
-            print 'WARNING: scenario should be provided in the example'
+            print('WARNING: scenario should be provided in the example')
             scenario = scenario_db.get(raw['scenario_uuid'])
         else:
             raise ValueError('No scenario')
@@ -38,7 +38,7 @@ class Example(object):
         outcome = raw['outcome']
         ex_id = raw['uuid']
         if 'agents' in raw:
-            agents = {int(k): v for k, v in raw['agents'].iteritems()}
+            agents = {int(k): v for k, v in raw['agents'].items()}
         else:
             agents = None
         agents_info = raw.get('agents_info', None)
@@ -51,7 +51,7 @@ class Example(object):
         outcome = raw['outcome']
         ex_id = raw['uuid']
         if 'agents' in raw:
-            agents = {int(k): v for k, v in raw['agents'].iteritems()}
+            agents = {int(k): v for k, v in raw['agents'].items()}
         else:
             agents = None
         agents_info = raw.get('agents_info', None)
@@ -113,9 +113,9 @@ def read_examples(paths, max_examples, Scenario):
     '''
     examples = []
     for path in paths:
-        print 'read_examples: %s' % path
+        print('read_examples: %s' % path)
         for raw in read_json(path):
-            if max_examples >= 0 and len(examples) >= max_examples:
+            if not (max_examples is None) and max_examples >= 0 and len(examples) >= max_examples:
                 break
             examples.append(Example.from_dict(raw, Scenario))
     return examples
@@ -133,4 +133,4 @@ def read_dataset(args, Scenario):
 if __name__ == "__main__":
     lines = read_json("fb-negotiation/scr/data/transformed_test.json")
     for idx, raw in enumerate(lines):
-        print Example.from_dict(raw)
+        print(Example.from_dict(raw))

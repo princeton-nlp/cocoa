@@ -1,6 +1,6 @@
 from cocoa.core.scenario_db import Scenario as BaseScenario
 from cocoa.core.schema import Attribute
-from kb import KB
+from .kb import KB
 
 class Scenario(BaseScenario):
     # Agent ids

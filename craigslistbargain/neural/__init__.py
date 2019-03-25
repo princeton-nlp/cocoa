@@ -7,7 +7,7 @@ def get_data_generator(args, model_args, schema, test=False):
 
     from core.scenario import Scenario
     from core.price_tracker import PriceTracker
-    from preprocess import DataGenerator, Preprocessor
+    from .preprocess import DataGenerator, Preprocessor
     import os.path
 
     # TODO: move this to dataset
