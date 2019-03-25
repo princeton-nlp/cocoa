@@ -1,6 +1,5 @@
 import random
 import re
-from itertools import izip
 import numpy as np
 import torch
 from onmt.Utils import use_gpu
@@ -9,7 +8,7 @@ from cocoa.model.vocab import Vocabulary
 from cocoa.core.entity import is_entity, Entity
 
 from core.event import Event
-from session import Session
+from .session import Session
 from neural.preprocess import markers, Dialogue
 from neural.batcher import Batch
 
@@ -31,7 +30,7 @@ class NeuralSession(Session):
     # TODO: move this to preprocess?
     def convert_to_int(self):
         for i, turn in enumerate(self.dialogue.token_turns):
-            for curr_turns, stage in izip(self.dialogue.turns, ('encoding', 'decoding', 'target')):
+            for curr_turns, stage in zip(self.dialogue.turns, ('encoding', 'decoding', 'target')):
                 if i >= len(curr_turns):
                     curr_turns.append(self.env.textint_map.text_to_int(turn, stage))
 

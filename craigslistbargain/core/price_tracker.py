@@ -116,7 +116,7 @@ class PriceTracker(object):
         if kb:
             kb_numbers = self.get_kb_numbers(kb)
             list_price = kb.facts['item']['Price']
-        for i in xrange(1, len(tokens)-1):
+        for i in range(1, len(tokens)-1):
             token = tokens[i]
             try:
                 number = float(self.process_string(token))

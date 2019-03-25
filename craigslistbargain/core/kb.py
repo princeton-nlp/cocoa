@@ -43,7 +43,7 @@ class KB(BaseKB):
             for attr in self.attributes:
                 if attr.name not in ('Role', 'Bottomline', 'Target'):
                     if attr.name == 'Description':
-                        value = '\n' + '\n'.join(self.facts['item'][attr.name]).encode('utf8')
+                        value = '\n'.encode('utf8') + '\n'.join(self.facts['item'][attr.name]).encode('utf8')
                     elif attr.name == 'Price':
                         value = self.facts['item'][attr.name]
                     elif attr.name == 'Images':

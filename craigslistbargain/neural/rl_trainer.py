@@ -55,7 +55,7 @@ class RLTrainer(Trainer):
         nll = torch.cat(nll)  # (total_seq_len, batch_size)
 
         rewards = [Variable(torch.zeros(1, 1).fill_(reward))]
-        for i in xrange(1, nll.size(0)):
+        for i in range(1, nll.size(0)):
             rewards.append(rewards[-1] * discount)
         rewards = rewards[::-1]
         rewards = torch.cat(rewards)
@@ -87,7 +87,7 @@ class RLTrainer(Trainer):
         split = 'dev'
         self.model.eval()
         total_stats = Statistics()
-        print '='*20, 'VALIDATION', '='*20
+        print('='*20, 'VALIDATION', '='*20)
         for scenario in self.scenarios[split][:200]:
             controller = self._get_controller(scenario, split=split)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
@@ -95,7 +95,7 @@ class RLTrainer(Trainer):
             reward = self.get_reward(example, session)
             stats = Statistics(reward=reward)
             total_stats.update(stats)
-        print '='*20, 'END VALIDATION', '='*20
+        print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         return total_stats
 
@@ -106,7 +106,7 @@ class RLTrainer(Trainer):
                         root=opt.model_path,
                         model=opt.model_filename)
 
-            print 'Save best checkpoint {path}'.format(path=path)
+            print('Save best checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
     def checkpoint_path(self, episode, opt, stats):
@@ -118,7 +118,7 @@ class RLTrainer(Trainer):
         return path
 
     def learn(self, args):
-        for i in xrange(args.num_dialogues):
+        for i in range(args.num_dialogues):
             # Rollout
             scenario = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
@@ -134,14 +134,14 @@ class RLTrainer(Trainer):
                 # Standardize the reward
                 all_rewards = self.all_rewards[session_id]
                 all_rewards.append(reward)
-                print 'step:', i
-                print 'reward:', reward
+                print('step:', i)
+                print('reward:', reward)
                 reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
-                print 'scaled reward:', reward
-                print 'mean reward:', np.mean(all_rewards)
+                print('scaled reward:', reward)
+                print('mean reward:', np.mean(all_rewards))
 
                 batch_iter = session.iter_batches()
-                T = batch_iter.next()
+                T = next(batch_iter)
                 self.update(batch_iter, reward, self.model, discount=args.discount_factor)
 
             if i > 0 and i % 100 == 0:
@@ -168,7 +168,7 @@ class RLTrainer(Trainer):
     def _margin_reward(self, example):
         # No agreement
         if not self._is_agreed(example):
-            print 'No agreement'
+            print('No agreement')
             return {'seller': -0.5, 'buyer': -0.5}
 
         rewards = {}
@@ -190,7 +190,7 @@ class RLTrainer(Trainer):
     def _length_reward(self, example):
         # No agreement
         if not self._is_agreed(example):
-            print 'No agreement'
+            print('No agreement')
             return {'seller': -0.5, 'buyer': -0.5}
 
         # Encourage long dialogue
@@ -202,7 +202,7 @@ class RLTrainer(Trainer):
     def _fair_reward(self, example):
         # No agreement
         if not self._is_agreed(example):
-            print 'No agreement'
+            print('No agreement')
             return {'seller': -0.5, 'buyer': -0.5}
 
         rewards = {}
@@ -213,7 +213,7 @@ class RLTrainer(Trainer):
 
     def get_reward(self, example, session):
         if not self._is_valid_dialogue(example):
-            print 'Invalid'
+            print('Invalid')
             rewards = {'seller': -1., 'buyer': -1.}
         if self.reward_func == 'margin':
             rewards = self._margin_reward(example)

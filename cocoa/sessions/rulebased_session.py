@@ -1,7 +1,7 @@
 from cocoa.model.parser import LogicalForm as LF, Utterance
 
 # NOTE: using the task-specific Session
-from sessions.session import Session
+from .sessions.session import Session
 
 class RulebasedSession(Session):
     """Generic rule-based system framework.

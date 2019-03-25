@@ -3,9 +3,9 @@ from __future__ import print_function
 import json
 import random
 
-from util import generate_uuid
-from dataset import Example
-from event import Event
+from .util import generate_uuid
+from .dataset import Example
+from .event import Event
 from threading import Lock
 
 class Controller(object):

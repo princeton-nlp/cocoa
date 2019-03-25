@@ -47,7 +47,8 @@ class Batch(object):
 
         if time_major:
             for attr in batch_major_attributes:
-                setattr(self, attr, np.swapaxes(getattr(self, attr), 0, 1))
+                if len(getattr(self, attr)) > 0:
+                    setattr(self, attr, np.swapaxes(getattr(self, attr), 0, 1))
 
         # To tensor/variable
         self.encoder_inputs = self.to_variable(self.encoder_inputs, 'long', cuda)
@@ -100,6 +101,7 @@ class Batch(object):
             return inputs
         else:
             if type(inputs) is np.ndarray:
+                if len(inputs) == 0: return inputs
                 return inputs[ids, :]
             elif type(inputs) is list:
                 return [inputs[i] for i in ids]

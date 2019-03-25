@@ -7,8 +7,8 @@ from onmt.Utils import aeq, use_gpu
 from cocoa.core.entity import is_entity
 from cocoa.neural.generator import Generator, Sampler
 
-from symbols import markers, category_markers, sequence_markers
-from utterance import UtteranceBuilder
+from .symbols import markers, category_markers, sequence_markers
+from .utterance import UtteranceBuilder
 
 
 class LFSampler(Sampler):
@@ -16,7 +16,7 @@ class LFSampler(Sampler):
                  temperature=1, max_length=100, cuda=False):
         super(LFSampler, self).__init__(model, vocab, temperature=temperature, max_length=max_length, cuda=cuda)
         self.price_actions = map(self.vocab.to_ind, ('init-price', 'counter-price', markers.OFFER))
-        self.prices = set([id_ for w, id_ in self.vocab.word_to_ind.iteritems() if is_entity(w)])
+        self.prices = set([id_ for w, id_ in self.vocab.word_to_ind.items() if is_entity(w)])
         self.price_list = list(self.prices)
         self.eos = self.vocab.to_ind(markers.EOS)
         # TODO: fix the hard coding
@@ -42,7 +42,7 @@ class LFSampler(Sampler):
         # (2) Sampling
         batch_size = batch.size
         preds = []
-        for i in xrange(self.max_length):
+        for i in range(self.max_length):
             # Outputs to probs
             dec_out = dec_out.squeeze(0)  # (batch_size, rnn_size)
             out = self.model.generator.forward(dec_out).data  # Logprob (batch_size, vocab_size)
