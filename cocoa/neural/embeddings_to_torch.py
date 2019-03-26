@@ -35,7 +35,7 @@ def get_vocabs(vocab_path, vocab_type):
 
 def get_embeddings(file_):
     embs = dict()
-    with open(file_, 'r') as f:
+    with open(file_, 'r', encoding='ascii', errors='ignore') as f:
         for l in progress_bar(f):
             l_split = l.strip().split()
             embs[l_split[0]] = [float(em) for em in l_split[1:]]
