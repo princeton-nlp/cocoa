@@ -65,7 +65,7 @@ def add_model_arguments(parser):
                        help="""The attention type to use: dotprod or general (Luong)
                        or MLP (Bahdanau), prepend multibank to add context""")
     group.add_argument('--model', type=str, default='seq2seq',
-                       choices=['seq2seq', 'lf2lf'],
+                       choices=['seq2seq', 'lf2lf', 'tom'],
                        help='Model type')
     group.add_argument('--num-context', type=int, default=2,
                        help='Number of sentences to consider as dialogue context (in addition to the encoder input)')

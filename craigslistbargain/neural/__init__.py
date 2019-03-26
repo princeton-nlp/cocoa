@@ -57,7 +57,10 @@ def check_model_args(args):
 
 def make_model_mappings(model, mappings):
     mappings['src_vocab'] = mappings['utterance_vocab']
-    mappings['tgt_vocab'] = mappings['utterance_vocab']
+    if model == "tom":
+        mappings['tgt_vocab'] = mappings['lf_vocab']
+    else:
+        mappings['tgt_vocab'] = mappings['utterance_vocab']
     return mappings
 
 def build_optim(opt, model, checkpoint):

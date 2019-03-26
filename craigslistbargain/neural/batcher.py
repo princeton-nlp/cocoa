@@ -371,7 +371,7 @@ class DialogueBatcherWrapper(object):
 class DialogueBatcherFactory(object):
     @classmethod
     def get_dialogue_batcher(cls, model, **kwargs):
-        if model in ('seq2seq', 'lf2lf'):
+        if model in ('seq2seq', 'lf2lf', 'tom'):
             batcher = DialogueBatcher(**kwargs)
         else:
             raise ValueError

@@ -73,6 +73,7 @@ class TextIntMap(object):
 
 class Dialogue(object):
     textint_map = None
+    lfint_map = None
     ENC = 0
     DEC = 1
     TARGET = 2
@@ -216,13 +217,20 @@ class Dialogue(object):
         if self.is_int:
             return
 
-        for turn in self.token_turns:
-            # turn is a list of tokens that an agent spoke on their turn
-            # self.turns starts out as [[], [], []], so
-            #   each portion is a list holding the tokens of either the
-            #   encoding portion, decoding portion, or the target portion
-            for portion, stage in zip(self.turns, ('encoding', 'decoding', 'target')):
-                portion.append(self.textint_map.text_to_int(turn, stage))
+        if self.model in ['lf2lf', 'seq2seq']:
+            for turn in self.token_turns:
+                # turn is a list of tokens that an agent spoke on their turn
+                # self.turns starts out as [[], [], []], so
+                #   each portion is a list holding the tokens of either the
+                #   encoding portion, decoding portion, or the target portion
+                for portion, stage in zip(self.turns, ('encoding', 'decoding', 'target')):
+                    portion.append(self.textint_map.text_to_int(turn, stage))
+        
+        elif self.model in ['tom']:
+            for turn, lf, in zip(self.token_turns, self.lfs):
+                self.turns[ENC].append(self.textint_map.text_to_int(turn, 'encoding'))
+                self.turns[DEC].append(self.lfint_map.text_to_int(lf, 'decoding'))
+                self.turns[TARGET].append(self.lfint_map.text_to_int(lf, 'target'))
 
         self.kb_context_to_int()
         self.lf_to_int()
@@ -425,17 +433,23 @@ class DataGenerator(object):
 
         self.mappings = self.load_mappings(model, mappings_path, schema, preprocessor)
         self.textint_map = TextIntMap(self.mappings['utterance_vocab'], preprocessor)
+        if model == 'tom':
+            self.lfint_map = TextIntMap(self.mappings['lf_vocab'], preprocessor)
 
         Dialogue.mappings = self.mappings
         Dialogue.textint_map = self.textint_map
         Dialogue.preprocessor = preprocessor
         Dialogue.num_context = num_context
 
+        if model == 'tom':
+            Dialogue.lfint_map = self.lfint_map
+
         self.dialogue_batcher = DialogueBatcherFactory.get_dialogue_batcher(model,
                         kb_pad=self.mappings['kb_vocab'].to_ind(markers.PAD),
                         mappings=self.mappings, num_context=num_context)
 
         self.batches = {k: self.create_batches(k, dialogues, batch_size) for k, dialogues in self.dialogues.items()}
+
 
     def load_mappings(self, model_type, mappings_path, schema, preprocessor):
         vocab_path = os.path.join(mappings_path, 'vocab.pkl')
