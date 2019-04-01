@@ -1,3 +1,6 @@
+## Update
+Python 2.7, PyTorch 0.4 --> Python 3.5, PyTorch 1.0
+
 Code in this folder contains implementation for the CraigslistBargain task in the following paper:
 
 [Decoupling Strategy and Generation in Negotiation Dialogues](https://arxiv.org/abs/1808.09637).
@@ -5,7 +8,6 @@ He He, Derek Chen, Anusha Balakrishnan and Percy Liang.
 Empirical Methods in Natural Language Processing (EMNLP), 2018.
 
 ## Dependencies
-Python 2.7, PyTorch 0.4.
 
 Install `cocoa`:
 ```
