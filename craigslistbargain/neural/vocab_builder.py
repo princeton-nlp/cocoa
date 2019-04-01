@@ -1,5 +1,6 @@
 from cocoa.model.vocab import Vocabulary
 from cocoa.neural.vocab_builder import build_utterance_vocab
+from cocoa.core.entity import Entity, CanonicalEntity, is_entity
 
 from .symbols import markers, sequence_markers
 
@@ -22,21 +23,62 @@ def build_kb_vocab(dialogues, special_symbols=[]):
     print('Category vocab size:', cat_vocab.size)
     return kb_vocab, cat_vocab
 
-def build_lf_vocab(dialogues):
+
+def build_lf_vocab_simple(dialogues):
     vocab = Vocabulary(offset=0, unk=True)
     for dialogue in dialogues:
         assert dialogue.is_int is False
         for lf in dialogue.lfs:
-            vocab.add_words(lf)
+           vocab.add_words(lf)
     vocab.add_words(sequence_markers, special=True)
-    vocab.finish()
     print('LF vocabulary size:', vocab.size)
     return vocab
 
-def create_mappings(dialogues, schema, entity_forms):
+
+def get_entity_form(entity, form):
+    assert len(entity) == 2
+    if form == 'surface':
+        return entity.surface
+    elif form == 'type':
+        return '<%s>' % entity.canonical.type
+    elif form == 'canonical':
+        if isinstance(entity, Entity):
+                return entity._replace(surface='')
+        else:
+            return entity
+    else:
+        raise ValueError('Unknown entity form %s' % form)
+
+
+def build_lf_vocab(dialogues, special_symbols=[], entity_forms=[]):
+    vocab = Vocabulary(offset=0, unk=True)
+
+    def _add_entity(entity):
+        for entity_form in entity_forms:
+            word = get_entity_form(entity, entity_form)
+            vocab.add_word(word)
+
+    for dialogue in dialogues:
+        assert dialogue.is_int is False
+        for lf in dialogue.lfs:
+            for token in lf:
+                if is_entity(token):
+                    _add_entity(token)
+                else:
+                    vocab.add_word(token)
+    vocab.add_words(sequence_markers, special=True)
+    vocab.finish(size_threshold=10000)
+    print('LF vocabulary size:', vocab.size)
+    return vocab
+
+
+def create_mappings(dialogues, schema, entity_forms, model_type):
     utterance_vocab = build_utterance_vocab(dialogues, sequence_markers, entity_forms)
     kb_vocab, cat_vocab = build_kb_vocab(dialogues, [markers.PAD])
-    lf_vocab = build_lf_vocab(dialogues)
+    if model_type == "tom":
+        lf_vocab = build_lf_vocab(dialogues, sequence_markers, entity_forms)
+    else:
+        lf_vocab = build_lf_vocab_simple(dialogues)
     return {'utterance_vocab': utterance_vocab,
             'kb_vocab': kb_vocab,
             'cat_vocab': cat_vocab,

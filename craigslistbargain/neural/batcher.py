@@ -128,7 +128,12 @@ class DialogueBatcher(object):
         return num_turns
 
     def _get_turn_batch_at(self, dialogues, STAGE, i):
-        pad = self.mappings['utterance_vocab'].to_ind(markers.PAD)
+        if STAGE == 0:
+            # encoder pad
+            pad = self.mappings['src_vocab'].to_ind(markers.PAD)
+        else:
+            # decoder & target pad
+            pad = self.mappings['tgt_vocab'].to_ind(markers.PAD)
         if i is None:
             # Return all turns
             return [self._get_turn_batch_at(dialogues, STAGE, i) for i in range(dialogues[0].num_turns)]

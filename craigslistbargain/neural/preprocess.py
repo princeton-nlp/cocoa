@@ -19,6 +19,10 @@ from .symbols import markers
 from .vocab_builder import create_mappings
 from neural import make_model_mappings
 
+__global_map = map #keep reference to the original map
+lmap = lambda func, *iterable: list(__global_map(func, *iterable)) # using "map" here will cause infinite recursion
+map = lmap
+
 category_to_marker = {
         'car': markers.C_car,
         'phone': markers.C_phone,
@@ -217,6 +221,9 @@ class Dialogue(object):
         if self.is_int:
             return
 
+        self.kb_context_to_int()
+        self.lf_to_int()
+
         if self.model in ['lf2lf', 'seq2seq']:
             for turn in self.token_turns:
                 # turn is a list of tokens that an agent spoke on their turn
@@ -225,15 +232,12 @@ class Dialogue(object):
                 #   encoding portion, decoding portion, or the target portion
                 for portion, stage in zip(self.turns, ('encoding', 'decoding', 'target')):
                     portion.append(self.textint_map.text_to_int(turn, stage))
-        
+
         elif self.model in ['tom']:
             for turn, lf, in zip(self.token_turns, self.lfs):
-                self.turns[ENC].append(self.textint_map.text_to_int(turn, 'encoding'))
-                self.turns[DEC].append(self.lfint_map.text_to_int(lf, 'decoding'))
-                self.turns[TARGET].append(self.lfint_map.text_to_int(lf, 'target'))
-
-        self.kb_context_to_int()
-        self.lf_to_int()
+                self.turns[0].append(self.textint_map.text_to_int(turn, 'encoding'))
+                self.turns[1].append(lf)
+                self.turns[2].append(lf)
 
         self.is_int = True
 
@@ -287,7 +291,10 @@ class Preprocessor(object):
         elif form == 'type':
             return '<%s>' % entity.canonical.type
         elif form == 'canonical':
-            return entity._replace(surface='')
+            if isinstance(entity, Entity):
+                return entity._replace(surface='')
+            else:
+                return entity
         else:
             raise ValueError('Unknown entity form %s' % form)
 
@@ -313,6 +320,7 @@ class Preprocessor(object):
                     summary.extend(utterance)
                 else:
                     summary = utterance
+
             return [self.get_entity_form(x, self.entity_forms[stage]) if is_entity(x) else x for x in summary]
 
     def lf_to_tokens(self, kb, lf):
@@ -456,7 +464,7 @@ class DataGenerator(object):
         if not os.path.exists(vocab_path):
             print('Vocab not found at', vocab_path)
             mappings = create_mappings(self.dialogues['train'], schema,
-                preprocessor.entity_forms.values())
+                preprocessor.entity_forms.values(), model_type)
             write_pickle(mappings, vocab_path)
             print('Wrote mappings to {}.'.format(vocab_path))
         else:

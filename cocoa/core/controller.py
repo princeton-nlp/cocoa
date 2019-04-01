@@ -29,6 +29,7 @@ class Controller(object):
         for session in self.sessions:
             print('\nAGENT={}'.format(session.agent))
             session.kb.dump()
+            print(session.kb)
         print('='*50)
         return True
 
