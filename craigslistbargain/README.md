@@ -96,25 +96,39 @@ run REINFORCE with a given reward function.
 First, let's generate the training and validation scenarios.
 We will directly get those from the training and validation data.
 ```
-PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/train.json --scenarios data/train-scenarios.json
-PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/dev.json --scenarios data/dev-scenarios.json
+PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/train-luis-post.json --scenarios data/train-scenarios.json
+PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/dev-luis-post.json --scenarios data/dev-scenarios.json
 ```
 Now, we can run self-play and REINFORCE with a reward function, e.g. `margin`.
 ```
-mkdir checkpoint/lf2lf-margin;
+mkdir checkpoint/new_lf2lf-balance;
 PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \
 --valid-scenarios-path data/dev-scenarios.json \
---price-tracker price_tracker.pkl \
---agent-checkpoints checkpoint/lf2lf/model_best.pt checkpoint/lf2lf/model_best.pt \
---model-path checkpoint/lf2lf-margin \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/new_lf2lf/model_best.pt checkpoint/new_lf2lf/model_best.pt \
+--model-path checkpoint/new_lf2lf-balance \
 --optim adagrad --learning-rate 0.001 \
 --agents pt-neural pt-neural \
 --report-every 500 --max-turns 20 --num-dialogues 5000 \
---sample --temperature 0.5 --max-length 20 --reward margin
+--sample --temperature 0.5 --max-length 20 --reward balance
 ```
 - `--reward`: `margin` (utility), `fair` (fairness), and `length` (length).
 - `--agents`: agent types 
+
+```
+mkdir checkpoint/new_lf2lf-balance-rlvsrl;
+PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/new_lf2lf-balance/model_best.pt checkpoint/new_lf2lf-balance/model_best.pt \
+--model-path checkpoint/new_lf2lf-balance-rlvsrl \
+--optim adagrad --learning-rate 0.001 \
+--agents pt-neural pt-neural \
+--report-every 500 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance
+```
 
 ### Use the end-to-end approach
 

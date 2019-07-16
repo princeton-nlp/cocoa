@@ -92,11 +92,13 @@ class Trainer(object):
             train_iter = data.generator('train', cuda=use_gpu(opt))
             train_stats = self.train_epoch(train_iter, opt, epoch, report_func)
             print('Train loss: %g' % train_stats.mean_loss())
+            print('Train accuracy: %g' % train_stats.accuracy())
 
             # 2. Validate on the validation set.
             valid_iter = data.generator('dev', cuda=use_gpu(opt))
             valid_stats = self.validate(valid_iter)
             print('Validation loss: %g' % valid_stats.mean_loss())
+            print('Validation accuracy: %g' % valid_stats.accuracy())
 
             # 3. Log to remote server.
             #if opt.exp_host:

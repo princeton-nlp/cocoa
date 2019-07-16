@@ -42,7 +42,7 @@ class Statistics(object):
         self.n_correct += stat.n_correct
 
     def accuracy(self):
-        return 100 * (self.n_correct / self.n_words)
+        return 100 * (self.n_correct.float() / self.n_words.float())
 
     def mean_loss(self):
         return self.loss / self.n_words.float()

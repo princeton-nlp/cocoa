@@ -79,7 +79,7 @@ def add_trainer_arguments(parser):
 
 def add_rl_arguments(parser):
     cocoa.options.add_rl_arguments(parser)
-    parser.add_argument('--reward', choices=['margin', 'length', 'fair'],
+    parser.add_argument('--reward', choices=['margin', 'length', 'fair', 'balance'],
             help='Which reward function to use')
 
 

@@ -78,7 +78,8 @@ def create_mappings(dialogues, schema, entity_forms, model_type):
     if model_type == "tom":
         lf_vocab = build_lf_vocab(dialogues, sequence_markers, entity_forms)
     else:
-        lf_vocab = build_lf_vocab_simple(dialogues)
+        # lf_vocab = build_lf_vocab_simple(dialogues)
+        lf_vocab = build_lf_vocab(dialogues, sequence_markers, entity_forms)
     return {'utterance_vocab': utterance_vocab,
             'kb_vocab': kb_vocab,
             'cat_vocab': cat_vocab,

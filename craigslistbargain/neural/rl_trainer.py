@@ -153,6 +153,7 @@ class RLTrainer(Trainer):
         for event in example.events:
             if event.action in ('offer', 'quit', 'accept', 'reject'):
                 special_actions[event.action] += 1
+                # Cannot repeat special action
                 if special_actions[event.action] > 1:
                     return False
                 # Cannot accept or reject before offer
@@ -211,15 +212,46 @@ class RLTrainer(Trainer):
             rewards[role] = -1. * abs(margin_rewards[role]) + 2.
         return rewards
 
+
+    def _balance_reward(self, example):
+        # No agreement
+        if not self._is_agreed(example):
+            print('No agreement')
+            return {'seller': -0.5, 'buyer': -0.5}
+
+        rewards = {}
+        targets = {}
+        kbs = example.scenario.kbs
+        for agent_id in (0, 1):
+            kb = kbs[agent_id]
+            targets[kb.role] = kb.target
+
+        midpoint = (targets['seller'] + targets['buyer']) / 2.
+
+        price = example.outcome['offer']['price']
+        norm_factor = abs(midpoint - targets['seller'])
+        rewards['seller'] = (price - midpoint) / norm_factor
+        # Zero sum
+        rewards['buyer'] = -1. * rewards['seller']
+
+        for role in ('buyer', 'seller'):
+            rewards[role] += len(example.events) / 20.
+
+        return rewards
+
+
     def get_reward(self, example, session):
         if not self._is_valid_dialogue(example):
             print('Invalid')
-            rewards = {'seller': -1., 'buyer': -1.}
-        if self.reward_func == 'margin':
-            rewards = self._margin_reward(example)
-        elif self.reward_func == 'fair':
-            rewards = self._fair_reward(example)
-        elif self.reward_func == 'length':
-            rewards = self._length_reward(example)
+            rewards = {'seller': -2., 'buyer': -2.}
+        else:
+            if self.reward_func == 'margin':
+                rewards = self._margin_reward(example)
+            elif self.reward_func == 'fair':
+                rewards = self._fair_reward(example)
+            elif self.reward_func == 'length':
+                rewards = self._length_reward(example)
+            elif self.reward_func == 'balance':
+                rewards = self._balance_reward(example)
         reward = rewards[session.kb.role]
         return reward

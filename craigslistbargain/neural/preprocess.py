@@ -547,4 +547,3 @@ class DataGenerator(object):
                             num_context=self.num_context, cuda=cuda)
             # End of dialogue
             yield None
-
