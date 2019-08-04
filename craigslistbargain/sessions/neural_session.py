@@ -39,12 +39,19 @@ class NeuralSession(Session):
             return
         # Parse utterance
         utterance = self.env.preprocessor.process_event(event, self.kb)
+        # print('utterance is:', utterance)
+
         # Empty message
         if utterance is None:
             return
 
         #print 'receive:', utterance
-        self.dialogue.add_utterance(event.agent, utterance)
+        # self.dialogue.add_utterance(event.agent, utterance)
+        # state = event.metadata.copy()
+        state = {'enc_output': event.metadata['enc_output']}
+        utterance_int = self.env.textint_map.text_to_int(utterance)
+        state['action'] = utterance_int[0]
+        self.dialogue.add_utterance_with_state(event.agent, utterance, state)
 
     def _has_entity(self, tokens):
         for token in tokens:
@@ -60,15 +67,17 @@ class NeuralSession(Session):
         return s
 
     def send(self):
-        tokens = self.generate()
+        tokens, output_data = self.generate()
+
         if tokens is None:
             return None
         self.dialogue.add_utterance(self.agent, list(tokens))
+        # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
 
         if len(tokens) > 1 and tokens[0] == markers.OFFER and is_entity(tokens[1]):
             try:
                 price = self.builder.get_price_number(tokens[1], self.kb)
-                return self.offer({'price': price})
+                return self.offer({'price': price}, metadata=output_data)
             except ValueError:
                 #return None
                 pass
@@ -76,15 +85,15 @@ class NeuralSession(Session):
 
         if len(tokens) > 0:
             if tokens[0] == markers.ACCEPT:
-                return self.accept()
+                return self.accept(metadata=output_data)
             elif tokens[0] == markers.REJECT:
-                return self.reject()
+                return self.reject(metadata=output_data)
             elif tokens[0] == markers.QUIT:
-                return self.quit()
+                return self.quit(metadata=output_data)
 
         s = self.attach_punct(' '.join(tokens))
         #print 'send:', s
-        return self.message(s)
+        return self.message(s, metadata=output_data)
 
     def iter_batches(self):
         """Compute the logprob of each generated utterance.
@@ -101,6 +110,12 @@ class NeuralSession(Session):
                           num_context=Dialogue.num_context, cuda=self.env.cuda)
             yield batch
 
+    def iter_batches_critic(self):
+        """
+
+        :return:
+        """
+        pass
 
 class PytorchNeuralSession(NeuralSession):
     def __init__(self, agent, kb, env):
@@ -151,6 +166,7 @@ class PytorchNeuralSession(NeuralSession):
     def generate(self):
         if len(self.dialogue.agents) == 0:
             self.dialogue._add_utterance(1 - self.agent, [])
+            # TODO: Need we add an empty state?
         batch = self._create_batch()
 
         enc_state = self.dec_state.hidden if self.dec_state is not None else None
@@ -164,7 +180,7 @@ class PytorchNeuralSession(NeuralSession):
 
         entity_tokens = self._output_to_tokens(output_data)
 
-        return entity_tokens
+        return entity_tokens, output_data
 
     def _is_valid(self, tokens):
         if not tokens:

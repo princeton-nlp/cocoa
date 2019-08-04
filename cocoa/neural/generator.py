@@ -57,9 +57,9 @@ class Generator(object):
         dec_states = self.model.decoder.init_decoder_state(
                                         encoder_inputs, memory_bank, enc_states)
 
-        return dec_states, memory_bank
+        return dec_states, memory_bank, enc_states
 
-    def _run_attention_memory(self, batch, enc_memory_bank):
+    def  _run_attention_memory(self, batch, enc_memory_bank):
         if batch.num_context > 0 and hasattr(self.model, 'kb_embedder'):
             context_inputs = batch.context_inputs
             _, context_memory_bank = self.model.context_embedder(context_inputs)
@@ -133,6 +133,7 @@ class Generator(object):
         lengths = batch.lengths
         dec_states, enc_memory_bank = self._run_encoder(batch, enc_state)
         memory_bank = self._run_attention_memory(batch, enc_memory_bank)
+        enc_output = dec_states
 
         # (1.1) Go over forced prefix.
         if gt_prefix > 1:
@@ -206,12 +207,13 @@ class Generator(object):
                     unbottle(attn["std"]).data[:, j, :memory_lengths[j]])
                 dec_states.beam_update(j, b.get_current_origin(), beam_size)
 
-        # (4) Extract sentences from beam.
+        # (4) Extract dialogue_batcher from beam.
         ret = self._from_beam(beam)
         ret["gold_score"] = [0] * batch_size
         #if "tgt" in batch.__dict__:
         #    ret["gold_score"] = self._run_target(batch, data)
         ret["batch"] = batch
+        ret["enc_output"] = enc_output
         return ret
 
     def _from_beam(self, beam):
@@ -291,7 +293,7 @@ class Sampler(Generator):
         # (2) Sampling
         batch_size = batch.size
         preds = []
-        for i in xrange(self.max_length):
+        for i in range(self.max_length):
             # Outputs to probs
             dec_out = dec_out.squeeze(0)  # (batch_size, rnn_size)
             out = self.model.generator.forward(dec_out).data  # Logprob (batch_size, vocab_size)
@@ -330,7 +332,7 @@ class LMSampler(Sampler):
         # (2) Sampling
         batch_size = batch.size
         preds = []
-        for i in xrange(self.max_length):
+        for i in range(self.max_length):
             # Outputs to probs
             dec_out = dec_out.squeeze(0)  # (batch_size, rnn_size)
             out = self.model.generator.forward(dec_out).data  # Logprob (batch_size, vocab_size)

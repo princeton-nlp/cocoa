@@ -8,7 +8,7 @@ from __future__ import unicode_literals, division
 from math import log
 
 from nltk import compat
-from util import safe_div
+from .util import safe_div
 
 
 NEG_INF = float("-inf")
@@ -170,10 +170,10 @@ class LaplaceNgramModel(LidstoneNgramModel):
 
 #####################################################
 if __name__ == '__main__':
-    from counter import build_vocabulary, count_ngrams
+    from .counter import build_vocabulary, count_ngrams
     sents = [['a', 'b', 'c'], ['a', 'c', 'c']]
     vocab = build_vocabulary(1, *sents)
     counter = count_ngrams(2, vocab, sents)
     model = MLENgramModel(counter)
-    print model.score('b', ('a',))
-    print model.order
+    print(model.score('b', ('a',)))
+    print(model.order)

@@ -46,10 +46,10 @@ class Manager(object):
         if len(freqdist) == 0:
             return None
         best_action = max(freqdist, key=lambda x: x[1])[0]
-        print 'context:', context
+        print('context:', context)
         #print 'dist:', freqdist
-        print 'available actions:', actions
-        print 'action:', best_action
+        print('available actions:', actions)
+        print('action:', best_action)
         return best_action
 
     def save(self, output):

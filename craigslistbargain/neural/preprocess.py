@@ -111,6 +111,8 @@ class Dialogue(object):
         self.is_int = False  # Whether we've converted it to integers
         self.num_context = None
 
+        self.states = []
+
     @property
     def num_turns(self):
         return len(self.turns[0])
@@ -137,6 +139,21 @@ class Dialogue(object):
         if len(self.agents) == 0 and agent == self.agent:
             self._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
         self._add_utterance(agent, utterance, lf=lf)
+
+    def add_utterance_with_state(self, agent, utterance, state, lf=None):
+        self.states.append(state)
+        self.add_utterance(agent,utterance, lf)
+
+    def delete_last_utterance(self, agent, utterance=None, delete_state=True):
+        if delete_state:
+            self.states = self.states[:-1]
+
+        # Always start in the middle and delete the utterance of another agent
+        self.agents.pop()
+        self.roles.pop()
+        self.token_turns.pop()
+        self.entities.pop()
+        self.lfs.pop()
 
     @classmethod
     def scale_price(cls, kb, utterance):

@@ -1,3 +1,4 @@
+torch
 nltk>=3.2.4
 torchtext>=0.3.1
 whoosh==2.7.4

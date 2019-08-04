@@ -6,7 +6,7 @@ class Vocabulary(object):
 
     UNK = '<unk>'
 
-    def __init__(self, offset=0, unk=True):
+    def __init__(self, offset=0, unk=True, max_bound=3, mini_step=0.01):
         self.word_to_ind = {}
         self.ind_to_word = {}
         self.word_count = Counter()
@@ -16,6 +16,14 @@ class Vocabulary(object):
         if unk:
             self.add_word(self.UNK, special=True)
         self.finished = False
+
+        self._init_prices()
+
+    def _init_prices(self):
+        from core.price_tracker import PriceList
+        self.p_list = PriceList.getPriceList().p_list
+        from cocoa.core.entity import Entity, CanonicalEntity
+        self.add_words([Entity(surface='', canonical=CanonicalEntity(value=p, type='price')) for p in self.p_list])
 
     def __len__(self):
         return self.size
@@ -30,6 +38,7 @@ class Vocabulary(object):
     def add_word(self, word, special=False):
         self.word_count[word] += 1
         if special:
+            print('add', word)
             self.special_words.add(word)
 
     def finish(self, freq_threshold=0, size_threshold=None):

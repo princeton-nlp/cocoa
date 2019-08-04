@@ -17,24 +17,31 @@ from .utterance import UtteranceBuilder
 
 
 class RLTrainer(Trainer):
-    def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin'):
+    def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin', cuda=False):
         self.agents = agents
         self.scenarios = scenarios
 
         self.training_agent = training_agent
         self.model = agents[training_agent].env.model
+        self.critic_model = agents[training_agent].env.critic_model
         self.train_loss = train_loss
         self.optim = optim
-        self.cuda = False
+        self.optim = optim
+        self.cuda = cuda
 
         self.best_valid_reward = None
 
         self.all_rewards = [[], []]
         self.reward_func = reward_func
 
+    def update_critic(self, reward, model, discount=0.95):
+        model.train()
+
     def update(self, batch_iter, reward, model, discount=0.95):
         model.train()
         model.generator.train()
+        # if self.critic_model is not None:
+        #     self.critic_model.train()
 
         nll = []
         # batch_iter gives a dialogue
@@ -43,6 +50,10 @@ class RLTrainer(Trainer):
             if not model.stateful:
                 dec_state = None
             enc_state = dec_state.hidden if dec_state is not None else None
+
+            print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
+            if enc_state is not None:
+                print("state: {}".format(batch, enc_state[0].shape))
 
             outputs, _, dec_state = self._run_batch(batch, None, enc_state)  # (seq_len, batch_size, rnn_size)
             loss, _ = self.train_loss.compute_loss(batch.targets, outputs)  # (seq_len, batch_size)
@@ -60,7 +71,11 @@ class RLTrainer(Trainer):
         rewards = rewards[::-1]
         rewards = torch.cat(rewards)
 
-        loss = nll.squeeze().dot(rewards.squeeze())
+        if self.cuda:
+            loss = nll.squeeze().dot(rewards.squeeze().cuda())
+        else:
+            loss = nll.squeeze().dot(rewards.squeeze())
+
         model.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm(model.parameters(), 1.)
@@ -99,6 +114,33 @@ class RLTrainer(Trainer):
         self.model.train()
         return total_stats
 
+    def validate_critic(self, args):
+        split = 'dev'
+        # Set model in validating mode.
+        self.critic_model.eval()
+
+        stats = Statistics()
+
+        num_val_batches = next(valid_iter)
+        dec_state = None
+        for batch in valid_iter:
+            if batch is None:
+                dec_state = None
+                continue
+            elif not self.model.stateful:
+                dec_state = None
+            enc_state = dec_state.hidden if dec_state is not None else None
+
+            outputs, attns, dec_state = self._run_batch(batch, None, enc_state)
+            _, batch_stats = self.valid_loss.compute_loss(batch.targets, outputs)
+            stats.update(batch_stats)
+
+        # Set model back to training mode
+        self.model.train()
+
+        self.critic_model.train()
+        return stats
+
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
         if self.best_valid_reward is None or valid_stats.mean_reward() > self.best_valid_reward:
             self.best_valid_reward = valid_stats.mean_reward()
@@ -118,6 +160,9 @@ class RLTrainer(Trainer):
         return path
 
     def learn(self, args):
+        rewards = [None]*2
+        s_rewards = [None]*2
+
         for i in range(args.num_dialogues):
             # Rollout
             scenario = self._get_scenario()
@@ -126,7 +171,7 @@ class RLTrainer(Trainer):
 
             for session_id, session in enumerate(controller.sessions):
                 # Only train one agent
-                if session_id != self.training_agent:
+                if args.only_run != True and session_id != self.training_agent:
                     continue
 
                 # Compute reward
@@ -134,19 +179,47 @@ class RLTrainer(Trainer):
                 # Standardize the reward
                 all_rewards = self.all_rewards[session_id]
                 all_rewards.append(reward)
-                print('step:', i)
-                print('reward:', reward)
-                reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
-                print('scaled reward:', reward)
-                print('mean reward:', np.mean(all_rewards))
+                s_reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
+
+                rewards[session_id] = reward
+                s_rewards[session_id] = s_reward
 
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
-                self.update(batch_iter, reward, self.model, discount=args.discount_factor)
 
-            if i > 0 and i % 100 == 0:
+                #if not args.only_run:
+                self.update(batch_iter, s_reward, self.model, discount=args.discount_factor)
+
+                #if
+                self.update_critic(s_reward, self.critic_model, discount=args.discount_factor)
+
+            if ((i + 1) % args.report_every) == 0:
+                import seaborn as sns
+                import matplotlib.pyplot as plt
+                if args.histogram:
+                    sns.set_style('darkgrid')
+                for j in range(2):
+                    print('agent={}'.format(j), end=' ')
+                    print('step:', i, end=' ')
+                    print('reward:', rewards[j], end=' ')
+                    print('scaled reward:', s_rewards[j], end=' ')
+                    print('mean reward:', np.mean(self.all_rewards[j]))
+                    if args.histogram:
+                        self.agents[j].env.dialogue_generator.get_policyHistogram()
+                print('-'*10)
+                if args.histogram:
+                    plt.show()
+
+            # Save model
+            if (i > 0 and i % 100 == 0) and not args.only_run:
                 valid_stats = self.validate(args)
                 self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
+
+            # TODO: Save critic model
+            if (i > 0 and i % 100 == 0) and not args.only_run:
+                valid_stats = self.validate_critic(args)
+                self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
+
 
     def _is_valid_dialogue(self, example):
         special_actions = defaultdict(int)
@@ -155,9 +228,15 @@ class RLTrainer(Trainer):
                 special_actions[event.action] += 1
                 # Cannot repeat special action
                 if special_actions[event.action] > 1:
+                    print('Invalid events(0): ')
+                    for x in example.events:
+                        print('\t', x.action)
                     return False
                 # Cannot accept or reject before offer
                 if event.action in ('accept', 'reject') and special_actions['offer'] == 0:
+                    print('Invalid events(1): ')
+                    for x in example.events:
+                        print('\t', x.action)
                     return False
         return True
 

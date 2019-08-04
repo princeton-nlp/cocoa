@@ -12,13 +12,13 @@ class Session(BaseSession):
             OfferEvent
 
         """
-        return Event.OfferEvent(self.agent, offer, time=self.timestamp(), metadata=None)
+        return Event.OfferEvent(self.agent, offer, time=self.timestamp(), metadata=metadata)
 
     def accept(self, metadata=None):
-        return Event.AcceptEvent(self.agent, time=self.timestamp(), metadata=None)
+        return Event.AcceptEvent(self.agent, time=self.timestamp(), metadata=metadata)
 
     def reject(self, metadata=None):
-        return Event.RejectEvent(self.agent, time=self.timestamp(), metadata=None)
+        return Event.RejectEvent(self.agent, time=self.timestamp(), metadata=metadata)
 
     def quit(self, metadata=None):
-        return Event.QuitEvent(self.agent, time=self.timestamp(), metadata=None)
+        return Event.QuitEvent(self.agent, time=self.timestamp(), metadata=metadata)

@@ -24,6 +24,23 @@ class LFSampler(Sampler):
                 (is_entity(w) or w in category_markers or w in sequence_markers
                     or w in (vocab.UNK, '</sum>', '<slot>', '</slot>'))])
         self.actions = map(self.vocab.to_ind, actions)
+        # for i,j in self.vocab.word_to_ind.items():
+        #     print(i,j)
+        print('special:{}'.format(self.vocab.ind_to_word))
+        print('price_actions:{}'.format(list(self.price_actions)))
+        print('price:{}'.format(self.prices))
+        print('actions:{}'.format(list(self.actions)))
+        # Draw the distribution of prices
+        # p_list = [self.vocab.to_word(i).canonical.value for i in self.price_list]
+        # p_list = sorted(p_list)
+        # print('plist:{}'.format(p_list))
+        # import seaborn as sns
+        # import matplotlib.pyplot as plt
+        # sns.set()
+        # sns.distplot(p_list, rug=True, bins=50)
+        # plt.show()
+
+        self.policy_history = []
 
     def generate_batch(self, batch, gt_prefix=1, enc_state=None):
         # This is to ensure we can stop at EOS for stateful models
@@ -31,7 +48,7 @@ class LFSampler(Sampler):
 
         # (1) Run the encoder on the src.
         lengths = batch.lengths
-        dec_states, enc_memory_bank = self._run_encoder(batch, enc_state)
+        dec_states, enc_memory_bank, enc_output = self._run_encoder(batch, enc_state)
         memory_bank = self._run_attention_memory(batch, enc_memory_bank)
 
         # (1.1) Go over forced prefix.
@@ -65,7 +82,13 @@ class LFSampler(Sampler):
                 scores[mask == 0] = -100.
 
             scores.sub_(scores.max(1, keepdim=True)[0].expand(scores.size(0), scores.size(1)))
+            #print('score: ', scores.exp())
+
+            self.policy_history.append(torch.softmax(scores, dim=1).cpu().numpy())
+
             pred = torch.multinomial(scores.exp(), 1).squeeze(1)  # (batch_size,)
+            #print('pred: ', pred)
+
             preds.append(pred)
             if pred[0] == self.eos:
                 break
@@ -87,7 +110,33 @@ class LFSampler(Sampler):
 
         ret["gold_score"] = [0] * batch_size
         ret["batch"] = batch
+        ret["enc_output"] = enc_output[-1].detach()
         return ret
+
+    def get_policyHistogram(self):
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import re
+
+        allNum = len(self.policy_history)
+        tmpData = np.mean(self.policy_history,axis=0)[0]
+        r = re.compile(u'\d+[.]?\d*')
+        x, w = [], []
+        for i in range(len(tmpData)):
+            tmp = self.vocab.ind_to_word[i]
+            if not is_entity(tmp):
+                continue
+            name = tmp.canonical.value
+            if abs(name) > 10.1: continue
+            x.append(name)
+            w.append(tmpData[i])
+
+        w = w/np.sum(w)
+        from scipy.stats import norm
+        sns.distplot(x, bins=100, kde=False, hist_kws={'weights': w}, )
+        #plt.show()
+
 
 
 def get_generator(model, vocab, scorer, args, model_args):

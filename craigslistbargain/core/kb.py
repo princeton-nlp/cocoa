@@ -35,9 +35,9 @@ class KB(BaseKB):
     def dump(self):
         # NOTE: We no longer have a bottomline price
         price_range = (None, self.target)
-        print('----------------')
-        print('Role: {}'.format(self.role))
-        print('Price range: {}'.format(str(price_range)))
+        # print('----------------')
+        # print('Role: {}'.format(self.role))
+        # print('Price range: {}'.format(str(price_range)))
         if self.role == 'seller':
             width = max([len(str(attr.name)) for attr in self.attributes])
             for attr in self.attributes:
@@ -50,4 +50,4 @@ class KB(BaseKB):
                         value = ' '.join(self.facts['item'][attr.name])
                     else:
                         value = self.facts['item'][attr.name].encode('utf8')
-                    print('{empty:4}{name:<{width}s} {value}'.format(empty='', width=width, name=attr.name, value=value))
+                    # print('{empty:4}{name:<{width}s} {value}'.format(empty='', width=width, name=attr.name, value=value))

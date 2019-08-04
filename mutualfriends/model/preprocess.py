@@ -6,13 +6,13 @@ import random
 import re
 import copy
 import numpy as np
-from itertools import chain, izip
+from itertools import chain
 from collections import namedtuple, defaultdict
 
 from cocoa.model.vocab import Vocabulary
 from cocoa.core.entity import is_entity
 
-from graph import Graph, GraphBatch, inv_rel, item_to_str
+from .graph import Graph, GraphBatch, inv_rel, item_to_str
 from core.tokenizer import tokenize
 
 def add_preprocess_arguments(parser):
@@ -39,7 +39,7 @@ def build_schema_mappings(schema, num_items):
     for type_, values in schema.values.iteritems():
         entity_map.add_words(((value.lower(), type_) for value in values))
     # Add item nodes
-    for i in xrange(num_items):
+    for i in range(num_items):
         entity_map.add_word(item_to_entity(i)[1])
     # Add attr nodes
     #for attr in schema.attributes:
@@ -77,7 +77,7 @@ def build_vocab(dialogues, special_symbols=[], entity_forms=[]):
 
     # Add special symbols
     vocab.add_words(special_symbols)
-    print 'Vocabulary size:', vocab.size
+    print('Vocabulary size:', vocab.size)
     return vocab
 
 def create_mappings(dialogues, schema, num_items, entity_forms):
@@ -126,7 +126,7 @@ class TextIntMap(object):
         # If use_entity_map, nothing needs to be done as entities are already mapped by the entity_map
         if not use_entity_map:
             # Entities needs to be transformed and mapped by vocab
-            for tok_int, is_ent in izip(np.nditer(token_array, op_flags=['readwrite']), np.nditer(entity_inds)):
+            for tok_int, is_ent in zip(np.nditer(token_array, op_flags=['readwrite']), np.nditer(entity_inds)):
                 if is_ent:
                     entity = self.entity_map.to_word(tok_int - offset)
                     # NOTE: at this point we have lost the surface form of the entity: using an empty string
@@ -214,11 +214,11 @@ class Dialogue(object):
             utterances[self.DEC][:0] = decoder_entities
         # Same agent talking
         if len(self.agents) > 0 and agent == self.agents[-1]:
-            for i in xrange(2):
+            for i in range(2):
                 self.token_turns[i][-1].append(utterances[i])
         else:
             self.agents.append(agent)
-            for i in xrange(2):
+            for i in range(2):
                 self.token_turns[i].append([utterances[i]])
 
     def convert_to_int(self):
@@ -269,9 +269,9 @@ class Dialogue(object):
         '''
         turns, agents = self.turns, self.agents
         assert len(turns[0]) == len(turns[1]) and len(turns[0]) == len(turns[2])
-        for i in xrange(len(turns[0]), num_turns):
+        for i in range(len(turns[0]), num_turns):
             agents.append(1 - agents[-1])
-            for j in xrange(len(turns)):
+            for j in range(len(turns)):
                 turns[j].append([])
 
 class DialogueBatch(object):
@@ -308,24 +308,24 @@ class DialogueBatch(object):
 
     def _create_turn_batches(self):
         turn_batches = []
-        for i in xrange(Dialogue.num_stages):
+        for i in range(Dialogue.num_stages):
             turn_batches.append([self._normalize_turn(
                 [dialogue.turns[i][j] for dialogue in self.dialogues])
-                for j in xrange(self.num_turns)])
+                for j in range(self.num_turns)])
         return turn_batches
 
     def _get_agent_batch(self, i):
         return [dialogue.agents[i] for dialogue in self.dialogues]
 
     def _get_kb_batch(self, agents):
-        return [dialogue.kbs[agent] for dialogue, agent in izip(self.dialogues, agents)]
+        return [dialogue.kbs[agent] for dialogue, agent in zip(self.dialogues, agents)]
 
     def _get_matched_item_batch(self, agents):
-        item_entities = [item_to_entity(dialogue.matched_items[agent]) for dialogue, agent in izip(self.dialogues, agents)]
+        item_entities = [item_to_entity(dialogue.matched_items[agent]) for dialogue, agent in zip(self.dialogues, agents)]
         return Dialogue.textint_map.text_to_int(item_entities, 'target')
 
     def _get_graph_batch(self, agents):
-        return GraphBatch([dialogue.graphs[agent] for dialogue, agent in izip(self.dialogues, agents)])
+        return GraphBatch([dialogue.graphs[agent] for dialogue, agent in zip(self.dialogues, agents)])
 
     def _remove_last(self, array, value):
         '''
@@ -334,8 +334,8 @@ class DialogueBatch(object):
         </s> <pad> (deterministically).
         '''
         nrows, ncols = array.shape
-        for i in xrange(nrows):
-            for j in xrange(ncols-1, -1, -1):
+        for i in range(nrows):
+            for j in range(ncols-1, -1, -1):
                 if array[i][j] == value:
                     array[i][j] = int_markers.PAD
                     break
@@ -350,7 +350,7 @@ class DialogueBatch(object):
             # If there's no input to encode, use </s> as the encoder input.
             encoder_inputs = np.full((batch_size, 1), int_markers.EOS, dtype=np.int32)
             # encode_tokens are empty lists
-            encode_tokens = [[''] for _ in xrange(batch_size)]
+            encode_tokens = [[''] for _ in range(batch_size)]
 
         # Decoder inputs: start from <go> to generate, i.e. <go> <token>
         assert decode_turn.shape == target_turn.shape
@@ -499,7 +499,7 @@ class Preprocessor(object):
                 break
         if item_id is None:
             kb.dump()
-            print item
+            print(item)
         assert item_id is not None
         return item_id
 
@@ -545,9 +545,9 @@ class Preprocessor(object):
             # Skip incomplete chats
             if len(d.agents) < 2 or ex.outcome['reward'] == 0:
                 continue
-                print 'Removing dialogue %s' % d.uuid
+                print('Removing dialogue %s' % d.uuid)
                 for event in ex.events:
-                    print event.to_dict()
+                    print(event.to_dict())
             else:
                 dialogues.append(d)
         return dialogues
@@ -566,7 +566,7 @@ class DataGenerator(object):
         self.dialogues = {k: preprocessor.preprocess(v)  for k, v in examples.iteritems()}
 
         for fold, dialogues in self.dialogues.iteritems():
-            print '%s: %d dialogues out of %d examples' % (fold, len(dialogues), self.num_examples[fold])
+            print('%s: %d dialogues out of %d examples' % (fold, len(dialogues), self.num_examples[fold]))
 
         if not mappings:
             mappings = create_mappings(self.dialogues['train'], schema, num_items, preprocessor.entity_forms.values())

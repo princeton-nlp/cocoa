@@ -9,6 +9,35 @@ from cocoa.core.util import read_json, write_pickle, read_pickle
 from .tokenizer import tokenize
 
 
+class PriceList(object):
+
+    pList = None
+
+    @classmethod
+    def getPriceList(cls):
+        if cls.pList is None:
+            cls.pList = PriceList()
+        return cls.pList
+
+    def __init__(self, max_bound=3, mini_step=0.05):
+        self.p_list = [-max_bound, +max_bound]
+        start, end = -max_bound/2, +max_bound/2
+        while start <= end:
+            self.p_list.append(start)
+            start += mini_step
+        self.p_list = [float('{:.2f}'.format(p)) for p in self.p_list]
+        self.p_list = sorted(self.p_list)
+
+    def get_round(self, number):
+        if number <= self.p_list[0]:
+            return self.p_list[0]
+        if number >= self.p_list[-1]:
+            return self.p_list[-1]
+        for i, a in enumerate(self.p_list):
+            if (a <= number) and (number <= self.p_list[i+1]):
+                return a if number <= (self.p_list[i+1]+a)/2 else self.p_list[i+1]
+        return None
+
 class PriceScaler(object):
     @classmethod
     def get_price_range(cls, kb):
@@ -55,7 +84,9 @@ class PriceScaler(object):
         w, c = cls.get_parameters(b, t)
         p = w * p + c
         # Discretize to two digits
-        p = float('{:.2f}'.format(p))
+        #p = float('{:.2f}'.format(p))
+        p = PriceList.getPriceList().get_round(p)
+        # print("scale_result:{}".format(p))
         return p
 
     @classmethod
@@ -75,6 +106,7 @@ class PriceTracker(object):
 
     @classmethod
     def get_price(cls, token):
+        # print('token', token)
         try:
             return token.canonical.value
         except:

@@ -16,7 +16,7 @@ from cocoa.core.entity import Entity, is_entity, CanonicalEntity
 
 from core.scenario import Scenario
 from core.tokenizer import tokenize
-from speech_acts import SpeechActAnalyzer
+from analysis.speech_acts import SpeechActAnalyzer
 
 sent_tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 nltk.download('stopwords')
@@ -371,8 +371,8 @@ if __name__ == '__main__':
     dialogue = Dialogue.from_dict(transcripts[0], price_tracker)
     dialogue.label_liwc(liwc)
     for u in dialogue.iter_utterances():
-        print u.text
-        print u.categories
+        print(u.text)
+        print(u.categories)
     #dialogue.extract_keywords()
     #dialogue.label_speech_acts()
     #dialogue.label_stage()

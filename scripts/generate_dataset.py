@@ -37,9 +37,9 @@ def generate_examples(num_examples, scenario_db, examples_path, max_examples, re
     with open(examples_path, 'w') as out:
         print >>out, json.dumps([e.to_dict() for e in examples])
     if num_failed == 0:
-        print 'All {} dialogues succeeded!'.format(num_examples)
+        print ('All {} dialogues succeeded!'.format(num_examples))
     else:
-        print 'Number of failed dialogues:', num_failed
+        print ('Number of failed dialogues:', num_failed)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(conflict_handler='resolve')

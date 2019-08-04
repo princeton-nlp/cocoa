@@ -145,6 +145,7 @@ class DialogueBatcher(object):
     def _create_turn_batches(self):
         turn_batches = []
         pad = self.mappings['utterance_vocab'].to_ind(markers.PAD)
+        from .preprocess import Dialogue
         for i in range(Dialogue.num_stages):
             try:
                 for j in range(self.num_turns):
@@ -347,6 +348,38 @@ class DialogueBatcher(object):
         # the state of each batch is passed on to the next batch
         return batch_seq
 
+    def create_batch_critic(self, dialogues):
+        num_turns = self._normalize_dialogue(dialogues)
+        dialogue_data = self._get_dialogue_data(dialogues)
+
+        dialogue_class = type(dialogues[0])
+        ENC, DEC, TARGET = dialogue_class.ENC, dialogue_class.DEC, dialogue_class.TARGET
+
+        encode_turn_ids = self.get_encoding_turn_ids(num_turns)
+        encoder_turns_all = self._get_turn_batch_at(dialogues, ENC, None)
+
+        # NOTE: encoder_turns contains all previous dialogue context, |num_context|
+        # decides how many turns to use
+        batch_seq = [
+            dialogues[0].
+            self._create_one_batch(
+                encoder_turns=encoder_turns_all[:i + 1],
+                decoder_turns=self._get_turn_batch_at(dialogues, DEC, i + 1),
+                target_turns=self._get_turn_batch_at(dialogues, TARGET, i + 1),
+                encoder_tokens=self._get_token_turns_at(dialogues, i),
+                decoder_tokens=self._get_token_turns_at(dialogues, i + 1),
+                agents=dialogue_data['agents'],
+                uuids=dialogue_data['uuids'],
+                kbs=dialogue_data['kbs'],
+                kb_context=dialogue_data['kb_context'],
+                num_context=self.num_context,
+            )
+            for i in encode_turn_ids
+        ]
+
+        # bath_seq: A sequence of batches that can be processed in turn where
+        # the state of each batch is passed on to the next batch
+        return batch_seq
 
 class DialogueBatcherWrapper(object):
     def __init__(self, batcher):
