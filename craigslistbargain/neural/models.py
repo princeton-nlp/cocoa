@@ -19,14 +19,6 @@ class NegotiationModel(NMTModel):
         else:
             memory_banks = [enc_memory_bank, context_memory_bank]
 
-        print('memory_banks:')
-        for i in memory_banks:
-            print('\t',i.shape)
-        print('enc_final:')
-        for i in enc_final:
-            print('\t',i.shape)
-
-
         enc_state = self.decoder.init_decoder_state(src, enc_memory_bank, enc_final)
         dec_state = enc_state if dec_state is None else dec_state
         decoder_outputs, dec_state, attns = self.decoder(tgt, memory_banks,

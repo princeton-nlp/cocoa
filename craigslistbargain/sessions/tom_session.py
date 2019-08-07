@@ -11,75 +11,45 @@ from core.event import Event
 from .session import Session
 from neural.preprocess import markers, Dialogue
 from neural.batcher import Batch
+from sessions.neural_session import PytorchNeuralSession
 
-class NeuralSession(Session):
+class PytorchNeuralTomSession(PytorchNeuralSession):
     def __init__(self, agent, kb, env):
-        super(NeuralSession, self).__init__(agent)
-        self.env = env
-        self.kb = kb
-        self.builder = env.utterance_builder
-        self.generator = env.dialogue_generator
-        self.cuda = env.cuda
+        super(PytorchNeuralTomSession, self).__init__(agent, kb, env)
+        self.controller = None
+        self.critic = env.critic_model
 
-        self.batcher = self.env.dialogue_batcher
-        self.dialogue = Dialogue(agent, kb, None)
-        self.dialogue.kb_context_to_int()
-        self.kb_context_batch = self.batcher.create_context_batch([self.dialogue], self.batcher.kb_pad)
-        self.max_len = 100
+    def set_controller(self, controller):
+        self.controller = controller
 
-    # TODO: move this to preprocess?
-    def convert_to_int(self):
-        for i, turn in enumerate(self.dialogue.token_turns):
-            for curr_turns, stage in zip(self.dialogue.turns, ('encoding', 'decoding', 'target')):
-                if i >= len(curr_turns):
-                    curr_turns.append(self.env.textint_map.text_to_int(turn, stage))
+    def generate(self, act = None):
+        if len(self.dialogue.agents) == 0:
+            self.dialogue._add_utterance(1 - self.agent, [])
+            # TODO: Need we add an empty state?
+        batch = self._create_batch()
 
-    def receive(self, event):
-        if event.action in Event.decorative_events:
-            return
-        # Parse utterance
-        utterance = self.env.preprocessor.process_event(event, self.kb)
-        # print('utterance is:', utterance)
+        enc_state = self.dec_state.hidden if self.dec_state is not None else None
 
-        # Empty message
-        if utterance is None:
-            return
+        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=enc_state,
+                                                    whole_policy=True, special_actions=act)
 
-        #print 'receive:', utterance
-        # self.dialogue.add_utterance(event.agent, utterance)
-        # state = event.metadata.copy()
-        state = {'enc_output': event.metadata['enc_output']}
-        utterance_int = self.env.textint_map.text_to_int(utterance)
-        state['action'] = utterance_int[0]
-        self.dialogue.add_utterance_with_state(event.agent, utterance, state)
+        if self.stateful:
+            # TODO: only works for Sampler for now. cannot do beam search.
+            self.dec_state = output_data['dec_states']
+        else:
+            self.dec_state = None
 
-    def _has_entity(self, tokens):
-        for token in tokens:
-            if is_entity(token):
-                return True
-        return False
+        entity_tokens = self._output_to_tokens(output_data)
 
-    def attach_punct(self, s):
-        s = re.sub(r' ([.,!?;])', r'\1', s)
-        s = re.sub(r'\.{3,}', r'...', s)
-        s = re.sub(r" 's ", r"'s ", s)
-        s = re.sub(r" n't ", r"n't ", s)
-        return s
+        return entity_tokens, output_data
 
-    def send(self):
-        tokens, output_data = self.generate()
-
-        if tokens is None:
-            return None
-        self.dialogue.add_utterance(self.agent, list(tokens))
-        # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
-
+    def _tokens_to_event(self, tokens, output_data):
         if len(tokens) > 1 and tokens[0] == markers.OFFER and is_entity(tokens[1]):
             try:
                 price = self.builder.get_price_number(tokens[1], self.kb)
                 return self.offer({'price': price}, metadata=output_data)
             except ValueError:
-                #return None
+                # return None
                 pass
         tokens = self.builder.entity_to_str(tokens, self.kb)
 
@@ -92,105 +62,63 @@ class NeuralSession(Session):
                 return self.quit(metadata=output_data)
 
         s = self.attach_punct(' '.join(tokens))
-        #print 'send:', s
+        # print 'send:', s
         return self.message(s, metadata=output_data)
 
-    def iter_batches(self):
-        """Compute the logprob of each generated utterance.
-        """
-        self.convert_to_int()
-        batches = self.batcher.create_batch([self.dialogue])
-        yield len(batches)
-        for batch in batches:
-            # TODO: this should be in batcher
-            batch = Batch(batch['encoder_args'],
-                          batch['decoder_args'],
-                          batch['context_data'],
-                          self.env.vocab,
-                          num_context=Dialogue.num_context, cuda=self.env.cuda)
-            yield batch
+    def send(self):
 
-    def iter_batches_critic(self):
-        """
+        # argmax u2
+        best_action = None
+        for act in self.generator.all_actions:
+            tokens, output_data = self.generate(act=list(act))
+            info = self.controller.fake_step(self.agent, self._tokens_to_event(tokens, output_data))
+            self.controller.step_back(self.agent)
 
-        :return:
-        """
-        pass
+            policy = info['policy']
+            state = info['state']
+            self.critic.eval()
+            utility = self.critic(state.squeeze(0).cuda())
 
-class PytorchNeuralSession(NeuralSession):
-    def __init__(self, agent, kb, env):
-        super(PytorchNeuralSession, self).__init__(agent, kb, env)
-        self.vocab = env.vocab
-        self.gt_prefix = env.gt_prefix
+            # Origin policy: p(u2|u1)
+            p = output_data['probability']
+            if len(p) == 3:
+                p = p[1]
+            else:
+                p = p[1]*p[2]
 
-        self.dec_state = None
-        self.stateful = self.env.model.stateful
+            # Multiply with p(u3|u2)*U(u3)
+            p = p * torch.sum(utility.mul(policy.cuda())).item()
+            if (best_action is None) or (p > best_action[1]):
+                best_action = ((tokens, output_data), p)
 
-        self.new_turn = False
-        self.end_turn = False
 
-    def get_decoder_inputs(self):
-        # Don't include EOS
-        utterance = self.dialogue._insert_markers(self.agent, [], True)[:-1]
-        inputs = self.env.textint_map.text_to_int(utterance, 'decoding')
-        inputs = np.array(inputs, dtype=np.int32).reshape([1, -1])
-        return inputs
+        tokens, output_data = best_action[0]
+        print('the best one:', tokens)
 
-    def _create_batch(self):
-        num_context = Dialogue.num_context
+        if tokens is None:
+            return None
+        self.dialogue.add_utterance(self.agent, list(tokens))
+        # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
 
-        # All turns up to now
-        self.convert_to_int()
-        encoder_turns = self.batcher._get_turn_batch_at([self.dialogue], Dialogue.ENC, None)
+        return self._tokens_to_event(tokens, output_data)
 
-        encoder_inputs = self.batcher.get_encoder_inputs(encoder_turns)
-        encoder_context = self.batcher.get_encoder_context(encoder_turns, num_context)
-        encoder_args = {
-                        'inputs': encoder_inputs,
-                        'context': encoder_context
-                    }
-        decoder_args = {
-                        'inputs': self.get_decoder_inputs(),
-                        'context': self.kb_context_batch,
-                        'targets': np.copy(encoder_turns[0]),
-                    }
+    def receive(self, event):
+        if event.action in Event.decorative_events:
+            return
+        # Parse utterance
+        utterance = self.env.preprocessor.process_event(event, self.kb)
+        # print('utterance is:', utterance)
 
-        context_data = {
-                'agents': [self.agent],
-                'kbs': [self.kb],
-                }
+        # Empty message
+        if utterance is None:
+            return
 
-        return Batch(encoder_args, decoder_args, context_data,
-                self.vocab, sort_by_length=False, num_context=num_context, cuda=self.cuda)
+        # print 'receive:', utterance
+        # self.dialogue.add_utterance(event.agent, utterance)
+        # state = event.metadata.copy()
+        state = {'enc_output': event.metadata['enc_output']}
+        utterance_int = self.env.textint_map.text_to_int(utterance)
+        state['action'] = utterance_int[0]
+        self.dialogue.add_utterance_with_state(event.agent, utterance, state)
 
-    def generate(self):
-        if len(self.dialogue.agents) == 0:
-            self.dialogue._add_utterance(1 - self.agent, [])
-            # TODO: Need we add an empty state?
-        batch = self._create_batch()
-
-        enc_state = self.dec_state.hidden if self.dec_state is not None else None
-        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=enc_state)
-
-        if self.stateful:
-            # TODO: only works for Sampler for now. cannot do beam search.
-            self.dec_state = output_data['dec_states']
-        else:
-            self.dec_state = None
-
-        entity_tokens = self._output_to_tokens(output_data)
-
-        return entity_tokens, output_data
-
-    def _is_valid(self, tokens):
-        if not tokens:
-            return False
-        if Vocabulary.UNK in tokens:
-            return False
-        return True
-
-    def _output_to_tokens(self, data):
-        predictions = data["predictions"][0][0]
-        tokens = self.builder.build_target_tokens(predictions, self.kb)
-        return tokens
 

@@ -34,5 +34,9 @@ def get_system(name, args, schema=None, timed=False, model_path=None):
         from .ac_system import PytorchNeuralACSystem
         assert model_path
         return PytorchNeuralACSystem(args, schema, lexicon, model_path, timed)
+    elif name == 'tom':
+        from .tom_system import PytorchNeuralTomSystem
+        assert model_path
+        return PytorchNeuralTomSystem(args, schema, lexicon, model_path, timed)
     else:
         raise ValueError('Unknown system %s' % name)

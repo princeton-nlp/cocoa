@@ -18,7 +18,7 @@ class QNetwork(nn.Module):
         last_size = input_size
         for i, h in enumerate(hidden_size):
             self.hidden_layers.append(nn.Linear(last_size, h))
-            self.hidden_bn.append((nn.BatchNorm1d(h)))
+            self.hidden_bn.append(nn.BatchNorm1d(h))
             last_size = h
 
 
@@ -29,4 +29,21 @@ class QNetwork(nn.Module):
             x = F.relu(self.hidden_bn[i](self.hidden_layers[i](x)))
         return self.output(x)
 
+    def set_eval(self):
+        for i in self.hidden_bn:
+            i.eval()
 
+        for i in self.hidden_layers:
+            i.eval()
+
+        self.output.eval()
+
+    def set_cuda(self):
+
+        for i in self.hidden_bn:
+            i.cuda()
+
+        for i in self.hidden_layers:
+            i.cuda()
+
+        self.output.cuda()

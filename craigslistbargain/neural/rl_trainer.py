@@ -23,9 +23,7 @@ class RLTrainer(Trainer):
 
         self.training_agent = training_agent
         self.model = agents[training_agent].env.model
-        self.critic_model = agents[training_agent].env.critic_model
         self.train_loss = train_loss
-        self.optim = optim
         self.optim = optim
         self.cuda = cuda
 
@@ -34,14 +32,9 @@ class RLTrainer(Trainer):
         self.all_rewards = [[], []]
         self.reward_func = reward_func
 
-    def update_critic(self, reward, model, discount=0.95):
-        model.train()
-
     def update(self, batch_iter, reward, model, discount=0.95):
         model.train()
         model.generator.train()
-        # if self.critic_model is not None:
-        #     self.critic_model.train()
 
         nll = []
         # batch_iter gives a dialogue
@@ -51,9 +44,9 @@ class RLTrainer(Trainer):
                 dec_state = None
             enc_state = dec_state.hidden if dec_state is not None else None
 
-            print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
-            if enc_state is not None:
-                print("state: {}".format(batch, enc_state[0].shape))
+            # print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
+            # if enc_state is not None:
+            #     print("state: {}".format(batch, enc_state[0].shape))
 
             outputs, _, dec_state = self._run_batch(batch, None, enc_state)  # (seq_len, batch_size, rnn_size)
             loss, _ = self.train_loss.compute_loss(batch.targets, outputs)  # (seq_len, batch_size)
@@ -114,33 +107,6 @@ class RLTrainer(Trainer):
         self.model.train()
         return total_stats
 
-    def validate_critic(self, args):
-        split = 'dev'
-        # Set model in validating mode.
-        self.critic_model.eval()
-
-        stats = Statistics()
-
-        num_val_batches = next(valid_iter)
-        dec_state = None
-        for batch in valid_iter:
-            if batch is None:
-                dec_state = None
-                continue
-            elif not self.model.stateful:
-                dec_state = None
-            enc_state = dec_state.hidden if dec_state is not None else None
-
-            outputs, attns, dec_state = self._run_batch(batch, None, enc_state)
-            _, batch_stats = self.valid_loss.compute_loss(batch.targets, outputs)
-            stats.update(batch_stats)
-
-        # Set model back to training mode
-        self.model.train()
-
-        self.critic_model.train()
-        return stats
-
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
         if self.best_valid_reward is None or valid_stats.mean_reward() > self.best_valid_reward:
             self.best_valid_reward = valid_stats.mean_reward()
@@ -187,11 +153,7 @@ class RLTrainer(Trainer):
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
 
-                #if not args.only_run:
                 self.update(batch_iter, s_reward, self.model, discount=args.discount_factor)
-
-                #if
-                self.update_critic(s_reward, self.critic_model, discount=args.discount_factor)
 
             if ((i + 1) % args.report_every) == 0:
                 import seaborn as sns
@@ -213,11 +175,6 @@ class RLTrainer(Trainer):
             # Save model
             if (i > 0 and i % 100 == 0) and not args.only_run:
                 valid_stats = self.validate(args)
-                self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
-
-            # TODO: Save critic model
-            if (i > 0 and i % 100 == 0) and not args.only_run:
-                valid_stats = self.validate_critic(args)
                 self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
 
 

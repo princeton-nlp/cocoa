@@ -144,7 +144,7 @@ class Dialogue(object):
         self.states.append(state)
         self.add_utterance(agent,utterance, lf)
 
-    def delete_last_utterance(self, agent, utterance=None, delete_state=True):
+    def delete_last_utterance(self, delete_state=True):
         if delete_state:
             self.states = self.states[:-1]
 
@@ -202,6 +202,9 @@ class Dialogue(object):
             new_turn = False
         else:
             new_turn = True
+
+        if not new_turn:
+            print('FUck')
 
         utterance = self._insert_markers(agent, utterance, new_turn)
         entities = [x if is_entity(x) else None for x in utterance]

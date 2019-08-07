@@ -9,6 +9,29 @@ class Controller(BaseController):
         self.outcomes = [None, None]
         self.quit = False
 
+    def fake_step(self, agent, event):
+        '''
+               Simulate a dialogue.
+        '''
+        session = self.sessions[agent]
+        # event = session.send()
+        time = self.time_tmp
+        if not event:
+            print('Error: Event')
+            return
+        event.time = time + 1
+
+        for partner, other_session in enumerate(self.sessions):
+            if agent != partner:
+                other_session.receive(event)
+                info_back = other_session.send(is_fake=True)
+                return info_back
+
+    def step_back(self, agent):
+        for partner, other_session in enumerate(self.sessions):
+            if agent != partner:
+                other_session.step_back()
+
     def event_callback(self, event):
         if event.action == 'offer':
             self.offers[event.agent] = event.data

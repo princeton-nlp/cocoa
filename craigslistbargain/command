@@ -1,0 +1,52 @@
+PYTHONPATH=. python tom.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/normal_lf2lf-balance/model_best.pt checkpoint/normal_lf2lf/model_best.pt \
+--critic-path checkpoint/normal_lf2lf-ac \
+--optim adagrad --learning-rate 0.05 \
+--agents tom pt-neural \
+--report-every 100 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance
+
+
+mkdir checkpoint/lf2lf-ac;
+PYTHONPATH=. python critic.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/lf2lf-balance/model_best.pt checkpoint/lf2lf/model_best.pt \
+--model-path checkpoint/normal_lf2lf-ac \
+--optim adagrad --learning-rate 0.05 \
+--agents ac ac \
+--report-every 100 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance
+
+mkdir -p mappings/lf2lf;
+mkdir -p cache/lf2lf;
+mkdir -p checkpoint/lf2lf;
+PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-examples-paths data/train-luis-post.json --test-examples-paths data/dev-luis-post.json \
+--price-tracker data/price_tracker.pkl \
+--model lf2lf \
+--model-path checkpoint/lf2lf --mappings mappings/lf2lf \
+--word-vec-size 300 --pretrained-wordvec '' '' \
+--rnn-size 300 --rnn-type LSTM --global-attention multibank_general \
+--num-context 2 --stateful \
+--batch-size 128 --gpuid 0 --optim adagrad --learning-rate 0.01 \
+--epochs 15 --report-every 500 \
+--cache cache/lf2lf --ignore-cache \
+--verbose
+
+
+mkdir checkpoint/lf2lf-balance;
+PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/lf2lf/model_best.pt checkpoint/lf2lf/model_best.pt \
+--model-path checkpoint/lf2lf-balance \
+--optim adagrad --learning-rate 0.001 \
+--agents pt-neural pt-neural \
+--report-every 500 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance
+

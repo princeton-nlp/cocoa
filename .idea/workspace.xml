@@ -2,45 +2,22 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/critic.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/critic_trainer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/qnetwork.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/systems/ac_system.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/tom.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/cocoa.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/cocoa.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/systems/tom_system.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/analysis/analyzer.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/analysis/analyzer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/analysis/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/analysis/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cocoa/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/model/manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/model/manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/model/ngram.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/model/ngram.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cocoa/core/dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/dataset.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cocoa/model/vocab.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/model/vocab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/neural/generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/neural/generator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/sessions/rulebased_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/sessions/rulebased_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/systems/rulebased_system.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/systems/rulebased_system.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/analysis/dialogue.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/analysis/dialogue.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/core/kb.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/core/kb.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/core/price_tracker.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/core/price_tracker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/batcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/batcher.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/core/controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/model_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/model_builder.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/preprocess.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/qnetwork.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/qnetwork.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/rl_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_trainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/options.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/options.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/reinforce.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/reinforce.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/cmd_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/cmd_session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/rulebased_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/rulebased_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/systems/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/systems/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mutualfriends/model/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/mutualfriends/model/preprocess.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/onmt/translate/Beam.py" beforeDir="false" afterPath="$PROJECT_DIR$/onmt/translate/Beam.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/generate_dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/generate_dataset.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/tom.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/tom.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -72,7 +49,7 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="SearchEverywhereHistoryKey" value="xrange&#9;null&#9;null" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/sessions" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/neural" />
     <property name="settings.editor.selected.configurable" value="terminal" />
   </component>
   <component name="RecentsManager">

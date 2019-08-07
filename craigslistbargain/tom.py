@@ -36,7 +36,13 @@ if __name__ == '__main__':
     parser.add_argument('--agent-checkpoints', nargs='+', help='Directory to learned models')
     parser.add_argument('--random-seed', help='Random seed', type=int, default=1)
     parser.add_argument('--verbose', default=False, action='store_true', help='Whether or not to have verbose prints')
+
+    parser.add_argument('--histogram', default=False, action='store_true', help='Whether or not to show histogram of policies')
     parser.add_argument('--valid-scenarios-path', help='Output path for the validation scenarios')
+
+    parser.add_argument('--only-run', default=False, action='store_true', help='only sample trajectories.')
+    parser.add_argument('--critic-path', default=None, help='Output path for the critic Model')
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_system_arguments(parser)
     options.add_rl_arguments(parser)
@@ -57,9 +63,11 @@ if __name__ == '__main__':
     rl_agent = 0
     system = systems[rl_agent]
     model = system.env.model
+    critic_model = system.env.critic_model
     loss = make_loss(args, model, system.mappings['tgt_vocab'])
     optim = build_optim(args, model, None)
+    # critic_optim = build_optim(args, critic_model, None)
 
     scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
-    trainer = TomTrainer(systems, scenarios, loss, optim, rl_agent, reward_func=args.reward)
+    trainer = TomTrainer(systems, scenarios, loss, rl_agent, reward_func=args.reward, cuda=(len(args.gpuid) > 0))
     trainer.learn(args)

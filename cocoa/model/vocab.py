@@ -4,7 +4,9 @@ from collections import Counter
 
 class Vocabulary(object):
 
-    UNK = '<unk>'
+    # UNK = '<unk>'
+    # TODO: Pay attenaion! We used luis data, so change the unkown marker.
+    UNK = 'unknown'
 
     def __init__(self, offset=0, unk=True, max_bound=3, mini_step=0.01):
         self.word_to_ind = {}

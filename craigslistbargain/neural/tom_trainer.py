@@ -17,54 +17,24 @@ from .utterance import UtteranceBuilder
 
 
 class TomTrainer(Trainer):
-    def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin'):
+    def __init__(self, agents, scenarios, train_loss, training_agent=0, reward_func='margin', cuda=False):
         self.agents = agents
         self.scenarios = scenarios
 
         self.training_agent = training_agent
         self.model = agents[training_agent].env.model
+        self.critic_model = agents[training_agent].env.critic_model
         self.train_loss = train_loss
-        self.optim = optim
-        self.cuda = False
+        self.cuda = cuda
 
         self.best_valid_reward = None
 
         self.all_rewards = [[], []]
         self.reward_func = reward_func
-
-    def update(self, batch_iter, reward, model, discount=0.95):
-        model.train()
-        model.generator.train()
-
-        nll = []
-        # batch_iter gives a dialogue
-        dec_state = None
-        for batch in batch_iter:
-            if not model.stateful:
-                dec_state = None
-            enc_state = dec_state.hidden if dec_state is not None else None
-
-            outputs, _, dec_state = self._run_batch(batch, None, enc_state)  # (seq_len, batch_size, rnn_size)
-            loss, _ = self.train_loss.compute_loss(batch.targets, outputs)  # (seq_len, batch_size)
-            nll.append(loss)
-
-            # Don't backprop fully.
-            if dec_state is not None:
-                dec_state.detach()
-
-        nll = torch.cat(nll)  # (total_seq_len, batch_size)
-
-        rewards = [Variable(torch.zeros(1, 1).fill_(reward))]
-        for i in range(1, nll.size(0)):
-            rewards.append(rewards[-1] * discount)
-        rewards = rewards[::-1]
-        rewards = torch.cat(rewards)
-
-        loss = nll.squeeze().dot(rewards.squeeze().cuda())
-        model.zero_grad()
-        loss.backward()
-        nn.utils.clip_grad_norm(model.parameters(), 1.)
-        self.optim.step()
+        self.model.eval()
+        self.model.generator.eval()
+        self.critic_model.eval()
+        self.critic_model.set_eval()
 
     def _get_scenario(self, scenario_id=None, split='train'):
         scenarios = self.scenarios[split]
@@ -90,13 +60,14 @@ class TomTrainer(Trainer):
         print('='*20, 'VALIDATION', '='*20)
         for scenario in self.scenarios[split][:200]:
             controller = self._get_controller(scenario, split=split)
+            # Training_agent is the ToM model
+            controller.sessions[self.training_agent].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
             session = controller.sessions[self.training_agent]
             reward = self.get_reward(example, session)
             stats = Statistics(reward=reward)
             total_stats.update(stats)
         print('='*20, 'END VALIDATION', '='*20)
-        self.model.train()
         return total_stats
 
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
@@ -118,15 +89,20 @@ class TomTrainer(Trainer):
         return path
 
     def learn(self, args):
+        rewards = [None]*2
+        s_rewards = [None]*2
+
         for i in range(args.num_dialogues):
             # Rollout
             scenario = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
+            # Training_agent is the ToM model
+            controller.sessions[self.training_agent].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
 
             for session_id, session in enumerate(controller.sessions):
                 # Only train one agent
-                if session_id != self.training_agent:
+                if args.only_run != True and session_id != self.training_agent:
                     continue
 
                 # Compute reward
@@ -134,21 +110,37 @@ class TomTrainer(Trainer):
                 # Standardize the reward
                 all_rewards = self.all_rewards[session_id]
                 all_rewards.append(reward)
-                reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
+                s_reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
 
-                if((i+1) % args.report_every)==0:
-                    print('step:', i)
-                    print('reward:', reward)
-                    print('scaled reward:', reward)
-                    print('mean reward:', np.mean(all_rewards))
+                rewards[session_id] = reward
+                s_rewards[session_id] = s_reward
 
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
-                self.update(batch_iter, reward, self.model, discount=args.discount_factor)
 
-            if i > 0 and i % 100 == 0:
+            if ((i + 1) % args.report_every) == 0:
+                import seaborn as sns
+                import matplotlib.pyplot as plt
+                if args.histogram:
+                    sns.set_style('darkgrid')
+                for j in range(2):
+                    print('agent={}'.format(j), end=' ')
+                    print('step:', i, end=' ')
+                    print('reward:', rewards[j], end=' ')
+                    print('scaled reward:', s_rewards[j], end=' ')
+                    print('mean reward:', np.mean(self.all_rewards[j]))
+                    if args.histogram:
+                        self.agents[j].env.dialogue_generator.get_policyHistogram()
+                print('-'*10)
+                if args.histogram:
+                    plt.show()
+
+            # Valid test
+            if (i > 0 and i % 100 == 0):
                 valid_stats = self.validate(args)
-                self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
+                print('valid result:{}'.format(valid_stats))
+
+
 
     def _is_valid_dialogue(self, example):
         special_actions = defaultdict(int)

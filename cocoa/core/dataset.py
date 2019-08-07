@@ -118,6 +118,7 @@ def read_examples(paths, max_examples, Scenario):
             if not (max_examples is None) and max_examples >= 0 and len(examples) >= max_examples:
                 break
             examples.append(Example.from_dict(raw, Scenario))
+            # print('actions: ', [i.data for i in examples[-1].events])
     return examples
 
 def read_dataset(args, Scenario):

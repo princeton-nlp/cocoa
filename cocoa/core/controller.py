@@ -24,6 +24,8 @@ class Controller(object):
         self.allow_cross_talk = allow_cross_talk
         self.session_status = {agent: 'received' for agent, _ in enumerate(self.sessions)}
 
+        self.time_tmp = 0
+
     def describe_scenario(self):
         #print('='*50)
         for session in self.sessions:
@@ -60,12 +62,14 @@ class Controller(object):
             for agent, session in enumerate(self.sessions):
                 if num_turns == 0 and agent != first_speaker:
                     continue
+                self.time_tmp = time
                 event = session.send()
                 time += 1
                 if not event:
                     continue
 
                 event.time = time
+                print('[{}]: {}'.format(agent, event.action))
                 self.event_callback(event)
                 self.events.append(event)
 
@@ -94,7 +98,6 @@ class Controller(object):
         agent_names = {'0': self.session_names[0], '1': self.session_names[1]}
         return Example(self.scenario, uuid, self.events, outcome, uuid, agent_names)
 
-    def 
 
     def step(self, backend=None):
         '''

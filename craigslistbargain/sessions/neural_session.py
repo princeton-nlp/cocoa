@@ -37,6 +37,7 @@ class NeuralSession(Session):
     def receive(self, event):
         if event.action in Event.decorative_events:
             return
+        # print(event.data)
         # Parse utterance
         utterance = self.env.preprocessor.process_event(event, self.kb)
         # print('utterance is:', utterance)
@@ -49,6 +50,7 @@ class NeuralSession(Session):
         # self.dialogue.add_utterance(event.agent, utterance)
         # state = event.metadata.copy()
         state = {'enc_output': event.metadata['enc_output']}
+
         utterance_int = self.env.textint_map.text_to_int(utterance)
         state['action'] = utterance_int[0]
         self.dialogue.add_utterance_with_state(event.agent, utterance, state)
@@ -66,8 +68,11 @@ class NeuralSession(Session):
         s = re.sub(r" n't ", r"n't ", s)
         return s
 
-    def send(self):
-        tokens, output_data = self.generate()
+    def send(self, is_fake=False):
+        tokens, output_data = self.generate(is_fake)
+
+        if is_fake:
+            return {'policy': output_data['policies'][1], 'state': output_data['enc_output']}
 
         if tokens is None:
             return None
@@ -95,6 +100,10 @@ class NeuralSession(Session):
         #print 'send:', s
         return self.message(s, metadata=output_data)
 
+    def step_back(self):
+        # Delete utterance from receive
+        self.dialogue.delete_last_utterance(delete_state=True)
+
     def iter_batches(self):
         """Compute the logprob of each generated utterance.
         """
@@ -110,12 +119,6 @@ class NeuralSession(Session):
                           num_context=Dialogue.num_context, cuda=self.env.cuda)
             yield batch
 
-    def iter_batches_critic(self):
-        """
-
-        :return:
-        """
-        pass
 
 class PytorchNeuralSession(NeuralSession):
     def __init__(self, agent, kb, env):
@@ -163,14 +166,14 @@ class PytorchNeuralSession(NeuralSession):
         return Batch(encoder_args, decoder_args, context_data,
                 self.vocab, sort_by_length=False, num_context=num_context, cuda=self.cuda)
 
-    def generate(self):
+    def generate(self, is_fake=False):
         if len(self.dialogue.agents) == 0:
             self.dialogue._add_utterance(1 - self.agent, [])
             # TODO: Need we add an empty state?
         batch = self._create_batch()
 
         enc_state = self.dec_state.hidden if self.dec_state is not None else None
-        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=enc_state)
+        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=enc_state, whole_policy=is_fake)
 
         if self.stateful:
             # TODO: only works for Sampler for now. cannot do beam search.
