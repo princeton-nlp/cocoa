@@ -61,6 +61,9 @@ def make_model_mappings(model, mappings):
         mappings['tgt_vocab'] = mappings['lf_vocab']
     else:
         mappings['tgt_vocab'] = mappings['utterance_vocab']
+    print(mappings['src_vocab'].word_to_ind)
+    print('\n\n------------------------------\n\n')
+    print(mappings['lf_vocab'].word_to_ind)
     return mappings
 
 def build_optim(opt, model, checkpoint):

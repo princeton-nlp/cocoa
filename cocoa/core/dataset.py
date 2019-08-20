@@ -69,6 +69,12 @@ class Example(object):
             'agents_info': self.agents_info,
         }
 
+    def to_text(self):
+        ret = []
+        for i, e in enumerate(self.events):
+            ret.append("[{}: {}]\t{}\t{}".format(e.time, e.agent, e.action, e.data))
+        return ret
+
 class Dataset(object):
     '''
     A dataset consists of a list of train and test examples.

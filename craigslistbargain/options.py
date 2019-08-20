@@ -25,8 +25,10 @@ def add_data_generator_arguments(parser):
 def add_model_arguments(parser):
     from onmt.modules.SRU import CheckSRU
     group = parser.add_argument_group('Model')
-    group.add_argument('--word-vec-size', type=int, default=300,
+    group.add_argument('--word-vec-size', type=int, default=64,
                        help='Word embedding size for src and tgt.')
+    group.add_argument('--hidden-size', type=int, default=64,
+                       help='Hidden layer size for src and tgt.')
     group.add_argument('--share-decoder-embeddings', action='store_true',
                        help="""Use a shared weight matrix for the input and
                        output word  embeddings in the decoder.""")

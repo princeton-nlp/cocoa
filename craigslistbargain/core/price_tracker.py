@@ -49,8 +49,11 @@ class PriceScaler(object):
 
         if role == 'seller':
             b = t * 0.7
+            # print('[Role: {}]\ttarget: {},\tbottom {}'.format(role, t, b))
         else:
             b = kb.facts['item']['Price']
+            # print('[Role: {}]\tbottom {},\ttarget: {}\tratio:{}'.format(role, b, t, 1.*t/b))
+
 
         return b, t
 
@@ -85,7 +88,7 @@ class PriceScaler(object):
         p = w * p + c
         # Discretize to two digits
         #p = float('{:.2f}'.format(p))
-        p = PriceList.getPriceList().get_round(p)
+        # p = PriceList.getPriceList().get_round(p)
         # print("scale_result:{}".format(p))
         return p
 
@@ -107,13 +110,12 @@ class PriceTracker(object):
     @classmethod
     def get_price(cls, token):
         # print('token', token)
-        try:
+        if isinstance(token, Entity):
             return token.canonical.value
-        except:
-            try:
-                return token.value
-            except:
-                return None
+        elif isinstance(token, CanonicalEntity):
+            return token.value
+        else:
+            return None
 
     @classmethod
     def process_string(cls, token):

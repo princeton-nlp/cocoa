@@ -8,18 +8,22 @@ class Vocabulary(object):
     # TODO: Pay attenaion! We used luis data, so change the unkown marker.
     UNK = 'unknown'
 
-    def __init__(self, offset=0, unk=True, max_bound=3, mini_step=0.01):
+    def __init__(self, offset=0, unk=True, max_bound=3, mini_step=0.01, discrete_price=False, except_words=[]):
         self.word_to_ind = {}
         self.ind_to_word = {}
         self.word_count = Counter()
         self.size = 0
         self.offset = offset
         self.special_words = set()
-        if unk:
-            self.add_word(self.UNK, special=True)
         self.finished = False
 
-        self._init_prices()
+        self.discrete_price = discrete_price
+        self.except_words = except_words
+        if discrete_price:
+            self._init_prices()
+
+        if unk:
+            self.add_word(self.UNK, special=True)
 
     def _init_prices(self):
         from core.price_tracker import PriceList
@@ -38,6 +42,13 @@ class Vocabulary(object):
         return word in self.word_to_ind
 
     def add_word(self, word, special=False):
+        from cocoa.core.entity import Entity, CanonicalEntity
+        if word in self.except_words:
+            return
+
+        if (isinstance(word, Entity) or isinstance(word, CanonicalEntity))and not self.discrete_price:
+            return
+
         self.word_count[word] += 1
         if special:
             print('add', word)
@@ -64,6 +75,18 @@ class Vocabulary(object):
         self.finished = True
 
     def to_ind(self, word):
+        from cocoa.core.entity import Entity, CanonicalEntity
+        if word is None:
+            return word
+
+        if not self.discrete_price and isinstance(word, Entity):
+            # Use float value as price
+            return word.canonical.value
+
+        if not self.discrete_price and isinstance(word, CanonicalEntity):
+            # Use float value as price
+            return word.value
+
         if word in self.word_to_ind:
             return self.word_to_ind[word]
         else:
@@ -74,7 +97,11 @@ class Vocabulary(object):
                 raise KeyError(str(word))
 
     def to_word(self, ind):
-        return self.ind_to_word[ind]
+        if isinstance(ind, int):
+            return self.ind_to_word[ind]
+        else:
+            from cocoa.core.entity import CanonicalEntity
+            return CanonicalEntity(value=ind, type='price')
 
     def dump(self):
         for i, w in enumerate(self.ind_to_word):

@@ -16,8 +16,8 @@ PYTHONPATH=. python critic.py --schema-path data/craigslist-schema.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/lf2lf-balance/model_best.pt checkpoint/lf2lf/model_best.pt \
---model-path checkpoint/normal_lf2lf-ac \
---optim adagrad --learning-rate 0.05 \
+--model-path checkpoint/lf2lf-ac \
+--optim adagrad --learning-rate 0.08 \
 --agents ac ac \
 --report-every 100 --max-turns 20 --num-dialogues 5000 \
 --sample --temperature 0.5 --max-length 20 --reward balance

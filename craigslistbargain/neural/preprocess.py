@@ -14,7 +14,7 @@ from cocoa.model.vocab import Vocabulary
 
 from core.price_tracker import PriceTracker, PriceScaler
 from core.tokenizer import tokenize
-from .batcher import DialogueBatcherFactory, Batch
+from .batcher_rl import DialogueBatcherFactory, Batch
 from .symbols import markers
 from .vocab_builder import create_mappings
 from neural import make_model_mappings
@@ -72,6 +72,7 @@ class TextIntMap(object):
         toks = [self.vocab.to_word(ind) for ind in inds]
         if prices is not None:
             assert len(inds) == len(prices)
+            # TODO: Why do we use CanonicalEntity here?
             toks = [CanonicalEntity(value=p, type='price') if price_filler(x) else x for x, p in zip(toks, prices)]
         return toks
 
@@ -134,10 +135,26 @@ class Dialogue(object):
     def num_tokens(self):
         return sum([len(t) for t in self.token_turns])
 
+    def process_lf(self, utterance):
+        lf = self.textint_map.text_to_int(utterance)
+        intent = lf[0]
+        if (len(lf) > 1):
+            price = lf[1]
+        else:
+            price = None
+        return {'intent': intent, 'price': price}
+
     def add_utterance(self, agent, utterance, lf=None):
         # Always start from the partner agent
         if len(self.agents) == 0 and agent == self.agent:
             self._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
+        # Try to process lf from utterance
+        if lf is None:
+            lf = self.process_lf(utterance)
+        if lf is []:
+            print('[] case: ', utterance, lf)
+            assert True
+        # print("lf {}".format(lf))
         self._add_utterance(agent, utterance, lf=lf)
 
     def add_utterance_with_state(self, agent, utterance, state, lf=None):
@@ -203,15 +220,21 @@ class Dialogue(object):
         else:
             new_turn = True
 
-        if not new_turn:
-            print('FUck')
+        # if not new_turn:
+        #     print('FUck')
 
         utterance = self._insert_markers(agent, utterance, new_turn)
         entities = [x if is_entity(x) else None for x in utterance]
+        for e in entities:
+            if e is not None:
+                if isinstance(e, CanonicalEntity):
+                    print(type(e))
+                #print(type(e))
         if lf:
-            lf = self._insert_markers(agent, self.lf_to_tokens(self.kb, lf), new_turn)
+            pass
         else:
-            lf = []
+            print('error-lf: ', lf)
+        assert lf
 
         if new_turn:
             self.agents.append(agent)
@@ -235,7 +258,10 @@ class Dialogue(object):
         self.lf_token_turns = []
         for i, lf in enumerate(self.lfs):
             self.lf_token_turns.append(lf)
-            self.lfs[i] = map(self.mappings['lf_vocab'].to_ind, lf)
+            tmp_lf = {}
+            for k in lf:
+                tmp_lf[k] = self.mappings['lf_vocab'].to_ind(lf[k])
+            self.lfs[i] = tmp_lf
 
     def convert_to_int(self):
         if self.is_int:
@@ -274,7 +300,7 @@ class Dialogue(object):
         self.roles = self._pad_list(self.roles, num_turns, None)
         for turns in self.turns:
             self._pad_list(turns, num_turns, [])
-        self.lfs = self._pad_list(self.lfs, num_turns, [])
+        self.lfs = self._pad_list(self.lfs, num_turns, {'intent': self.mappings['lf_vocab'].to_ind(markers.PAD), 'price': None})
 
     def get_price_turns(self, pad):
         '''
@@ -344,6 +370,7 @@ class Preprocessor(object):
             return [self.get_entity_form(x, self.entity_forms[stage]) if is_entity(x) else x for x in summary]
 
     def lf_to_tokens(self, kb, lf):
+        lf = lf.copy()
         intent = lf['intent']
         if intent == 'accept':
             intent = markers.ACCEPT
@@ -357,8 +384,10 @@ class Preprocessor(object):
         if lf.get('price') is not None:
             p = lf['price']
             price = Entity.from_elements(surface=p, value=p, type='price')
-            tokens.append(PriceScaler.scale_price(kb, price))
-        return tokens
+            price = PriceScaler.scale_price(kb, price)
+            tokens.append(price)
+            lf['price'] = price
+        return tokens, lf
 
     def _process_example(self, ex):
         '''
@@ -372,11 +401,12 @@ class Preprocessor(object):
                 if self.model in ('lf2lf',):
                     lf = e.metadata
                     assert lf is not None
-                    utterance = self.lf_to_tokens(dialogue.kb, lf)
+                    utterance, lf = self.lf_to_tokens(dialogue.kb, lf)
                 else:
+                    lf = e.metadata
                     utterance = self.process_event(e, dialogue.kb)
                 if utterance:
-                    dialogue.add_utterance(e.agent, utterance, lf=e.metadata)
+                    dialogue.add_utterance(e.agent, utterance, lf=lf)
             yield dialogue
 
     @classmethod
@@ -461,8 +491,8 @@ class DataGenerator(object):
 
         self.mappings = self.load_mappings(model, mappings_path, schema, preprocessor)
         self.textint_map = TextIntMap(self.mappings['utterance_vocab'], preprocessor)
-        if model == 'tom':
-            self.lfint_map = TextIntMap(self.mappings['lf_vocab'], preprocessor)
+        # if model == 'tom':
+        self.lfint_map = TextIntMap(self.mappings['lf_vocab'], preprocessor)
 
         Dialogue.mappings = self.mappings
         Dialogue.textint_map = self.textint_map

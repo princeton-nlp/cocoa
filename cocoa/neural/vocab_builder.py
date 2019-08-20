@@ -12,8 +12,8 @@ def get_entity_form(entity, form):
     else:
         raise ValueError('Unknown entity form %s' % form)
 
-def build_utterance_vocab(dialogues, special_symbols=[], entity_forms=[]):
-    vocab = Vocabulary(offset=0, unk=True)
+def build_utterance_vocab(dialogues, special_symbols=[], entity_forms=[], except_words=[]):
+    vocab = Vocabulary(offset=0, unk=True, except_words=except_words)
 
     def _add_entity(entity):
         for entity_form in entity_forms:

@@ -2,22 +2,30 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/systems/tom_system.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/batcher_rl.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_model_builder.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/sl_trainer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/train_sl.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cocoa/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/controller.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cocoa/core/dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/dataset.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/cocoa/model/vocab.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/model/vocab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/core/controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cocoa/neural/vocab_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/neural/vocab_builder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/command" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/command" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/core/price_tracker.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/core/price_tracker.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/batcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/batcher.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/models.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/preprocess.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/qnetwork.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/qnetwork.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/rl_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_trainer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/vocab_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/vocab_builder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/options.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/options.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/systems/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/systems/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/tom.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/tom.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/onmt/Trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/onmt/Trainer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/onmt/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/onmt/__init__.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -49,16 +57,19 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="SearchEverywhereHistoryKey" value="xrange&#9;null&#9;null" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/neural" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/onmt" />
     <property name="settings.editor.selected.configurable" value="terminal" />
   </component>
   <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/craigslistbargain/neural" />
+    </key>
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/craigslistbargain/onmt" />
       <recent name="$PROJECT_DIR$/craigslistbargain/neural" />
       <recent name="$PROJECT_DIR$/craigslistbargain" />
       <recent name="$PROJECT_DIR$/craigslistbargain/systems" />
       <recent name="$PROJECT_DIR$/mutualfriends/systems" />
-      <recent name="$PROJECT_DIR$/cocoa/neural" />
     </key>
   </component>
   <component name="RunDashboard">

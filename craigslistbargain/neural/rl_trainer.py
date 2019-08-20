@@ -155,6 +155,13 @@ class RLTrainer(Trainer):
 
                 self.update(batch_iter, s_reward, self.model, discount=args.discount_factor)
 
+            if args.verbose:
+                strs = example.to_text()
+                for str in strs:
+                    print(str)
+                print("reward: [0]{} [1]{}".format(self.all_rewards[0][-1], self.all_rewards[1][-1]))
+                # print("Standard reward: [0]{} [1]{}".format(s_rewards[0], s_rewards[1]))
+
             if ((i + 1) % args.report_every) == 0:
                 import seaborn as sns
                 import matplotlib.pyplot as plt

@@ -69,16 +69,19 @@ class Controller(object):
                     continue
 
                 event.time = time
-                print('[{}]: {}'.format(agent, event.action))
+                # print('[{}]: {}'.format(agent, event.action))
                 self.event_callback(event)
                 self.events.append(event)
 
-                if verbose:
-                    print('agent=%s: session=%s, event=%s' % (agent, type(session).__name__, event.to_dict()))
-                else:
-                    action = event.action
-                    data = event.data
-                    event_output = data if action == 'message' else "Action: {0}, Data: {1}".format(action, data)
+                # if verbose:
+                #     event_tmp = event.to_dict()
+                #     #event_tmp.pop('enc_output')
+                #     event_tmp['metadata'] = None
+                #     print('agent=%s: session=%s, event=%s' % (agent, type(session).__name__, event_tmp))
+                # else:
+                #     action = event.action
+                #     data = event.data
+                #     event_output = data if action == 'message' else "Action: {0}, Data: {1}".format(action, data)
                     # print('agent=%s, event=%s' % (agent, event_output))
                 num_turns += 1
                 if self.game_over() or (max_turns and num_turns >= max_turns):

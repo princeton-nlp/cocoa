@@ -79,6 +79,14 @@ class NeuralSession(Session):
         self.dialogue.add_utterance(self.agent, list(tokens))
         # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
 
+        # if self.agent == 0 :
+        #     try:
+        #         tokens = [0, 0]
+        #         tokens[0] = markers.OFFER
+        #         tokens[1] = '$60'
+        #     except ValueError:
+        #         #return None
+        #         pass
         if len(tokens) > 1 and tokens[0] == markers.OFFER and is_entity(tokens[1]):
             try:
                 price = self.builder.get_price_number(tokens[1], self.kb)
@@ -175,11 +183,6 @@ class PytorchNeuralSession(NeuralSession):
         enc_state = self.dec_state.hidden if self.dec_state is not None else None
         output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=enc_state, whole_policy=is_fake)
 
-        if self.stateful:
-            # TODO: only works for Sampler for now. cannot do beam search.
-            self.dec_state = output_data['dec_states']
-        else:
-            self.dec_state = None
 
         entity_tokens = self._output_to_tokens(output_data)
 
@@ -193,7 +196,7 @@ class PytorchNeuralSession(NeuralSession):
         return True
 
     def _output_to_tokens(self, data):
-        predictions = data["predictions"][0][0]
+        predictions = [data["intent"][0][0], data['price'][0][0]]
         tokens = self.builder.build_target_tokens(predictions, self.kb)
         return tokens
 

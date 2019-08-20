@@ -69,6 +69,8 @@ class PytorchNeuralTomSession(PytorchNeuralSession):
 
         # argmax u2
         best_action = None
+        history = []
+        us = {}
         for act in self.generator.all_actions:
             tokens, output_data = self.generate(act=list(act))
             info = self.controller.fake_step(self.agent, self._tokens_to_event(tokens, output_data))
@@ -86,13 +88,26 @@ class PytorchNeuralTomSession(PytorchNeuralSession):
             else:
                 p = p[1]*p[2]
 
+
+
             # Multiply with p(u3|u2)*U(u3)
-            p = p * torch.sum(utility.mul(policy.cuda())).item()
+            u = torch.min(utility.mul(policy.cuda())).item()
+            if not (tokens[0] in us.keys()):
+                us[tokens[0]] = []
+            us[tokens[0]].append(u)
+
+            history.append((tokens, p*u, u, p, output_data['probability']))
+
+            p = p * u
             if (best_action is None) or (p > best_action[1]):
                 best_action = ((tokens, output_data), p)
 
 
         tokens, output_data = best_action[0]
+        # for h in history:
+        #     print(h)
+        # for k in us:
+        #     print('{}:\t{}'.format(k, np.mean(us[k])))
         print('the best one:', tokens)
 
         if tokens is None:

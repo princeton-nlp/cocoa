@@ -19,9 +19,9 @@ import onmt
 from onmt.Utils import use_gpu
 
 from neural import get_data_generator, make_model_mappings
-from neural import rl_model_builder as model_builder
+from neural import model_builder
 from neural.utterance import UtteranceBuilder
-from neural.sl_trainer import SLTrainer
+from neural.trainer import Trainer
 import options
 
 def build_model(model_opt, opt, mappings, checkpoint):
@@ -61,9 +61,9 @@ def build_optim(opt, model, checkpoint):
     return optim
 
 def build_trainer(opt, model, vocab, optim):
-    # train_loss = make_loss(opt, model, vocab)
-    # valid_loss = make_loss(opt, model, vocab)
-    trainer = SLTrainer(model, None, None, optim)
+    train_loss = make_loss(opt, model, vocab)
+    valid_loss = make_loss(opt, model, vocab)
+    trainer = Trainer(model, train_loss, valid_loss, optim)
     return trainer
 
 def make_loss(opt, model, tgt_vocab):
