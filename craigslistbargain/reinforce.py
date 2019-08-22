@@ -62,7 +62,7 @@ if __name__ == '__main__':
     rl_agent = 0
     system = systems[rl_agent]
     model = system.env.model
-    loss = make_loss(args, model, system.mappings['tgt_vocab'])
+    loss = None
     optim = build_optim(args, model, None)
 
     scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}

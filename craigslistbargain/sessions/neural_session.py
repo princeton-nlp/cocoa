@@ -10,7 +10,7 @@ from cocoa.core.entity import is_entity, Entity
 from core.event import Event
 from .session import Session
 from neural.preprocess import markers, Dialogue
-from neural.batcher import Batch
+from neural.batcher_rl import Batch
 
 class NeuralSession(Session):
     def __init__(self, agent, kb, env):
@@ -132,10 +132,6 @@ class PytorchNeuralSession(NeuralSession):
     def __init__(self, agent, kb, env):
         super(PytorchNeuralSession, self).__init__(agent, kb, env)
         self.vocab = env.vocab
-        self.gt_prefix = env.gt_prefix
-
-        self.dec_state = None
-        self.stateful = self.env.model.stateful
 
         self.new_turn = False
         self.end_turn = False
@@ -152,18 +148,21 @@ class PytorchNeuralSession(NeuralSession):
 
         # All turns up to now
         self.convert_to_int()
-        encoder_turns = self.batcher._get_turn_batch_at([self.dialogue], Dialogue.ENC, None)
+        encoder_turns = self.batcher._get_turn_batch_at([self.dialogue], Dialogue.ENC, -1)
 
         encoder_inputs = self.batcher.get_encoder_inputs(encoder_turns)
         encoder_context = self.batcher.get_encoder_context(encoder_turns, num_context)
         encoder_args = {
-                        'inputs': encoder_inputs,
+                        'intent': encoder_inputs[0],
+                        'price': encoder_inputs[1],
+                        'price_mask': encoder_inputs[2],
                         'context': encoder_context
                     }
         decoder_args = {
-                        'inputs': self.get_decoder_inputs(),
+                        'intent': None,
+                        'price': None,
+                        'price_mask': None,
                         'context': self.kb_context_batch,
-                        'targets': np.copy(encoder_turns[0]),
                     }
 
         context_data = {
@@ -172,17 +171,15 @@ class PytorchNeuralSession(NeuralSession):
                 }
 
         return Batch(encoder_args, decoder_args, context_data,
-                self.vocab, sort_by_length=False, num_context=num_context, cuda=self.cuda)
+                self.vocab, num_context=num_context, cuda=self.cuda)
 
     def generate(self, is_fake=False):
         if len(self.dialogue.agents) == 0:
-            self.dialogue._add_utterance(1 - self.agent, [])
+            self.dialogue._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
             # TODO: Need we add an empty state?
         batch = self._create_batch()
 
-        enc_state = self.dec_state.hidden if self.dec_state is not None else None
-        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=enc_state, whole_policy=is_fake)
-
+        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=None, whole_policy=is_fake)
 
         entity_tokens = self._output_to_tokens(output_data)
 

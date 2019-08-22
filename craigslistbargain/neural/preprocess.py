@@ -102,6 +102,7 @@ class Dialogue(object):
         # token_turns: tokens and entitys (output of entity linking)
         self.token_turns = []
         # parsed logical forms
+        self.lf_tokens = []
         self.lfs = []
         # turns: input tokens of encoder, decoder input and target, later converted to integers
         self.turns = [[], [], []]
@@ -170,7 +171,8 @@ class Dialogue(object):
         self.roles.pop()
         self.token_turns.pop()
         self.entities.pop()
-        self.lfs.pop()
+        # self.lfs.pop()
+        self.lf_tokens.pop()
 
     @classmethod
     def scale_price(cls, kb, utterance):
@@ -243,11 +245,13 @@ class Dialogue(object):
 
             self.token_turns.append(utterance)
             self.entities.append(entities)
-            self.lfs.append(lf)
+            # self.lfs.append(lf)
+            self.lf_tokens.append(lf)
         else:
             self.token_turns[-1].extend(utterance)
             self.entities[-1].extend(entities)
-            self.lfs[-1].extend(lf)
+            # self.lfs[-1].extend(lf)
+            self.lf_tokens.append(lf)
 
     def kb_context_to_int(self):
         self.category = self.mappings['cat_vocab'].to_ind(self.category)
@@ -255,9 +259,9 @@ class Dialogue(object):
         self.description = map(self.mappings['kb_vocab'].to_ind, self.description)
 
     def lf_to_int(self):
-        self.lf_token_turns = []
-        for i, lf in enumerate(self.lfs):
-            self.lf_token_turns.append(lf)
+        self.lfs = []
+        for i, lf in enumerate(self.lf_tokens):
+            self.lfs.append(lf)
             tmp_lf = {}
             for k in lf:
                 tmp_lf[k] = self.mappings['lf_vocab'].to_ind(lf[k])
@@ -280,7 +284,7 @@ class Dialogue(object):
                     portion.append(self.textint_map.text_to_int(turn, stage))
 
         elif self.model in ['tom']:
-            for turn, lf, in zip(self.token_turns, self.lfs):
+            for turn, lf, in zip(self.token_turns, self.lf_tokens):
                 self.turns[0].append(self.textint_map.text_to_int(turn, 'encoding'))
                 self.turns[1].append(lf)
                 self.turns[2].append(lf)

@@ -50,3 +50,19 @@ PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
 --report-every 500 --max-turns 20 --num-dialogues 5000 \
 --sample --temperature 0.5 --max-length 20 --reward balance
 
+
+Supervise Learning:
+mkdir checkpoint/sl; mkdir mappings/sl;CUDA_LAUNCH_BLOCKING=1 PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-examples-paths data/train-luis-post-new.json --test-examples-paths data/dev-luis-post-new.json \
+--price-tracker data/price_tracker.pkl \
+--model lf2lf --gpuid 0 \
+--model-path checkpoint/sl --mappings mappings/sl \
+--word-vec-size 300 --pretrained-wordvec '' '' \
+--rnn-size 300 --rnn-type LSTM --global-attention multibank_general \
+--num-context 2 --stateful \
+--batch-size 128  --optim adagrad --learning-rate 0.01 \
+--epochs 15 --report-every 500 \
+--cache cache/sl --ignore-cache
+
+Reinforce:
+
+

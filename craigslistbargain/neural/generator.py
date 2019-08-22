@@ -15,9 +15,9 @@ class LFSampler(Sampler):
     def __init__(self, model, vocab,
                  temperature=1, max_length=100, cuda=False):
         super(LFSampler, self).__init__(model, vocab, temperature=temperature, max_length=max_length, cuda=cuda)
-        self.acc_or_rej = list(map(self.vocab.to_ind, (markers.ACCEPT, markers.REJECT)))
-        self.offer = list(map(self.vocab.to_ind, (markers.OFFER, )))
-        self.price_actions = list(map(self.vocab.to_ind, ('counter', 'propose', markers.OFFER)))
+        self.acc_or_rej = list(map(self.vocab.to_ind, ('accept', 'reject')))
+        self.offer = list(map(self.vocab.to_ind, ('offer', )))
+        self.price_actions = list(map(self.vocab.to_ind, ('counter', 'propose', 'offer', 'agree', 'disagree')))
 
         # for i,j in self.vocab.word_to_ind.items():
         #     print(i,j)
@@ -35,7 +35,7 @@ class LFSampler(Sampler):
         # plt.show()
 
         self.policy_history = []
-        self.all_actions = self._get_all_actions()
+        # self.all_actions = self._get_all_actions()
 
     def generate_batch(self, batch, gt_prefix=1, enc_state=None, whole_policy=False, special_actions=None):
         # This is to ensure we can stop at EOS for stateful models
@@ -50,8 +50,8 @@ class LFSampler(Sampler):
 
         # policy.sub_(policy.max(1, keepdim=True)[0].expand(policy.size(0), policy.size(1)))
         policy.sub_(policy.max(1, keepdim=True).expand(-1, policy.size(1)))
-        mask = batch.policy_mask
-        policy[mask == 0] = -100.
+        # mask = batch.policy_mask
+        # policy[mask == 0] = -100.
         p_exp = policy.exp()
         policy = p_exp / (torch.sum(p_exp, keepdim=True, dim=1))
         intent = torch.multinomial(policy, 1).squeeze(1)  # (batch_size,)

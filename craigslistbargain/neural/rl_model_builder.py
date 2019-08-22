@@ -12,6 +12,9 @@ import onmt.modules
 from onmt.RLModels import StateEncoder, PolicyDecoder, PolicyModel
 from onmt.Utils import use_gpu
 
+from cocoa.io.utils import read_pickle
+from neural import make_model_mappings
+
 
 def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
     return nn.Embedding(len(word_dict), emb_length)
@@ -37,22 +40,22 @@ def make_decoder(opt, encoder_size, intent_size):
     return PolicyDecoder(encoder_size=encoder_size, intent_size=intent_size)
 
 
-def load_test_model(opt, dummy_opt):
-    checkpoint = torch.load(opt.model,
-                            map_location=lambda storage, loc: storage)
-    fields = onmt.io.load_fields_from_vocab(
-        checkpoint['vocab'], data_type=opt.data_type)
-    print('fields', fields)
+def load_test_model(model_path, opt, dummy_opt):
+    checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
 
     model_opt = checkpoint['opt']
     for arg in dummy_opt:
         if arg not in model_opt:
             model_opt.__dict__[arg] = dummy_opt[arg]
 
-    model = make_base_model(model_opt, fields,
-                            use_gpu(opt), checkpoint)
+    mappings = read_pickle('{}/vocab.pkl'.format(model_opt.mappings))
+
+    # mappings = read_pickle('{0}/{1}/vocab.pkl'.format(model_opt.mappings, model_opt.model))
+    mappings = make_model_mappings(model_opt.model, mappings)
+
+    model = make_base_model(model_opt, mappings, use_gpu(opt), checkpoint)
     model.eval()
-    return fields, model, model_opt
+    return mappings, model, model_opt
 
 
 def make_base_model(model_opt, mappings, gpu, checkpoint=None):

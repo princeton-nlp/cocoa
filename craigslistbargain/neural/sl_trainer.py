@@ -5,6 +5,74 @@ from torch import nn
 from onmt.Utils import use_gpu
 from cocoa.io.utils import create_path
 
+import math, time, sys
+
+
+class Statistics(BaseTrainer):
+    """
+    Accumulator for loss statistics.
+    Currently calculates:
+
+    * accuracy
+    * perplexity
+    * elapsed time
+    """
+    def __init__(self, loss_intent=0, loss_price=0, n_words=0, n_correct=0):
+        self.loss_intent = loss_intent
+        self.loss_price = loss_price
+        self.n_words = n_words
+        self.n_correct = n_correct
+        self.n_src_words = 0
+        self.start_time = time.time()
+
+    def update(self, stat):
+        self.loss_intent += stat.loss_intent
+        self.loss_price += stat.loss_price
+        self.n_words += stat.n_words
+        self.n_correct += stat.n_correct
+
+    def accuracy(self):
+        return 100 * (self.n_correct / self.n_words)
+
+    def mean_loss(self, i=2):
+        if i == 0:
+            return self.loss_intent / self.n_words
+        elif i == 1:
+            return self.loss_price / self.n_words
+
+        return self.loss() / self.n_words
+
+    def elapsed_time(self):
+        return time.time() - self.start_time
+
+    def loss(self):
+        return self.loss_intent + self.loss_price
+
+    def ppl(self):
+        return math.exp(min(self.loss() / self.n_words, 100))
+
+    def str_loss(self):
+        return "acc: %6.4f; loss(act/price/total): %6.4f/%6.4f/%6.4f;" % (self.accuracy(),
+               self.mean_loss(0), self.mean_loss(1), self.mean_loss(2))
+
+    def output(self, epoch, batch, n_batches, start):
+        """Write out statistics to stdout.
+
+        Args:
+           epoch (int): current epoch
+           batch (int): current batch
+           n_batch (int): total batches
+           start (int): start time of epoch.
+        """
+        t = self.elapsed_time()
+        print(("Epoch %2d, %5d/%5d; acc_intent: %6.4f; loss(act/price/total): %6.4f/%6.4f/%6.4f; " +
+               "%6.0f s elapsed") %
+              (epoch, batch,  n_batches,
+               self.accuracy(),
+               self.mean_loss(0), self.mean_loss(1), self.mean_loss(2),
+               time.time() - start))
+        sys.stdout.flush()
+
 class SimpleLoss(nn.Module):
     def __init__(self, inp_with_sfmx=False):
         super(SimpleLoss, self).__init__()
@@ -15,15 +83,19 @@ class SimpleLoss(nn.Module):
         self.criterion_price = nn.MSELoss()
         self.use_nll = inp_with_sfmx
 
+    def _get_correct_num(self, enc_policy, tgt_intents):
+        enc_policy = enc_policy.argmax(dim=1)
+        return torch.sum(enc_policy == tgt_intents).item()
+
     def forward(self, enc_policy, enc_price, tgt_policy, tgt_price):
         loss0 = self.criterion_intent(enc_policy, tgt_policy)
-        loss1 = self.criterion_price(enc_price, enc_price)
+        loss1 = self.criterion_price(enc_price, tgt_price)
         loss = loss0 + loss1
-        loss_data = loss.data.clone()
-        stats = self._stats(loss_data, enc_policy.shape[0])
+        correct_num = self._get_correct_num(enc_policy, tgt_policy)
+        stats = self._stats(loss0, loss1, enc_policy.shape[0], correct_num)
         return loss, stats
 
-    def _stats(self, loss, num):
+    def _stats(self, loss0, loss1, word_num, correct_num):
         """
         Args:
             loss (:obj:`FloatTensor`): the loss computed by the loss criterion.
@@ -31,7 +103,7 @@ class SimpleLoss(nn.Module):
         Returns:
             :obj:`Statistics` : statistics for this batch.
         """
-        return onmt.Statistics(loss.item(), num)
+        return Statistics(loss0.item(), loss1.item(), word_num, correct_num)
 
 
 class SLTrainer(BaseTrainer):
@@ -110,12 +182,12 @@ class SLTrainer(BaseTrainer):
             # 1. Train for one epoch on the training set.
             train_iter = data.generator('train', cuda=use_gpu(opt))
             train_stats = self.train_epoch(train_iter, opt, epoch, report_func)
-            print('Train loss: %g' % (train_stats.loss / train_stats.n_words))
+            print('Train loss: ' + train_stats.str_loss())
 
             # 2. Validate on the validation set.
             valid_iter = data.generator('dev', cuda=use_gpu(opt))
             valid_stats = self.validate(valid_iter)
-            print('Validation loss: %g' % (valid_stats.loss / train_stats.n_words))
+            print('Validation loss: ' + valid_stats.str_loss())
 
             # 3. Log to remote server.
             # if opt.exp_host:
@@ -244,7 +316,7 @@ class SLTrainer(BaseTrainer):
             torch.save(checkpoint, path)
 
     def checkpoint_path(self, epoch, opt, stats):
-        path = '{root}/{model}_loss{loss:.2f}_e{epoch:d}.pt'.format(
+        path = '{root}/{model}_loss{loss:.4f}_e{epoch:d}.pt'.format(
             root=opt.model_path,
             model=opt.model_filename,
             loss=stats.mean_loss(),

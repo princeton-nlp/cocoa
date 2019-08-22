@@ -28,7 +28,7 @@ def build_lf_vocab_simple(dialogues):
     vocab = Vocabulary(offset=0, unk=True)
     for dialogue in dialogues:
         assert dialogue.is_int is False
-        for lf in dialogue.lfs:
+        for lf in dialogue.lf_tokens:
            vocab.add_words(lf)
     vocab.add_words(sequence_markers, special=True)
     print('LF vocabulary size:', vocab.size)
@@ -60,7 +60,7 @@ def build_lf_vocab(dialogues, special_symbols=[], entity_forms=[], except_words=
 
     for dialogue in dialogues:
         assert dialogue.is_int is False
-        for lf in dialogue.lfs:
+        for lf in dialogue.lf_tokens:
             # for token in lf:
             # if is_entity(lf):
             #     _add_entity(token)

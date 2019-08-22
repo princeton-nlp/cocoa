@@ -253,7 +253,7 @@ class DialogueBatcher(object):
             num_context=None, encoder_tokens=None, decoder_tokens=None):
         # encoder_context = self.get_encoder_context(encoder_turns, num_context)
 
-        print('encoder_turns: ', encoder_turns)
+        # print('encoder_turns: ', encoder_turns)
         encoder_intent, encoder_price, encoder_price_mask = self.get_encoder_inputs(encoder_turns)
         target_intent, target_price, target_price_mask = self.make_decoder_inputs_and_targets(decoder_turns, target_turns)
 
@@ -363,7 +363,7 @@ class DialogueBatcher(object):
                 kb_context=dialogue_data['kb_context'],
                 num_context=self.num_context,
                 )
-            for i in encode_turn_ids
+                for i in encode_turn_ids
             ]
 
         # bath_seq: A sequence of batches that can be processed in turn where

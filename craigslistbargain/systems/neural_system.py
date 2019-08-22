@@ -10,9 +10,9 @@ from cocoa.neural.beam import Scorer
 
 from neural.generator import get_generator
 from sessions.neural_session import PytorchNeuralSession
-from neural import model_builder, get_data_generator, make_model_mappings
+from neural import rl_model_builder, get_data_generator, make_model_mappings
 from neural.preprocess import markers, TextIntMap, Preprocessor, Dialogue
-from neural.batcher import DialogueBatcherFactory
+from neural.batcher_rl import DialogueBatcherFactory
 from neural.utterance import UtteranceBuilder
 import options
 
@@ -35,10 +35,11 @@ class PytorchNeuralSystem(System):
         dummy_args = dummy_parser.parse_known_args([])[0]
 
         # Load the model.
-        mappings, model, model_args = model_builder.load_test_model(
+        mappings, model, model_args = rl_model_builder.load_test_model(
                 model_path, args, dummy_args.__dict__)
         self.model_name = model_args.model
         vocab = mappings['utterance_vocab']
+        print(vocab.word_to_ind)
         self.mappings = mappings
 
         generator = get_generator(model, vocab, Scorer(args.alpha), args, model_args)
