@@ -29,11 +29,11 @@ class Batch(object):
             self.target_price = decoder_args['price']
             self.target_pmask = decoder_args['price_mask']
             # TODO: Get policy mask from the intent
-            self.policy_mask = np.ones((len(self.target_intent), len(self.vocab)))
+            self.policy_mask = np.ones((len(self.encoder_intent), len(self.vocab)))
             offer_idx = self.vocab.to_ind(markers.OFFER)
             acc_idx = self.vocab.to_ind(markers.ACCEPT)
             rej_idx = self.vocab.to_ind(markers.REJECT)
-            for i in range(len(self.target_intent)):
+            for i in range(len(self.encoder_intent)):
                 if self.encoder_intent[i] == offer_idx:
                     self.policy_mask[i, :] = 0
                     self.policy_mask[i,[acc_idx, rej_idx]] = 1
@@ -77,9 +77,19 @@ class Batch(object):
         self.encoder_pmask = self.to_variable(self.encoder_pmask, 'float', cuda).unsqueeze(1)
 
         if not for_value:
-            self.target_intent = self.to_variable(self.target_intent, 'long', cuda).unsqueeze(1)
-            self.target_price = self.to_variable(self.target_price, 'float', cuda).unsqueeze(1)
-            self.target_pmask = self.to_variable(self.target_pmask, 'float', cuda).unsqueeze(1)
+            # print('ti0, ', self.target_intent)
+            self.target_intent = self.to_variable(self.target_intent, 'long', cuda)
+            self.target_price = self.to_variable(self.target_price, 'float', cuda)
+            self.target_pmask = self.to_variable(self.target_pmask, 'float', cuda)
+            # print('ti1, ', self.target_intent)
+            for v in ['target_intent', 'target_price', 'target_pmask']:
+                while True:
+                    d = len(getattr(self, v).shape)
+                    if d >= 2:
+                        break
+                    setattr(self, v, getattr(self, v).unsqueeze(d))
+            # print('ti2, ', self.target_intent)
+
         else:
             self.target_value = self.to_variable(self.target_value, 'float', cuda).unsqueeze(1)
 
@@ -151,7 +161,7 @@ class DialogueBatcher(object):
         '''
         All dialogues in a batch should have the same number of turns.
         '''
-        max_num_turns = max([d.num_turns for d in dialogues])
+        max_num_turns = max([d.num_lfs for d in dialogues])
         for dialogue in dialogues:
             dialogue.pad_turns(max_num_turns)
         num_turns = dialogues[0].num_turns
@@ -339,6 +349,7 @@ class DialogueBatcher(object):
 
     def create_batch(self, dialogues):
         num_turns = self._normalize_dialogue(dialogues)
+        # print('num turns: ', num_turns)
         dialogue_data = self._get_dialogue_data(dialogues)
 
         dialogue_class = type(dialogues[0])

@@ -119,6 +119,10 @@ class Dialogue(object):
     def num_turns(self):
         return len(self.turns[0])
 
+    @property
+    def num_lfs(self):
+        return len(self.lf_tokens)
+
     def join_turns(self):
         for i, utterances in enumerate(self.turns):
             self.turns[i] = [x for utterance in utterances for x in utterance]
@@ -137,12 +141,17 @@ class Dialogue(object):
         return sum([len(t) for t in self.token_turns])
 
     def process_lf(self, utterance):
+        if len(utterance) > 1:
+            return {'intent': utterance[0], 'price': utterance[1]}
+        return {'intent': utterance[0]}
+
         lf = self.textint_map.text_to_int(utterance)
         intent = lf[0]
         if (len(lf) > 1):
             price = lf[1]
         else:
             price = None
+        # print("process lf: ", intent, price)
         return {'intent': intent, 'price': price}
 
     def add_utterance(self, agent, utterance, lf=None):
@@ -227,11 +236,11 @@ class Dialogue(object):
 
         utterance = self._insert_markers(agent, utterance, new_turn)
         entities = [x if is_entity(x) else None for x in utterance]
-        for e in entities:
-            if e is not None:
-                if isinstance(e, CanonicalEntity):
-                    print(type(e))
-                #print(type(e))
+        # for e in entities:
+        #     if e is not None:
+        #         if isinstance(e, CanonicalEntity):
+        #             print(type(e))
+        #         #print(type(e))
         if lf:
             pass
         else:

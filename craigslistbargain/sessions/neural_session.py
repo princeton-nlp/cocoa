@@ -29,10 +29,11 @@ class NeuralSession(Session):
 
     # TODO: move this to preprocess?
     def convert_to_int(self):
-        for i, turn in enumerate(self.dialogue.token_turns):
-            for curr_turns, stage in zip(self.dialogue.turns, ('encoding', 'decoding', 'target')):
-                if i >= len(curr_turns):
-                    curr_turns.append(self.env.textint_map.text_to_int(turn, stage))
+        # for i, turn in enumerate(self.dialogue.token_turns):
+        #     for curr_turns, stage in zip(self.dialogue.turns, ('encoding', 'decoding', 'target')):
+        #         if i >= len(curr_turns):
+        #             curr_turns.append(self.env.textint_map.text_to_int(turn, stage))
+        self.dialogue.lf_to_int()
 
     def receive(self, event):
         if event.action in Event.decorative_events:
@@ -49,10 +50,11 @@ class NeuralSession(Session):
         #print 'receive:', utterance
         # self.dialogue.add_utterance(event.agent, utterance)
         # state = event.metadata.copy()
-        state = {'enc_output': event.metadata['enc_output']}
+        # state = {'enc_output': event.metadata['enc_output']}
 
         utterance_int = self.env.textint_map.text_to_int(utterance)
-        state['action'] = utterance_int[0]
+        # state['action'] = utterance_int[0]
+        state = None
         self.dialogue.add_utterance_with_state(event.agent, utterance, state)
 
     def _has_entity(self, tokens):
@@ -104,6 +106,7 @@ class NeuralSession(Session):
             elif tokens[0] == markers.QUIT:
                 return self.quit(metadata=output_data)
 
+        while len(tokens) > 0 and tokens[-1] == None: tokens = tokens[:-1]
         s = self.attach_punct(' '.join(tokens))
         #print 'send:', s
         return self.message(s, metadata=output_data)
@@ -117,6 +120,7 @@ class NeuralSession(Session):
         """
         self.convert_to_int()
         batches = self.batcher.create_batch([self.dialogue])
+        # print('number of batches: ', len(batches))
         yield len(batches)
         for batch in batches:
             # TODO: this should be in batcher
@@ -151,17 +155,17 @@ class PytorchNeuralSession(NeuralSession):
         encoder_turns = self.batcher._get_turn_batch_at([self.dialogue], Dialogue.ENC, -1)
 
         encoder_inputs = self.batcher.get_encoder_inputs(encoder_turns)
-        encoder_context = self.batcher.get_encoder_context(encoder_turns, num_context)
+        # encoder_context = self.batcher.get_encoder_context(encoder_turns, num_context)
         encoder_args = {
                         'intent': encoder_inputs[0],
                         'price': encoder_inputs[1],
                         'price_mask': encoder_inputs[2],
-                        'context': encoder_context
+                        # 'context': encoder_context
                     }
         decoder_args = {
-                        'intent': None,
-                        'price': None,
-                        'price_mask': None,
+                        'intent': encoder_inputs[0],
+                        'price': encoder_inputs[1],
+                        'price_mask': encoder_inputs[2],
                         'context': self.kb_context_batch,
                     }
 
@@ -169,7 +173,7 @@ class PytorchNeuralSession(NeuralSession):
                 'agents': [self.agent],
                 'kbs': [self.kb],
                 }
-
+        # print('[self.vocab]: ', self.vocab)
         return Batch(encoder_args, decoder_args, context_data,
                 self.vocab, num_context=num_context, cuda=self.cuda)
 
@@ -179,7 +183,7 @@ class PytorchNeuralSession(NeuralSession):
             # TODO: Need we add an empty state?
         batch = self._create_batch()
 
-        output_data = self.generator.generate_batch(batch, gt_prefix=self.gt_prefix, enc_state=None, whole_policy=is_fake)
+        output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake)
 
         entity_tokens = self._output_to_tokens(output_data)
 
@@ -193,7 +197,12 @@ class PytorchNeuralSession(NeuralSession):
         return True
 
     def _output_to_tokens(self, data):
-        predictions = [data["intent"][0][0], data['price'][0][0]]
+        # print(data['intent'], data['price'])
+        predictions = [data["intent"].item()]
+        if data.get('price') is not None:
+            predictions += [data['price'].item()]
+        else:
+            predictions += [None]
         tokens = self.builder.build_target_tokens(predictions, self.kb)
         return tokens
 

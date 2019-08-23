@@ -76,6 +76,9 @@ class PolicyDecoder(nn.Module):
             p = self.reparameterize(p_mean, p_var)
         else:
             p = p_mean
+        #
+        # # TODO: test p_mean
+        # p = p_mean
 
         return policy, p
 

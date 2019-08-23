@@ -12,18 +12,74 @@ from torch.autograd import Variable
 from cocoa.neural.rl_trainer import Statistics
 
 from core.controller import Controller
-from neural.trainer import Trainer
 from .utterance import UtteranceBuilder
 
+from neural.sl_trainer import SLTrainer as BaseTrainer, Statistics, SimpleLoss
 
-class RLTrainer(Trainer):
+import math, time, sys
+
+
+class RLStatistics(BaseTrainer):
+    """
+    Accumulator for loss statistics.
+    Currently calculates:
+
+    * accuracy
+    * perplexity
+    * elapsed time
+    """
+    def __init__(self, loss=0, reward=0, n_words=0):
+        self.loss = loss
+        self.n_words = n_words
+        self.n_src_words = 0
+        self.start_time = time.time()
+
+    def update(self, stat):
+        self.loss += stat.loss
+        self.n_words += stat.n_words
+        self.reward += stat.reward
+
+
+    def mean_loss(self):
+        return self.loss / self.n_words
+
+    def mean_reward(self):
+        return self.loss / self.n_words
+
+    def elapsed_time(self):
+        return time.time() - self.start_time
+
+
+    def ppl(self):
+        return math.exp(min(self.loss / self.n_words, 100))
+
+    def str_loss(self):
+        return "loss: %6.4f reward: %6.4f;" % (self.mean_loss(), self.mean_reward())
+
+    def output(self, epoch, batch, n_batches, start):
+        """Write out statistics to stdout.
+
+        Args:
+           epoch (int): current epoch
+           batch (int): current batch
+           n_batch (int): total batches
+           start (int): start time of epoch.
+        """
+        t = self.elapsed_time()
+        print(("Epoch %2d, %5d/%5d;" + self.str_loss() +
+               "%6.0f s elapsed") %
+              (epoch, batch,  n_batches,
+               time.time() - start))
+        sys.stdout.flush()
+
+class RLTrainer(BaseTrainer):
     def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin', cuda=False):
         self.agents = agents
         self.scenarios = scenarios
 
         self.training_agent = training_agent
         self.model = agents[training_agent].env.model
-        self.train_loss = train_loss
+        self.train_loss = SimpleLoss(inp_with_sfmx=False)
         self.optim = optim
         self.cuda = cuda
 
@@ -34,27 +90,25 @@ class RLTrainer(Trainer):
 
     def update(self, batch_iter, reward, model, discount=0.95):
         model.train()
-        model.generator.train()
 
         nll = []
         # batch_iter gives a dialogue
         dec_state = None
         for batch in batch_iter:
-            if not model.stateful:
-                dec_state = None
-            enc_state = dec_state.hidden if dec_state is not None else None
 
             # print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
             # if enc_state is not None:
             #     print("state: {}".format(batch, enc_state[0].shape))
 
-            outputs, _, dec_state = self._run_batch(batch, None, enc_state)  # (seq_len, batch_size, rnn_size)
-            loss, _ = self.train_loss.compute_loss(batch.targets, outputs)  # (seq_len, batch_size)
+            policy, price = self._run_batch(batch)  # (seq_len, batch_size, rnn_size)
+            loss, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
+
+            loss = loss.view(-1)
             nll.append(loss)
 
-            # Don't backprop fully.
-            if dec_state is not None:
-                dec_state.detach()
+            # TODO: Don't backprop fully.
+            # if dec_state is not None:
+            #     dec_state.detach()
 
         nll = torch.cat(nll)  # (total_seq_len, batch_size)
 
@@ -153,7 +207,7 @@ class RLTrainer(Trainer):
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
 
-                self.update(batch_iter, s_reward, self.model, discount=args.discount_factor)
+                self.update(batch_iter, reward, self.model, discount=args.discount_factor)
 
             if args.verbose:
                 strs = example.to_text()

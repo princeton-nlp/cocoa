@@ -49,7 +49,7 @@ class LFSampler(Sampler):
         # tgt_emb = torch.cat([tgt_emb, batch.target_price], )
 
         # policy.sub_(policy.max(1, keepdim=True)[0].expand(policy.size(0), policy.size(1)))
-        policy.sub_(policy.max(1, keepdim=True).expand(-1, policy.size(1)))
+        policy.sub_(policy.max(1, keepdim=True).values.expand(-1, policy.size(1)))
         # mask = batch.policy_mask
         # policy[mask == 0] = -100.
         p_exp = policy.exp()
@@ -57,9 +57,10 @@ class LFSampler(Sampler):
         intent = torch.multinomial(policy, 1).squeeze(1)  # (batch_size,)
 
         # TODO: Not correct, I think.
-        if intent in self.price_actions:
+        if intent not in self.price_actions:
             price = None
 
+        # print('gen output: ',policy, price)
         ret = {"intent": intent,
                "price": price,
                "policy": policy,

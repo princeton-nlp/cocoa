@@ -17,10 +17,11 @@ class Statistics(BaseTrainer):
     * perplexity
     * elapsed time
     """
-    def __init__(self, loss_intent=0, loss_price=0, n_words=0, n_correct=0):
+    def __init__(self, loss_intent=0, loss_price=0, n_words=0, n_price=0, n_correct=0):
         self.loss_intent = loss_intent
         self.loss_price = loss_price
         self.n_words = n_words
+        self.n_price = n_price
         self.n_correct = n_correct
         self.n_src_words = 0
         self.start_time = time.time()
@@ -29,6 +30,7 @@ class Statistics(BaseTrainer):
         self.loss_intent += stat.loss_intent
         self.loss_price += stat.loss_price
         self.n_words += stat.n_words
+        self.n_price += stat.n_price
         self.n_correct += stat.n_correct
 
     def accuracy(self):
@@ -38,9 +40,11 @@ class Statistics(BaseTrainer):
         if i == 0:
             return self.loss_intent / self.n_words
         elif i == 1:
-            return self.loss_price / self.n_words
+            if self.n_price == 0:
+                return 0
+            return self.loss_price / self.n_price
 
-        return self.loss() / self.n_words
+        return self.mean_loss(0) + self.mean_loss(1)
 
     def elapsed_time(self):
         return time.time() - self.start_time
@@ -73,6 +77,11 @@ class Statistics(BaseTrainer):
                time.time() - start))
         sys.stdout.flush()
 
+class Weighted_MSELoss(nn.Module):
+    def forward(self, src, tgt, mask):
+        return torch.sum(mask * (src-tgt)**2)
+
+
 class SimpleLoss(nn.Module):
     def __init__(self, inp_with_sfmx=False):
         super(SimpleLoss, self).__init__()
@@ -87,15 +96,21 @@ class SimpleLoss(nn.Module):
         enc_policy = enc_policy.argmax(dim=1)
         return torch.sum(enc_policy == tgt_intents).item()
 
-    def forward(self, enc_policy, enc_price, tgt_policy, tgt_price):
+    def forward(self, enc_policy, enc_price, tgt_policy, tgt_price, pmask=None):
+        if pmask is None:
+            pmask = torch.ones_like(tgt_price)
+        alpha = 0.05
+        # print('policies: ', tgt_policy)
         loss0 = self.criterion_intent(enc_policy, tgt_policy)
-        loss1 = self.criterion_price(enc_price, tgt_price)
+        loss1 = self.criterion_price(enc_price*pmask, tgt_price)
+        loss1 = alpha * loss1
         loss = loss0 + loss1
         correct_num = self._get_correct_num(enc_policy, tgt_policy)
-        stats = self._stats(loss0, loss1, enc_policy.shape[0], correct_num)
+        price_num = torch.sum(tgt_price).item()
+        stats = self._stats(loss0, loss1, enc_policy.shape[0], price_num, correct_num)
         return loss, stats
 
-    def _stats(self, loss0, loss1, word_num, correct_num):
+    def _stats(self, loss0, loss1, word_num, price_num, correct_num):
         """
         Args:
             loss (:obj:`FloatTensor`): the loss computed by the loss criterion.
@@ -103,7 +118,7 @@ class SimpleLoss(nn.Module):
         Returns:
             :obj:`Statistics` : statistics for this batch.
         """
-        return Statistics(loss0.item(), loss1.item(), word_num, correct_num)
+        return Statistics(loss0.item(), loss1.item(), word_num, price_num, correct_num)
 
 
 class SLTrainer(BaseTrainer):
@@ -155,7 +170,7 @@ class SLTrainer(BaseTrainer):
         target_intent = batch.target_intent
         price = price.unsqueeze(1).mul(batch.target_pmask)
         # print('(policy, price, target_intent, batch.target_price)', (policy, price, target_intent, batch.target_price))
-        return loss(policy, price, target_intent.squeeze(), batch.target_price)
+        return loss(policy, price, target_intent.squeeze(1), batch.target_price, batch.target_pmask)
 
     def _run_batch(self, batch, dec_state=None, enc_state=None):
 

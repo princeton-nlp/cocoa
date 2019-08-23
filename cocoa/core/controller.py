@@ -79,10 +79,11 @@ class Controller(object):
                 #     event_tmp['metadata'] = None
                 #     print('agent=%s: session=%s, event=%s' % (agent, type(session).__name__, event_tmp))
                 # else:
-                #     action = event.action
-                #     data = event.data
-                #     event_output = data if action == 'message' else "Action: {0}, Data: {1}".format(action, data)
-                    # print('agent=%s, event=%s' % (agent, event_output))
+                action = event.action
+                data = event.data
+                event_output = data if action == 'message' else "Action: {0}, Data: {1}".format(action, data)
+                # print('agent=%s, event=%s' % (agent, event_output))
+
                 num_turns += 1
                 if self.game_over() or (max_turns and num_turns >= max_turns):
                     game_over = True
