@@ -22,7 +22,7 @@ class PytorchNeuralSystem(System):
     NeuralSystem loads a neural model from disk and provides a function instantiate a new dialogue agent (NeuralSession
     object) that makes use of this underlying model to send and receive messages in a dialogue.
     """
-    def __init__(self, args, schema, price_tracker, model_path, timed):
+    def __init__(self, args, schema, price_tracker, model_path, timed, name=None):
         super(PytorchNeuralSystem, self).__init__()
         self.schema = schema
         self.price_tracker = price_tracker
@@ -35,8 +35,16 @@ class PytorchNeuralSystem(System):
         dummy_args = dummy_parser.parse_known_args([])[0]
 
         # Load the model.
-        mappings, model, model_args = rl_model_builder.load_test_model(
+        mappings, model, model_args, critic = rl_model_builder.load_test_model(
                 model_path, args, dummy_args.__dict__)
+
+        # Load critic from other model.
+        # if name == 'tom':
+        if hasattr(args, 'load_critic_from') and args.load_critic_from is not None:
+            critic_path = args.load_critic_from
+            _, _, _, critic = rl_model_builder.load_test_model(
+                critic_path, args, dummy_args.__dict__)
+
         self.model_name = model_args.model
         vocab = mappings['utterance_vocab']
         print(vocab.word_to_ind)
@@ -52,9 +60,11 @@ class PytorchNeuralSystem(System):
         use_cuda = use_gpu(args)
 
         kb_padding = mappings['kb_vocab'].to_ind(markers.PAD)
+        # print('args: ', model_args.dia_num, model_args.state_length)
         dialogue_batcher = DialogueBatcherFactory.get_dialogue_batcher(model=self.model_name,
             kb_pad=kb_padding,
-            mappings=mappings, num_context=model_args.num_context)
+            mappings=mappings, num_context=model_args.num_context,
+            dia_num=model_args.dia_num, state_length=model_args.state_length)
 
         # TODO: class variable is not a good way to do this
         Dialogue.preprocessor = preprocessor
@@ -65,12 +75,14 @@ class PytorchNeuralSystem(System):
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',
             'stop_symbol', 'remove_symbols', 'gt_prefix',
             'max_len', 'dialogue_batcher', 'cuda',
-            'dialogue_generator', 'utterance_builder', 'model_args'])
+            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom'])
         self.env = Env(model, vocab, preprocessor, textint_map,
             stop_symbol=vocab.to_ind(markers.EOS), remove_symbols=remove_symbols,
             gt_prefix=1,
             max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda,
-            dialogue_generator=generator, utterance_builder=builder, model_args=model_args)
+            dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
+            critic=critic, usetom=(name == 'tom'))
+        print('usetom?:', (name == 'tom'))
 
     @classmethod
     def name(cls):

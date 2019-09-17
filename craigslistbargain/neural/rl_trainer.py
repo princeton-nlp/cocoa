@@ -14,12 +14,14 @@ from cocoa.neural.rl_trainer import Statistics
 from core.controller import Controller
 from .utterance import UtteranceBuilder
 
+from tensorboardX import SummaryWriter
+
 from neural.sl_trainer import SLTrainer as BaseTrainer, Statistics, SimpleLoss
 
 import math, time, sys
 
 
-class RLStatistics(BaseTrainer):
+class RLStatistics(Statistics):
     """
     Accumulator for loss statistics.
     Currently calculates:
@@ -32,6 +34,7 @@ class RLStatistics(BaseTrainer):
         self.loss = loss
         self.n_words = n_words
         self.n_src_words = 0
+        self.reward=reward
         self.start_time = time.time()
 
     def update(self, stat):
@@ -39,16 +42,14 @@ class RLStatistics(BaseTrainer):
         self.n_words += stat.n_words
         self.reward += stat.reward
 
-
     def mean_loss(self):
         return self.loss / self.n_words
 
     def mean_reward(self):
-        return self.loss / self.n_words
+        return self.reward / self.n_words
 
     def elapsed_time(self):
         return time.time() - self.start_time
-
 
     def ppl(self):
         return math.exp(min(self.loss / self.n_words, 100))
@@ -72,27 +73,82 @@ class RLStatistics(BaseTrainer):
                time.time() - start))
         sys.stdout.flush()
 
+class SimpleCriticLoss(nn.Module):
+    def __init__(self):
+        super(SimpleCriticLoss, self).__init__()
+        self.criterion = nn.MSELoss(reduce=False)
+
+    # def _get_correct_num(self, enc_policy, tgt_intents):
+    #     enc_policy = enc_policy.argmax(dim=1)
+    #     tmp = (enc_policy == tgt_intents).cpu().numpy()
+    #     tgt = tgt_intents.data.cpu().numpy()
+    #     tmp[tgt==19] = 1
+    #     import numpy as np
+    #     return np.sum(tmp)
+
+    def forward(self, pred, oracle, pmask=None):
+        loss = self.criterion(pred, oracle)
+        stats = self._stats(loss, pred.shape[0])
+        return loss, stats
+
+    def _stats(self, loss, data_num):
+        return RLStatistics(loss=loss.mean().item(), n_words=data_num)
+
+class EntropyLoss(nn.Module):
+    def __init__(self):
+        super(EntropyLoss, self).__init__()
+
+    def forward(self, enc_policy, enc_price, tgt_policy, tgt_price, pmask=None):
+        logpolicy = enc_policy
+        logpolicy = logpolicy - logpolicy.max(dim=1, keepdim=True).values
+        policy = logpolicy.exp() + 1e-6
+        logpolicy = policy.log()
+        z0 = policy.sum(dim=1)
+        # print('policy', logpolicy, policy)
+        policy = policy / z0
+        loss = torch.sum(policy.mul(torch.log(z0) - logpolicy), dim=1)
+        # print('policy', loss, logpolicy, policy)
+        stats = self._stats(loss.mean(), enc_policy.shape[0])
+        return loss, stats
+
+    def _stats(self, loss, word_num):
+        return Statistics(loss.item(), 0, word_num, 0, 0)
+
 class RLTrainer(BaseTrainer):
-    def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin', cuda=False):
+    def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin',
+                 cuda=False, args=None, ent_coef=0.08, val_coef=0.1):
         self.agents = agents
         self.scenarios = scenarios
 
         self.training_agent = training_agent
         self.model = agents[training_agent].env.model
+        self.critic = agents[training_agent].env.critic
         self.train_loss = SimpleLoss(inp_with_sfmx=False)
+        self.critic_loss = SimpleCriticLoss()
+        self.entropy_loss = EntropyLoss()
         self.optim = optim
         self.cuda = cuda
 
+        self.ent_coef = ent_coef
+        self.val_coef = val_coef
+        self.p_reg_coef = 0
+        # self.p_reg_coef = 100
+
         self.best_valid_reward = None
+        self.best_valid_loss = None
 
         self.all_rewards = [[], []]
         self.reward_func = reward_func
+
+        # Summary writer for tensorboard
+        self.writer = SummaryWriter(logdir='logs/{}'.format(args.name))
 
     def update(self, batch_iter, reward, model, discount=0.95):
         model.train()
 
         nll = []
         # batch_iter gives a dialogue
+        stats = Statistics()
         dec_state = None
         for batch in batch_iter:
 
@@ -100,8 +156,9 @@ class RLTrainer(BaseTrainer):
             # if enc_state is not None:
             #     print("state: {}".format(batch, enc_state[0].shape))
 
-            policy, price = self._run_batch(batch)  # (seq_len, batch_size, rnn_size)
-            loss, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
+            policy, price, pvar = self._run_batch(batch)  # (seq_len, batch_size, rnn_size)
+            loss, batch_stats = self._compute_loss(batch, policy=policy, price=(price, pvar), loss=self.train_loss)
+            stats.update(batch_stats)
 
             loss = loss.view(-1)
             nll.append(loss)
@@ -110,23 +167,83 @@ class RLTrainer(BaseTrainer):
             # if dec_state is not None:
             #     dec_state.detach()
 
+        # print('allnll ', nll)
+
         nll = torch.cat(nll)  # (total_seq_len, batch_size)
 
-        rewards = [Variable(torch.zeros(1, 1).fill_(reward))]
+        rewards = [Variable(torch.ones(1, 1)*(reward))]
         for i in range(1, nll.size(0)):
             rewards.append(rewards[-1] * discount)
         rewards = rewards[::-1]
         rewards = torch.cat(rewards)
+        # print('rl shapes',nll.shape, rewards.shape)
 
         if self.cuda:
-            loss = nll.squeeze().dot(rewards.squeeze().cuda())
+            loss = nll.view(-1).mul(rewards.view(-1).cuda()).mean()
         else:
-            loss = nll.squeeze().dot(rewards.squeeze())
+            loss = nll.view(-1).mul(rewards.view(-1)).mean()
 
         model.zero_grad()
         loss.backward()
         nn.utils.clip_grad_norm(model.parameters(), 1.)
         self.optim.step()
+
+        return torch.cat([loss.view(-1),
+                          nll.mean().view(-1),
+                          torch.ones(1) * stats.mean_loss(0),
+                          torch.ones(1) * stats.mean_loss(1)], ).view(1, -1).data.numpy()
+
+    def _compute_loss(self, batch, policy=None, price=None, value=None, oracle=None, loss=None):
+        if policy is not None:
+            target_intent = batch.target_intent
+            pmean, pvar = price
+            pmean = pmean.unsqueeze(1).mul(batch.target_pmask)
+            pvar = pvar.unsqueeze(1).mul(batch.target_pmask)
+            return loss(policy, (pmean, pvar), target_intent.squeeze(1), batch.target_price, batch.target_pmask)
+        elif value is not None:
+            return loss(value, oracle)
+
+    def _run_batch_critic(self, batch):
+        e_intent, e_price, e_pmask = batch.encoder_intent, batch.encoder_price, batch.encoder_pmask
+        # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
+
+        value = self.critic(e_intent, e_price, e_pmask, batch.encoder_dianum)
+        return value
+
+    def update_critic(self, batch_iter, reward, critic, discount=0.95):
+        critic.train()
+
+        values = []
+        # batch_iter gives a dialogue
+        dec_state = None
+        for batch in batch_iter:
+            # print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
+            batch.mask_last_price()
+            value = self._run_batch_critic(batch)
+
+            values.append(value.view(-1))
+
+        # print('allnll ', nll)
+        rewards = [0]*len(values)
+        rewards[-1] = reward
+        values = torch.cat(values)  # (total_seq_len, batch_size)
+        for i in range(len(rewards)-2, -1, -1):
+            rewards[i] += (values[i+1].cpu().item())*discount
+            rewards[i] = torch.ones(1)*rewards[i]
+        rewards[-1] = torch.ones(1)*rewards[-1]
+
+        rewards = torch.cat(rewards)
+        if self.cuda:
+            rewards = rewards.cuda()
+
+        loss, stats = self._compute_loss(None, value=values, oracle=rewards, loss=self.critic_loss)
+
+        critic.zero_grad()
+        loss.backward()
+        nn.utils.clip_grad_norm(critic.parameters(), 1.)
+        self.optim.step()
+
+        return stats
 
     def _get_scenario(self, scenario_id=None, split='train'):
         scenarios = self.scenarios[split]
@@ -145,54 +262,108 @@ class RLTrainer(BaseTrainer):
                     self.agents[1].new_session(1, scenario.kbs[1])]
         return Controller(scenario, sessions)
 
-    def validate(self, args):
+    def validate(self, args, valid_critic=False):
         split = 'dev'
         self.model.eval()
-        total_stats = Statistics()
+        total_stats = RLStatistics()
         print('='*20, 'VALIDATION', '='*20)
         for scenario in self.scenarios[split][:200]:
             controller = self._get_controller(scenario, split=split)
+            controller.sessions[self.training_agent].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
             session = controller.sessions[self.training_agent]
             reward = self.get_reward(example, session)
-            stats = Statistics(reward=reward)
+            stats = RLStatistics(reward=reward, n_words=1)
             total_stats.update(stats)
         print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         return total_stats
 
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
-        if self.best_valid_reward is None or valid_stats.mean_reward() > self.best_valid_reward:
-            self.best_valid_reward = valid_stats.mean_reward()
-            path = '{root}/{model}_best.pt'.format(
-                        root=opt.model_path,
-                        model=opt.model_filename)
 
+        path = None
+        if opt.model_type == 'reinforce':
+            if self.best_valid_reward is None or valid_stats.mean_reward() > self.best_valid_reward:
+                self.best_valid_reward = valid_stats.mean_reward()
+                path = '{root}/{model}_best.pt'.format(
+                            root=opt.model_path,
+                            model=opt.model_filename)
+        elif opt.model_type == 'critic':
+            if self.best_valid_loss is None or valid_stats.mean_loss() < self.best_valid_loss:
+                self.best_valid_loss = valid_stats.mean_loss()
+                path = '{root}/{model}_best.pt'.format(
+                            root=opt.model_path,
+                            model=opt.model_filename)
+
+        if path is not None:
             print('Save best checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
     def checkpoint_path(self, episode, opt, stats):
-        path = '{root}/{model}_reward{reward:.2f}_e{episode:d}.pt'.format(
-                    root=opt.model_path,
-                    model=opt.model_filename,
-                    reward=stats.mean_reward(),
-                    episode=episode)
+        path=None
+        if opt.model_type == 'reinforce':
+            path = '{root}/{model}_reward{reward:.2f}_e{episode:d}.pt'.format(
+                        root=opt.model_path,
+                        model=opt.model_filename,
+                        reward=stats.mean_reward(),
+                        episode=episode)
+        elif opt.model_type == 'critic':
+            path = '{root}/{model}_loss{reward:.4f}_e{episode:d}.pt'.format(
+                        root=opt.model_path,
+                        model=opt.model_filename,
+                        reward=stats.mean_loss(),
+                        episode=episode)
+        assert path is not None
         return path
 
+    def update_opponent(self, type=None):
+        if type is None:
+            types = ['policy', 'critic']
+        else:
+            types = [type]
+
+        print('update opponent model for {}.'.format(types))
+        if 'policy' in types:
+            tmp_model_dict = self.agents[self.training_agent].env.model.state_dict()
+            self.agents[self.training_agent^1].env.model.load_state_dict(tmp_model_dict)
+        if 'critic' in types:
+            tmp_model_dict = self.agents[self.training_agent].env.critic.state_dict()
+            self.agents[self.training_agent^1].env.critic.load_state_dict(tmp_model_dict)
+
     def learn(self, args):
+        if args.model_type == 'reinforce':
+            train_policy = True
+            train_critic = False
+        elif args.model_type == 'critic':
+            train_policy = False
+            train_critic = True
+        elif args.model_type == 'tom':
+            train_policy = False
+            train_critic = False
+
+
         rewards = [None]*2
         s_rewards = [None]*2
+
+        critic_report_stats = RLStatistics()
+        critic_stats = RLStatistics()
+        last_time = time.time()
+
+        tensorboard_every = 1
+        history_train_losses = [[], []]
 
         for i in range(args.num_dialogues):
             # Rollout
             scenario = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
+            # print('set controller for{} {}.'.format(self.training_agent, controller))
+            controller.sessions[0].set_controller(controller)
+            controller.sessions[1].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
 
             for session_id, session in enumerate(controller.sessions):
-                # Only train one agent
-                if args.only_run != True and session_id != self.training_agent:
-                    continue
+                # if args.only_run != True and session_id != self.training_agent:
+                #     continue
 
                 # Compute reward
                 reward = self.get_reward(example, session)
@@ -204,39 +375,91 @@ class RLTrainer(BaseTrainer):
                 rewards[session_id] = reward
                 s_rewards[session_id] = s_reward
 
+            for session_id, session in enumerate(controller.sessions):
+                # Only train one agent
+                if session_id != self.training_agent:
+                    continue
+
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
 
-                self.update(batch_iter, reward, self.model, discount=args.discount_factor)
+                if train_policy:
+                    loss = self.update(batch_iter, reward, self.model, discount=args.discount_factor)
+                    history_train_losses[session_id].append(loss)
+
+                if train_critic:
+                    stats = self.update_critic(batch_iter, reward, self.critic, discount=args.discount_factor)
+                    critic_report_stats.update(stats)
+                    critic_stats.update(stats)
+
+            # print('verbose: ', args.verbose)
 
             if args.verbose:
-                strs = example.to_text()
-                for str in strs:
-                    print(str)
-                print("reward: [0]{} [1]{}".format(self.all_rewards[0][-1], self.all_rewards[1][-1]))
-                # print("Standard reward: [0]{} [1]{}".format(s_rewards[0], s_rewards[1]))
+                if train_policy or args.model_type == 'tom':
+                    from core.price_tracker import PriceScaler
+                    for session_id, session in enumerate(controller.sessions):
+                        bottom, top = PriceScaler.get_price_range(session.kb)
+                        print('Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top))
+
+
+                    strs = example.to_text()
+                    for str in strs:
+                        print(str)
+                    print("reward: [0]{}\nreward: [1]{}".format(self.all_rewards[0][-1], self.all_rewards[1][-1]))
+                    # print("Standard reward: [0]{} [1]{}".format(s_rewards[0], s_rewards[1]))
+
+            # Save logs on tensorboard
+            if (i + 1) % tensorboard_every == 0:
+                for j in range(2):
+                    self.writer.add_scalar('agent{}/reward'.format(j), np.mean(self.all_rewards[j][-tensorboard_every:]), i)
+                    if len(history_train_losses[j]) >= tensorboard_every:
+                        tmp = np.concatenate(history_train_losses[j][-tensorboard_every:], axis=0)
+                        tmp = np.mean(tmp, axis=0)
+                        self.writer.add_scalar('agent{}/total_loss'.format(j), tmp[0], i)
+                        self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[1], i)
+                        self.writer.add_scalar('agent{}/intent_loss'.format(j), tmp[2], i)
+                        self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[3], i)
 
             if ((i + 1) % args.report_every) == 0:
                 import seaborn as sns
                 import matplotlib.pyplot as plt
                 if args.histogram:
                     sns.set_style('darkgrid')
-                for j in range(2):
-                    print('agent={}'.format(j), end=' ')
-                    print('step:', i, end=' ')
-                    print('reward:', rewards[j], end=' ')
-                    print('scaled reward:', s_rewards[j], end=' ')
-                    print('mean reward:', np.mean(self.all_rewards[j]))
-                    if args.histogram:
-                        self.agents[j].env.dialogue_generator.get_policyHistogram()
+
+                if train_policy:
+                    for j in range(2):
+                        print('agent={}'.format(j), end=' ')
+                        print('step:', i, end=' ')
+                        print('reward:', rewards[j], end=' ')
+                        print('scaled reward:', s_rewards[j], end=' ')
+                        print('mean reward:', np.mean(self.all_rewards[j]))
+                        if args.histogram:
+                            self.agents[j].env.dialogue_generator.get_policyHistogram()
+
+                if train_critic:
+                    critic_report_stats.output(i+1, 0, 0, last_time)
+                    critic_report_stats = RLStatistics()
+
                 print('-'*10)
                 if args.histogram:
                     plt.show()
 
+                last_time = time.time()
+
             # Save model
             if (i > 0 and i % 100 == 0) and not args.only_run:
-                valid_stats = self.validate(args)
-                self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
+                if train_policy:
+                    valid_stats = self.validate(args)
+                    self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
+                    self.update_opponent('policy')
+
+                elif train_critic:
+                    # TODO: reverse!
+                    self.drop_checkpoint(args, i, critic_stats, model_opt=self.agents[self.training_agent].env.model_args)
+                    critic_stats = RLStatistics()
+                else:
+                    valid_stats = self.validate(args)
+                    print('valid result: ', valid_stats.str_loss())
 
 
     def _is_valid_dialogue(self, example):
@@ -254,7 +477,7 @@ class RLTrainer(BaseTrainer):
                 if event.action in ('accept', 'reject') and special_actions['offer'] == 0:
                     print('Invalid events(1): ')
                     for x in example.events:
-                        print('\t', x.action)
+                        print('\t', x.action, x.data)
                     return False
         return True
 
@@ -266,7 +489,7 @@ class RLTrainer(BaseTrainer):
     def _margin_reward(self, example):
         # No agreement
         if not self._is_agreed(example):
-            print('No agreement')
+            # print('No agreement')
             return {'seller': -0.5, 'buyer': -0.5}
 
         rewards = {}
@@ -313,7 +536,7 @@ class RLTrainer(BaseTrainer):
     def _balance_reward(self, example):
         # No agreement
         if not self._is_agreed(example):
-            print('No agreement')
+            # print('No agreement')
             return {'seller': -0.5, 'buyer': -0.5}
 
         rewards = {}
@@ -328,6 +551,7 @@ class RLTrainer(BaseTrainer):
         price = example.outcome['offer']['price']
         norm_factor = abs(midpoint - targets['seller'])
         rewards['seller'] = (price - midpoint) / norm_factor
+        # print('calc price: {}\t{}\t{}\t{}'.format(price, midpoint, norm_factor, rewards['seller']))
         # Zero sum
         rewards['buyer'] = -1. * rewards['seller']
 

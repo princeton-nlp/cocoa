@@ -14,10 +14,10 @@ class Marker(BaseMarker):
     GO_B = '<go-b>'
 
     # Actions
-    OFFER = '<offer>'
-    QUIT = '<quit>'
-    ACCEPT = '<accept>'
-    REJECT = '<reject>'
+    OFFER = 'offer'
+    QUIT = 'quit'
+    ACCEPT = 'accept'
+    REJECT = 'reject'
 
     # Categories
     C_car = '<car>'

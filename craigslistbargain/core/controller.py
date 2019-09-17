@@ -27,6 +27,11 @@ class Controller(BaseController):
                 info_back = other_session.send(is_fake=True)
                 return info_back
 
+    def get_value(self, agent, events):
+        for partner, other_session in enumerate(self.sessions):
+            if agent != partner:
+                return other_session.get_value(events)
+
     def step_back(self, agent):
         for partner, other_session in enumerate(self.sessions):
             if agent != partner:

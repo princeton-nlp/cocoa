@@ -20,3 +20,11 @@ class Entity(namedtuple('Entity', ['surface', 'canonical'])):
 
 def is_entity(x):
     return isinstance(x, Entity) or isinstance(x, CanonicalEntity)
+
+def entity_to_value(x):
+    if isinstance(x, Entity):
+        return x.canonical.value
+    elif isinstance(x, CanonicalEntity):
+        return x.value
+    else:
+        return x

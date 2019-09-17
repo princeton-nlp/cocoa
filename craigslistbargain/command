@@ -52,17 +52,60 @@ PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
 
 
 Supervise Learning:
-mkdir checkpoint/sl; mkdir mappings/sl;CUDA_LAUNCH_BLOCKING=1 PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-examples-paths data/train-luis-post-new.json --test-examples-paths data/dev-luis-post-new.json \
+mkdir checkpoint/sl; mkdir mappings/sl;PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-examples-paths data/train-luis-clean.json --test-examples-paths data/dev-luis-clean.json \
 --price-tracker data/price_tracker.pkl \
---model lf2lf --gpuid 0 \
---model-path checkpoint/sl --mappings mappings/sl \
---word-vec-size 300 --pretrained-wordvec '' '' \
---rnn-size 300 --rnn-type LSTM --global-attention multibank_general \
+--model lf2lf \
+--model-path checkpoint/sl2 --mappings mappings/sl2 \
+--word-vec-size 20 --pretrained-wordvec '' '' \
+--hidden-size 64 --rnn-type LSTM --global-attention multibank_general \
 --num-context 2 --stateful \
---batch-size 128  --optim adagrad --learning-rate 0.01 \
---epochs 15 --report-every 500 \
---cache cache/sl --ignore-cache
+--batch-size 128 --gpuid 0 --optim adagrad --learning-rate 0.01 \
+--epochs 20 --report-every 500 \
+--cache cache/sl2 --ignore-cache --gpuid 0 \
+--dia-num 20 --state-length 4
+
 
 Reinforce:
+mkdir checkpoint/rl2;                    
+PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/sl2/model_best.pt checkpoint/sl2/model_best.pt \
+--model-path checkpoint/rl2 \
+--optim adagrad --learning-rate 0.001 \
+--agents pt-neural pt-neural \
+--report-every 100 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance \
+--dia-num 20 --state-length 4
 
+
+
+Critic:
+mkdir checkpoint/slsl_critic;           
+PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/slsl_critic \
+--optim adagrad --learning-rate 0.01 \
+--agents pt-neural pt-neural \
+--report-every 100 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance \
+--dia-num 20 --state-length 2 --model-type critic
+
+Tom:
+PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/rl/model_best.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/rl \
+--optim adagrad --learning-rate 0.001 \
+--agents tom pt-neural \
+--report-every 100 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance \
+--dia-num 20 --state-length 2 --model-type tom --verbose \
+--load-critic-from checkpoint/slsl_critic/model_best.pt
 

@@ -79,10 +79,11 @@ class Controller(object):
                 #     event_tmp['metadata'] = None
                 #     print('agent=%s: session=%s, event=%s' % (agent, type(session).__name__, event_tmp))
                 # else:
-                action = event.action
-                data = event.data
-                event_output = data if action == 'message' else "Action: {0}, Data: {1}".format(action, data)
-                # print('agent=%s, event=%s' % (agent, event_output))
+                # if verbose:
+                #     action = event.action
+                #     data = event.data
+                #     event_output = data if action == 'message' else "Action: {0}, Data: {1}".format(action, data)
+                #     print('agent=%s, event=%s' % (agent, event_output))
 
                 num_turns += 1
                 if self.game_over() or (max_turns and num_turns >= max_turns):
@@ -93,10 +94,18 @@ class Controller(object):
                     if agent != partner:
                         other_session.receive(event)
 
+        # Detect empty dialogues
+        for s in self.sessions:
+            if len(s.dialogue.lf_tokens) == 0:
+                print('error lfs: ', [s.dialogue.lf_tokens for ss in self.sessions])
+                print([str(e.action) + str(e.data) for e in self.events])
+                print(self.outcomes, self.offers, self.quit)
+                quit()
+
         uuid = generate_uuid('E')
         outcome = self.get_outcome()
         if verbose:
-            print('outcome: %s' % outcome)
+            # print('outcome: %s' % outcome)
             print('----------------')
         # TODO: add configurable names to systems and sessions
         agent_names = {'0': self.session_names[0], '1': self.session_names[1]}

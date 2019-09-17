@@ -79,12 +79,13 @@ class TextIntMap(object):
 class Dialogue(object):
     textint_map = None
     lfint_map = None
+    ROLE = -1
     ENC = 0
     DEC = 1
     TARGET = 2
     num_stages = 3  # encoding, decoding, target
 
-    def __init__(self, agent, kb, uuid, model='seq2seq'):
+    def __init__(self, agent, kb, uuid, model='seq2seq', hidden_price=True, update_agree=True):
         '''
         Dialogue data that is needed by the model.
         '''
@@ -112,6 +113,11 @@ class Dialogue(object):
         self.roles = []
         self.is_int = False  # Whether we've converted it to integers
         self.num_context = None
+
+        self.hidden_price = hidden_price
+        self.update_agree = update_agree
+        self.need_output = False
+        self.msgs = []
 
         self.states = []
 
@@ -154,7 +160,8 @@ class Dialogue(object):
         # print("process lf: ", intent, price)
         return {'intent': intent, 'price': price}
 
-    def add_utterance(self, agent, utterance, lf=None):
+    def add_utterance(self, agent, utterance, lf=None, msg=None):
+        utterance = utterance.copy()
         # Always start from the partner agent
         if len(self.agents) == 0 and agent == self.agent:
             self._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
@@ -165,7 +172,7 @@ class Dialogue(object):
             print('[] case: ', utterance, lf)
             assert True
         # print("lf {}".format(lf))
-        self._add_utterance(agent, utterance, lf=lf)
+        self._add_utterance(agent, utterance, lf=lf, msg=msg)
 
     def add_utterance_with_state(self, agent, utterance, state, lf=None):
         self.states.append(state)
@@ -224,7 +231,7 @@ class Dialogue(object):
 
         return utterance
 
-    def _add_utterance(self, agent, utterance, lf=None):
+    def _add_utterance(self, agent, utterance, lf=None, msg=None):
         # Same agent talking
         if len(self.agents) > 0 and agent == self.agents[-1]:
             new_turn = False
@@ -256,6 +263,7 @@ class Dialogue(object):
             self.entities.append(entities)
             # self.lfs.append(lf)
             self.lf_tokens.append(lf)
+            self.msgs.append(msg)
         else:
             self.token_turns[-1].extend(utterance)
             self.entities[-1].extend(entities)
@@ -269,12 +277,45 @@ class Dialogue(object):
 
     def lf_to_int(self):
         self.lfs = []
+        last_price = [0]*2
+        last_price[self.agent] = 1
+
+        self.need_output = False
+
         for i, lf in enumerate(self.lf_tokens):
+
             self.lfs.append(lf)
             tmp_lf = {}
             for k in lf:
                 tmp_lf[k] = self.mappings['lf_vocab'].to_ind(lf[k])
+
+            tmp_lf['original_price'] = tmp_lf.get('price')
+            # Add last price
+            if self.hidden_price:
+                if tmp_lf.get('price') is not None:
+                    last_price[self.agents[i]] = tmp_lf.get('price')
+
+                # Update intent price for agree-noprice
+                if self.update_agree and tmp_lf['intent'] == self.mappings['lf_vocab'].word_to_ind['agree-noprice']:
+                    agt = self.agents[i]
+                    last_price[agt] = last_price[agt ^ 1]
+
+                tmp_lf['price'] = last_price[self.agents[i]]
+
+                if tmp_lf['price'] <= -1:
+                    self.need_output = True
+
             self.lfs[i] = tmp_lf
+
+        for i, r in enumerate(self.roles):
+            if self.roles is not None:
+                self.roles[i] = 0 if r == 'seller' else 1
+        # if self.need_output:
+        # print('token_turns weird: ')
+        # for i, t in enumerate(self.token_turns):
+        #     print(self.lfs[i]['price'], t)
+        # for i in self.msgs:
+        #     print(i)
 
     def convert_to_int(self):
         if self.is_int:
@@ -419,7 +460,7 @@ class Preprocessor(object):
                     lf = e.metadata
                     utterance = self.process_event(e, dialogue.kb)
                 if utterance:
-                    dialogue.add_utterance(e.agent, utterance, lf=lf)
+                    dialogue.add_utterance(e.agent, utterance, lf=lf, msg=e.data)
             yield dialogue
 
     @classmethod
@@ -484,7 +525,8 @@ class DataGenerator(object):
     def __init__(self, train_examples, dev_examples, test_examples, preprocessor,
             schema, mappings_path=None, cache='.cache',
             ignore_cache=False, num_context=1, batch_size=1,
-            model='seq2seq'):
+            model='seq2seq',
+            dia_num=0, state_length=2):
         examples = {'train': train_examples, 'dev': dev_examples, 'test': test_examples}
         self.num_examples = {k: len(v) if v else 0 for k, v in examples.items()}
         self.num_context = num_context
@@ -517,7 +559,13 @@ class DataGenerator(object):
 
         self.dialogue_batcher = DialogueBatcherFactory.get_dialogue_batcher(model,
                         kb_pad=self.mappings['kb_vocab'].to_ind(markers.PAD),
-                        mappings=self.mappings, num_context=num_context)
+                        mappings=self.mappings, num_context=num_context,
+                        dia_num=dia_num, state_length=state_length)
+
+        from get_policy import PolicyCounter
+        self.policy = PolicyCounter(len(self.mappings['lf_vocab']), from_dataset=True)
+        # print(self.dialogues)
+        self.policy.add_dialogues(self.dialogues)
 
         self.batches = {k: self.create_batches(k, dialogues, batch_size) for k, dialogues in self.dialogues.items()}
 
@@ -552,7 +600,7 @@ class DataGenerator(object):
 
     def dialogue_sort_score(self, d):
         # Sort dialogues by number o turns
-        return len(d.turns[0])
+        return len(d.lfs[0])
 
     def create_dialogue_batches(self, dialogues, batch_size):
         dialogue_batches = []
@@ -564,6 +612,7 @@ class DataGenerator(object):
             end = min(start + batch_size, N)
             dialogue_batch = dialogues[start:end]
             dialogue_batches.append(self.dialogue_batcher.create_batch(dialogue_batch))
+            # print(dialogue_batches[-1][0]['encoder_args']['intent'][0])
             start = end
         return dialogue_batches
 

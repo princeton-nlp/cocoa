@@ -28,15 +28,15 @@ def get_system(name, args, schema=None, timed=False, model_path=None):
         return CmdSystem()
     elif name == 'pt-neural':
         from .neural_system import PytorchNeuralSystem
-        assert model_path
-        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed)
+        # assert model_path
+        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
     elif name == 'ac':
         from .ac_system import PytorchNeuralACSystem
         assert model_path
         return PytorchNeuralACSystem(args, schema, lexicon, model_path, timed)
     elif name == 'tom':
-        from .tom_system import PytorchNeuralTomSystem
+        from .neural_system import PytorchNeuralSystem
         assert model_path
-        return PytorchNeuralTomSystem(args, schema, lexicon, model_path, timed)
+        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
     else:
         raise ValueError('Unknown system %s' % name)

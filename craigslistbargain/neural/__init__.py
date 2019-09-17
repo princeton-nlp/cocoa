@@ -30,7 +30,8 @@ def get_data_generator(args, model_args, schema, test=False):
         cache=args.cache, ignore_cache=args.ignore_cache,
         num_context=model_args.num_context,
         batch_size=args.batch_size,
-        model=model_args.model)
+        model=model_args.model,
+        dia_num=args.dia_num, state_length=args.state_length)
 
     return data_generator
 
@@ -72,6 +73,9 @@ def build_optim(opt, model, checkpoint):
         opt.optim, opt.learning_rate, opt.max_grad_norm,
         model_size=opt.rnn_size)
 
-    optim.set_parameters(model.parameters())
+    if isinstance(model, list):
+        optim.set_parameters([m.parameters() for m in model])
+    else:
+        optim.set_parameters(model.parameters())
 
     return optim

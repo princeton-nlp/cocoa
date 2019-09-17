@@ -50,9 +50,19 @@ class PriceScaler(object):
         if role == 'seller':
             b = t * 0.7
             # print('[Role: {}]\ttarget: {},\tbottom {}'.format(role, t, b))
+            # Augment the price range
+            # b = b * 0.5
+            # t = t * 2
+            # unit = t-b
+            # t = t+unit*2
+            # b = b-unit
         else:
             b = kb.facts['item']['Price']
             # print('[Role: {}]\tbottom {},\ttarget: {}\tratio:{}'.format(role, b, t, 1.*t/b))
+            # Augment the price range
+            # unit = t-b
+            # t = t+unit*0.5
+            # b = b-unit
 
 
         return b, t

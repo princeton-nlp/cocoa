@@ -1,6 +1,5 @@
 import torch
 from torch.autograd import Variable
-
 import onmt.io
 from onmt.Utils import aeq, use_gpu
 
@@ -10,8 +9,13 @@ from cocoa.neural.generator import Generator, Sampler
 from .symbols import markers, category_markers, sequence_markers
 from .utterance import UtteranceBuilder
 
+from cocoa.core.entity import is_entity, Entity, CanonicalEntity
+
 
 class LFSampler(Sampler):
+
+    var_for_price = 0.1
+
     def __init__(self, model, vocab,
                  temperature=1, max_length=100, cuda=False):
         super(LFSampler, self).__init__(model, vocab, temperature=temperature, max_length=max_length, cuda=cuda)
@@ -35,6 +39,8 @@ class LFSampler(Sampler):
         # plt.show()
 
         self.policy_history = []
+
+
         # self.all_actions = self._get_all_actions()
 
     def generate_batch(self, batch, gt_prefix=1, enc_state=None, whole_policy=False, special_actions=None):
@@ -42,7 +48,7 @@ class LFSampler(Sampler):
         assert batch.size == 1
 
         # Run the model
-        policy, price = self.model(batch.encoder_intent, batch.encoder_price, batch.encoder_pmask)
+        policy, p_mean, p_logstd = self.model(batch.encoder_intent, batch.encoder_price, batch.encoder_pmask, batch.encoder_dianum)
 
         # Get embeddings of target
         # tgt_emb = self.model.encoder.embeddings(batch.target_intent)
@@ -52,11 +58,26 @@ class LFSampler(Sampler):
         policy.sub_(policy.max(1, keepdim=True).values.expand(-1, policy.size(1)))
         # mask = batch.policy_mask
         # policy[mask == 0] = -100.
-        p_exp = policy.exp()
+        # print(batch.policy_mask)
+
+        # Avoid policy equal to zero ( + 1e-6 )
+        p_exp = (policy.exp() + 1e-6).mul(batch.policy_mask)
+        # if torch.sum(p_exp).item() == 0:
+        #     p_exp += torch.ones_like(p_exp).mul(batch.policy_mask)
+
         policy = p_exp / (torch.sum(p_exp, keepdim=True, dim=1))
+        if torch.any(policy < 0) or torch.any(torch.isnan(policy)):
+            print('lots of errors: ',p_exp, batch.policy_mask)
         intent = torch.multinomial(policy, 1).squeeze(1)  # (batch_size,)
 
-        # TODO: Not correct, I think.
+        # Use Normal distribution with constant variance as policy on price
+
+        price = p_mean + p_logstd.exp() * torch.randn_like(p_mean)
+        # price = p_mean
+        # print(torch.cat([price.view(-1,1), p_mean.view(-1,1), p_logstd.view(-1,1)], dim=1))
+        # price = price + LFSampler.var_for_price * torch.randn_like(price).abs()
+
+        # TODO: Not correct, for multiple data.
         if intent not in self.price_actions:
             price = None
 
@@ -64,6 +85,8 @@ class LFSampler(Sampler):
         ret = {"intent": intent,
                "price": price,
                "policy": policy,
+               "price_mean": p_mean,
+               "price_logstd": p_logstd
                }
 
         ret["batch"] = batch
@@ -71,19 +94,29 @@ class LFSampler(Sampler):
         # ret["probability"] = probs
         return ret
 
-    def _get_all_actions(self):
-        all_actions = []
+    def _get_all_actions(self, mean, logstd, p_num=5):
+        # prices
+        self.prices = []
+        step = 0.05
+        now = step
+        while now < 1:
+            self.prices.append(now)
+            now += step
         num_acions = len(self.vocab.word_to_ind)
-        print(self.actions)
-        print(list(self.actions))
-        for i in list(self.actions):
+        self.actions = list(range(num_acions))
+
+        # get all actions
+        all_actions = []
+        for i in self.actions:
             if not i in self.price_actions:
-                print('a ', self.vocab.to_word(i))
-                all_actions.append((i,))
+                # print('a ', self.vocab.to_word(i))
+                all_actions.append((i,None))
         for i in self.price_actions:
-            print('pa ', self.vocab.to_word(i))
-            for j in self.prices:
-                all_actions.append((i,j))
+            # print('pa ', self.vocab.to_word(i))
+            for j in range(p_num):
+                p = mean + logstd.exp() * torch.randn_like(mean)
+                p = p.cpu().item()
+                all_actions.append((i,p))
         return all_actions
 
     def get_policyHistogram(self):

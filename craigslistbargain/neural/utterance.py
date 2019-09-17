@@ -3,7 +3,7 @@ from cocoa.neural.utterance import UtteranceBuilder as BaseUtteranceBuilder
 
 from .symbols import markers, category_markers
 from core.price_tracker import PriceScaler
-from cocoa.core.entity import is_entity, Entity
+from cocoa.core.entity import entity_to_value, Entity, CanonicalEntity
 
 class UtteranceBuilder(BaseUtteranceBuilder):
     """
@@ -30,4 +30,4 @@ class UtteranceBuilder(BaseUtteranceBuilder):
 
     def get_price_number(self, entity, kb):
         raw_price = PriceScaler.unscale_price(kb, entity)
-        return raw_price.canonical.value
+        return entity_to_value(raw_price)

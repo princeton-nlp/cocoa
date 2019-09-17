@@ -33,7 +33,7 @@ def make_loss(opt, model, tgt_vocab):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(conflict_handler='resolve')
     parser.add_argument('--agents', help='What kind of agent to use. The first agent is always going to be updated and the second is fixed.', nargs='*', required=True)
-    parser.add_argument('--agent-checkpoints', nargs='+', help='Directory to learned models')
+    parser.add_argument('--agent-checkpoints', default=[], nargs='+', help='Directory to learned models')
     parser.add_argument('--random-seed', help='Random seed', type=int, default=1)
     parser.add_argument('--verbose', default=False, action='store_true', help='Whether or not to have verbose prints')
 
@@ -42,7 +42,29 @@ if __name__ == '__main__':
 
     parser.add_argument('--only-run', default=False, action='store_true', help='only sample trajectories.')
 
+    parser.add_argument('--update-oppo', action='store_true', help='update opponent')
+
+    parser.add_argument('--model-type', default='reinforce', choices=['reinforce', 'a2c', 'critic', 'tom'], help='choise rl algorithms')
+    parser.add_argument('--load-critic-from', default=None, type=str, help='load critic model from another checkpoint')
+
+    parser.add_argument('--name', default='rl', type=str, help='Name of this experiment.')
+
+    parser.add_argument('--mappings', help='Path to vocab mappings')
+    # Initialization
+    parser.add_argument('--pretrained-wordvec', nargs='+', default=['', ''],
+                       help="""If a valid path is specified, then this will load
+                           pretrained word embeddings, if list contains two embeddings,
+                           then the second one is for item title and description""")
+    parser.add_argument('--param-init', type=float, default=0.1,
+                       help="""Parameters are initialized over uniform distribution
+                           with support (-param_init, param_init).
+                           Use 0 to not use initialization""")
+    parser.add_argument('--fix-pretrained-wordvec',
+                       action='store_true',
+                       help="Fix pretrained word embeddings.")
+
     cocoa.options.add_scenario_arguments(parser)
+    options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)
     options.add_rl_arguments(parser)
     options.add_model_arguments(parser)
@@ -56,15 +78,34 @@ if __name__ == '__main__':
     scenario_db = ScenarioDB.from_dict(schema, read_json(args.scenarios_path), Scenario)
     valid_scenario_db = ScenarioDB.from_dict(schema, read_json(args.valid_scenarios_path), Scenario)
 
-    assert len(args.agent_checkpoints) <= len(args.agents)
-    systems = [get_system(name, args, schema, False, args.agent_checkpoints[i]) for i, name in enumerate(args.agents)]
+    # if len(args.agent_checkpoints) == 0
+    # assert len(args.agent_checkpoints) <= len(args.agents)
+    if len(args.agent_checkpoints) < len(args.agents):
+        ckpt = [None]*2
+    else:
+        ckpt = args.agent_checkpoints
+
+    systems = [get_system(name, args, schema, False, ckpt[i]) for i, name in enumerate(args.agents)]
 
     rl_agent = 0
     system = systems[rl_agent]
     model = system.env.model
     loss = None
-    optim = build_optim(args, model, None)
+    if args.model_type == 'reinforce':
+        optim = build_optim(args, model, None)
+    elif args.model_type == 'a2c':
+        # optim = build_optim(args, [model, system.env.critic], None)
+        optim = {'model': build_optim(args, model, None),
+                 'critic': build_optim(args, system.env.critic, None)}
+    else:
+        optim = build_optim(args, system.env.critic, None)
 
     scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
-    trainer = RLTrainer(systems, scenarios, loss, optim, rl_agent, reward_func=args.reward, cuda=(len(args.gpuid) > 0))
+    if args.model_type =='a2c':
+        from neural.a2c_trainer import RLTrainer as A2CTrainer
+        trainer = A2CTrainer(systems, scenarios, loss, optim, rl_agent,
+                            reward_func=args.reward, cuda=(len(args.gpuid) > 0), args=args)
+    else:
+        trainer = RLTrainer(systems, scenarios, loss, optim, rl_agent,
+                            reward_func=args.reward, cuda=(len(args.gpuid) > 0), args=args)
     trainer.learn(args)

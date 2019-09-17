@@ -25,6 +25,9 @@ def add_data_generator_arguments(parser):
 def add_model_arguments(parser):
     from onmt.modules.SRU import CheckSRU
     group = parser.add_argument_group('Model')
+    group.add_argument('--dia-num', type=int, default=0, help='')
+    group.add_argument('--state-length', type=int, default=2, help='')
+
     group.add_argument('--word-vec-size', type=int, default=64,
                        help='Word embedding size for src and tgt.')
     group.add_argument('--hidden-size', type=int, default=64,
