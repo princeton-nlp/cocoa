@@ -33,29 +33,29 @@ class Batch(object):
 
         self.for_value = for_value
 
-        if not for_value:
-            self.target_intent = decoder_args['intent']
-            self.target_price = decoder_args['price']
-            self.target_pmask = decoder_args['price_mask']
-            # TODO: Get policy mask from the intent
-            self.policy_mask = np.ones((len(self.encoder_intent), len(self.vocab)))
-            offer_idx = self.vocab.to_ind('offer')
-            acc_idx = self.vocab.to_ind('accept')
-            rej_idx = self.vocab.to_ind('reject')
-            none_idx = self.vocab.to_ind('None')
-            unk_idx = self.vocab.to_ind('unkown')
-            quit_idx = self.vocab.to_ind('quit')
-            pad_idx = self.vocab.to_ind(markers.PAD)
-            start_idx = self.vocab.to_ind('start')
+        # if not for_value:
+        self.target_intent = decoder_args['intent']
+        self.target_price = decoder_args['price']
+        self.target_pmask = decoder_args['price_mask']
+        # TODO: Get policy mask from the intent
+        self.policy_mask = np.ones((len(self.encoder_intent), len(self.vocab)))
+        offer_idx = self.vocab.to_ind('offer')
+        acc_idx = self.vocab.to_ind('accept')
+        rej_idx = self.vocab.to_ind('reject')
+        none_idx = self.vocab.to_ind('None')
+        unk_idx = self.vocab.to_ind('unkown')
+        quit_idx = self.vocab.to_ind('quit')
+        pad_idx = self.vocab.to_ind(markers.PAD)
+        start_idx = self.vocab.to_ind('start')
 
-            for i in range(len(self.encoder_intent)):
-                if self.encoder_intent[i][-1] == offer_idx:
-                    self.policy_mask[i, :] = 0
-                    self.policy_mask[i,[acc_idx, rej_idx]] = 1
-                else:
-                    self.policy_mask[i, [acc_idx, rej_idx, pad_idx, none_idx, unk_idx, quit_idx, start_idx]] = 0
-        else:
-            self.target_value = decoder_args['value']
+        for i in range(len(self.encoder_intent)):
+            if self.encoder_intent[i][-1] == offer_idx:
+                self.policy_mask[i, :] = 0
+                self.policy_mask[i,[acc_idx, rej_idx]] = 1
+            else:
+                self.policy_mask[i, [acc_idx, rej_idx, pad_idx, none_idx, unk_idx, quit_idx, start_idx]] = 0
+        # else:
+        #     self.target_value = decoder_args['value']
 
         self.title_inputs = decoder_args['context']['title']
         self.desc_inputs = decoder_args['context']['description']
@@ -71,12 +71,12 @@ class Batch(object):
             unsorted_attributes += ['encoder_dianum']
             batch_major_attributes += ['encoder_dianum']
 
-        if not for_value:
-            unsorted_attributes += ['target_intent', 'target_price']
-            batch_major_attributes += ['target_intent', 'target_price']
-        else:
-            unsorted_attributes += ['target_value']
-            batch_major_attributes += ['target_value']
+        # if not for_value:
+        unsorted_attributes += ['target_intent', 'target_price']
+        batch_major_attributes += ['target_intent', 'target_price']
+        # else:
+        #     unsorted_attributes += ['target_value']
+        #     batch_major_attributes += ['target_value']
 
         # if num_context > 0:
         #     self.context_inputs = encoder_args['context'][0]
@@ -100,23 +100,23 @@ class Batch(object):
         if use_dianum:
             self.encoder_dianum = self.to_variable(self.encoder_dianum, 'float', cuda).view(-1,3)
 
-        if not for_value:
-            # print('ti0, ', self.target_intent)
-            self.target_intent = self.to_variable(self.target_intent, 'long', cuda)
-            self.target_price = self.to_variable(self.target_price, 'float', cuda)
-            self.target_pmask = self.to_variable(self.target_pmask, 'float', cuda)
-            self.policy_mask = self.to_variable(self.policy_mask, 'float', cuda)
-            # print('ti1, ', self.target_intent)
-            for v in ['target_intent', 'target_price', 'target_pmask']:
-                while True:
-                    d = len(getattr(self, v).shape)
-                    if d >= 2:
-                        break
-                    setattr(self, v, getattr(self, v).unsqueeze(d))
-            # print('ti2, ', self.target_intent)
+        # if not for_value:
+        #     # print('ti0, ', self.target_intent)
+        self.target_intent = self.to_variable(self.target_intent, 'long', cuda)
+        self.target_price = self.to_variable(self.target_price, 'float', cuda)
+        self.target_pmask = self.to_variable(self.target_pmask, 'float', cuda)
+        self.policy_mask = self.to_variable(self.policy_mask, 'float', cuda)
+        # print('ti1, ', self.target_intent)
+        for v in ['target_intent', 'target_price', 'target_pmask']:
+            while True:
+                d = len(getattr(self, v).shape)
+                if d >= 2:
+                    break
+                setattr(self, v, getattr(self, v).unsqueeze(d))
+        # print('ti2, ', self.target_intent)
 
-        else:
-            self.target_value = self.to_variable(self.target_value, 'float', cuda).unsqueeze(1)
+        # else:
+        #     self.target_value = self.to_variable(self.target_value, 'float', cuda).unsqueeze(1)
 
         self.title_inputs = self.to_variable(self.title_inputs, 'long', cuda)
         self.desc_inputs = self.to_variable(self.desc_inputs, 'long', cuda)
@@ -331,7 +331,7 @@ class DialogueBatcher(object):
 
     def _create_one_batch(self, encoder_turns=None, decoder_turns=None,
             target_turns=None, agents=None, uuids=None, kbs=None, kb_context=None,
-            num_context=None, encoder_tokens=None, decoder_tokens=None, i=None, roles=None):
+            num_context=None, encoder_tokens=None, decoder_tokens=None, i=None, roles=None, for_value=False):
         # encoder_context = self.get_encoder_context(encoder_turns, num_context)
 
         # print('encoder_turns: ', encoder_turns)
@@ -367,6 +367,7 @@ class DialogueBatcher(object):
                 'encoder_args': encoder_args,
                 'decoder_args': decoder_args,
                 'context_data': context_data,
+                'for_value':    for_value
                 }
         return batch
 
@@ -424,7 +425,7 @@ class DialogueBatcher(object):
         pad = self.mappings['lf_vocab'].to_ind(markers.PAD)
         return pad_list_to_array([d.lfs[i] for d in dialogues], pad, np.int32)
 
-    def create_batch(self, dialogues):
+    def create_batch(self, dialogues, for_value=False):
         num_turns = self._normalize_dialogue(dialogues)
         # print('num turns: ', num_turns)
         dialogue_data = self._get_dialogue_data(dialogues)
@@ -459,6 +460,22 @@ class DialogueBatcher(object):
 
         # bath_seq: A sequence of batches that can be processed in turn where
         # the state of each batch is passed on to the next batch
+        if for_value and not (num_turns-1 in encode_turn_ids):
+            i = num_turns-1
+            batch_seq.append(self._create_one_batch(
+                encoder_turns=self._get_turn_batch_at(dialogues, ENC, i, step_back=self.state_length),
+                decoder_turns=self._get_turn_batch_at(dialogues, DEC, i),
+                target_turns=self._get_turn_batch_at(dialogues, TARGET, i),
+                encoder_tokens=self._get_token_turns_at(dialogues, i),
+                decoder_tokens=self._get_token_turns_at(dialogues, i),
+                roles=self._get_turn_batch_at(dialogues, ROLE, i),
+                agents=dialogue_data['agents'],
+                uuids=dialogue_data['uuids'],
+                kbs=dialogue_data['kbs'],
+                kb_context=dialogue_data['kb_context'],
+                num_context=self.num_context,
+                i=i, for_value=True))
+
         return batch_seq
 
     def create_batch_critic(self, dialogues):

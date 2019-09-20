@@ -91,21 +91,13 @@ if __name__ == '__main__':
     system = systems[rl_agent]
     model = system.env.model
     loss = None
-    if args.model_type == 'reinforce':
-        optim = build_optim(args, model, None)
-    elif args.model_type == 'a2c':
-        # optim = build_optim(args, [model, system.env.critic], None)
-        optim = {'model': build_optim(args, model, None),
-                 'critic': build_optim(args, system.env.critic, None)}
-    else:
-        optim = build_optim(args, system.env.critic, None)
+    # optim = build_optim(args, [model, system.env.critic], None)
+    optim = {'model': build_optim(args, model, None),
+             'critic': build_optim(args, system.env.critic, None)}
+    optim['critic']._set_rate(0.05)
 
     scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
-    if args.model_type =='a2c':
-        from neural.a2c_trainer import RLTrainer as A2CTrainer
-        trainer = A2CTrainer(systems, scenarios, loss, optim, rl_agent,
-                            reward_func=args.reward, cuda=(len(args.gpuid) > 0), args=args)
-    else:
-        trainer = RLTrainer(systems, scenarios, loss, optim, rl_agent,
-                            reward_func=args.reward, cuda=(len(args.gpuid) > 0), args=args)
+    from neural.a2c_trainer import RLTrainer as A2CTrainer
+    trainer = A2CTrainer(systems, scenarios, loss, optim, rl_agent,
+                        reward_func=args.reward, cuda=(len(args.gpuid) > 0), args=args)
     trainer.learn(args)

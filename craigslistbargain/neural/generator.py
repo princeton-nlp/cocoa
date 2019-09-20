@@ -11,6 +11,8 @@ from .utterance import UtteranceBuilder
 
 from cocoa.core.entity import is_entity, Entity, CanonicalEntity
 
+import numpy as np
+
 
 class LFSampler(Sampler):
 
@@ -43,25 +45,31 @@ class LFSampler(Sampler):
 
         # self.all_actions = self._get_all_actions()
 
-    def generate_batch(self, batch, gt_prefix=1, enc_state=None, whole_policy=False, special_actions=None):
+    def generate_batch(self, batch, gt_prefix=1, enc_state=None, whole_policy=False, special_actions=None,
+                       temperature=1):
         # This is to ensure we can stop at EOS for stateful models
         assert batch.size == 1
 
         # Run the model
         policy, p_mean, p_logstd = self.model(batch.encoder_intent, batch.encoder_price, batch.encoder_pmask, batch.encoder_dianum)
+        # print('policy is:', policy)
 
         # Get embeddings of target
         # tgt_emb = self.model.encoder.embeddings(batch.target_intent)
         # tgt_emb = torch.cat([tgt_emb, batch.target_price], )
 
         # policy.sub_(policy.max(1, keepdim=True)[0].expand(policy.size(0), policy.size(1)))
+
+        # policy[batch.policy_mask == 0] = -100
         policy.sub_(policy.max(1, keepdim=True).values.expand(-1, policy.size(1)))
+        policy = policy * temperature
         # mask = batch.policy_mask
         # policy[mask == 0] = -100.
         # print(batch.policy_mask)
 
         # Avoid policy equal to zero ( + 1e-6 )
         p_exp = (policy.exp() + 1e-6).mul(batch.policy_mask)
+        # p_exp = (policy.exp() + 1e-6)
         # if torch.sum(p_exp).item() == 0:
         #     p_exp += torch.ones_like(p_exp).mul(batch.policy_mask)
 
@@ -72,7 +80,8 @@ class LFSampler(Sampler):
 
         # Use Normal distribution with constant variance as policy on price
 
-        price = p_mean + p_logstd.exp() * torch.randn_like(p_mean)
+        # price = p_mean + p_logstd.exp()*0.1 * torch.randn_like(p_mean)
+        price = p_mean + (1.1-temperature) * torch.randn_like(p_mean)
         # price = p_mean
         # print(torch.cat([price.view(-1,1), p_mean.view(-1,1), p_logstd.view(-1,1)], dim=1))
         # price = price + LFSampler.var_for_price * torch.randn_like(price).abs()
@@ -94,7 +103,7 @@ class LFSampler(Sampler):
         # ret["probability"] = probs
         return ret
 
-    def _get_all_actions(self, mean, logstd, p_num=5):
+    def _get_all_actions(self, mean, logstd, p_num=5, no_sample=False):
         # prices
         self.prices = []
         step = 0.05
@@ -111,12 +120,27 @@ class LFSampler(Sampler):
             if not i in self.price_actions:
                 # print('a ', self.vocab.to_word(i))
                 all_actions.append((i,None))
+        d = torch.distributions.normal.Normal(mean, logstd.exp())
+
         for i in self.price_actions:
             # print('pa ', self.vocab.to_word(i))
-            for j in range(p_num):
-                p = mean + logstd.exp() * torch.randn_like(mean)
-                p = p.cpu().item()
-                all_actions.append((i,p))
+            if no_sample:
+                now = 0.
+                step = 0.01
+                p_list = []
+                while now <= 1:
+                    p_list.append(now)
+                    now += step
+                prob = d.log_prob(torch.from_numpy(np.array(p_list)).float().to(mean.device)).exp()
+                prob = prob / prob.sum(dim=-1, keepdim= True)
+                for j, p in enumerate(p_list):
+                    all_actions.append((i,p, prob[j].cpu().item()))
+
+            else:
+                for j in range(p_num):
+                    p = mean + logstd.exp() * torch.randn_like(mean)
+                    p = p.cpu().item()
+                    all_actions.append((i,p))
         return all_actions
 
     def get_policyHistogram(self):

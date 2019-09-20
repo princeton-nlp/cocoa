@@ -44,7 +44,7 @@ class Controller(object):
     def get_result(self, agent_idx):
         return None
 
-    def simulate(self, max_turns=None, verbose=False):
+    def simulate(self, max_turns=None, verbose=False, temperature=1):
         '''
         Simulate a dialogue.
         '''
@@ -63,7 +63,7 @@ class Controller(object):
                 if num_turns == 0 and agent != first_speaker:
                     continue
                 self.time_tmp = time
-                event = session.send()
+                event = session.send(temperature=temperature)
                 time += 1
                 if not event:
                     continue

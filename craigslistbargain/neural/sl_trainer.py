@@ -129,8 +129,8 @@ class SimpleLoss(nn.Module):
         # if SimpleLoss.debug and torch.mean(tgt_price).item() != 1:
         #     print('compaire', torch.cat([enc_price, tgt_price],dim=1))
         #     SimpleLoss.debug = False
-        if pmask.sum() > 0:
-            loss1 = loss1 * loss1.shape[0] / pmask.sum()
+        # if pmask.sum() > 0:
+        #     loss1 = loss1 * loss1.shape[0] / pmask.sum()
         loss1 = alpha * loss1
         loss = loss0 + loss1
 

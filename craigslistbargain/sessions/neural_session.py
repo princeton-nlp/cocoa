@@ -154,8 +154,8 @@ class NeuralSession(Session):
         return values
 
 
-    def send(self, is_fake=False):
-        tokens, output_data = self.generate(is_fake)
+    def send(self, temperature=1, is_fake=False):
+        tokens, output_data = self.generate(is_fake=is_fake, temperature=temperature)
 
         if is_fake:
             # For the step of choosing U3
@@ -163,14 +163,14 @@ class NeuralSession(Session):
             p_logstd = output_data['price_logstd']
             # get all
             num_price = 5
-            all_actions = self.generator._get_all_actions(p_mean, p_logstd, num_price)
+            all_actions = self.generator._get_all_actions(p_mean, p_logstd, num_price, no_sample=True)
             all_events = []
             new_all_actions = []
 
             for act in all_actions:
                 if output_data['policy'][0, act[0]].item() < 1e-7:
                     continue
-                e = self._tokens_to_event(act, output_data)
+                e = self._tokens_to_event(act[:2], output_data)
                 all_events.append(e)
                 new_all_actions.append(act)
             all_actions = new_all_actions
@@ -184,18 +184,18 @@ class NeuralSession(Session):
             for i, act in enumerate(all_actions):
                 # print('act: ',i ,output_data['policy'], act, probs.shape)
                 if act[1] is not None:
-                    probs[i, 0] = output_data['policy'][0, act[0]].item() / num_price
+                    probs[i, 0] = output_data['policy'][0, act[0]].item() * act[2]
                 else:
                     probs[i, 0] = output_data['policy'][0, act[0]].item()
 
                 print_list.append((self.env.textint_map.int_to_text([act[0]]), act, probs[i, 0].item(), values[i, 0].item()))
 
-
-            # print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
-            # for i, s in enumerate(self.dialogue.lf_tokens):
-            #     print('\t[{}] {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
-            # for s in print_list:
-            #     print('\t' + str(s))
+            # if self.dialogue.lf_tokens[-1]['intent'] == 'offer':
+            #     print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
+            #     for i, s in enumerate(self.dialogue.lf_tokens):
+            #         print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
+            #     for s in print_list:
+            #         print('\t' + str(s))
 
 
             info = {'values': values, 'probs': probs}
@@ -213,6 +213,9 @@ class NeuralSession(Session):
             all_actions = self.generator._get_all_actions(p_mean, p_logstd)
             best_action = (None, None)
             print_list = []
+
+            tom_policy = []
+            tom_actions = []
             for act in all_actions:
                 if output_data['policy'][0, act[0]].item() < 1e-7:
                     continue
@@ -224,16 +227,23 @@ class NeuralSession(Session):
                 self.dialogue.delete_last_utterance(delete_state=False)
                 self.controller.step_back(self.agent)
 
-                tmp = info * output_data['policy'][0, act[0]]
+                tmp = info.exp() * output_data['policy'][0, act[0]]
                 # choice the best action
-                if best_action[1] is None or tmp.item() > best_action[1]:
-                    best_action = (tmp_tokens, tmp.item())
+                # if best_action[1] is None or tmp.item() > best_action[1]:
+                #     best_action = (tmp_tokens, tmp.item())
+                # record all the actions
+                tom_policy.append(tmp.item())
+                tom_actions.append(tmp_tokens)
+
                 print_list.append((self.env.textint_map.int_to_text([act[0]]), act, tmp.item(), info.item(), output_data['policy'][0, act[0]].item()))
+
+            # Sample action from new policy
+            final_action = torch.multinomial(torch.from_numpy(np.array(tom_policy),), 1).item()
+            tokens = list(tom_actions[final_action])
 
             # print('-'*5+'tom debug info: ', len(self.dialogue.lf_tokens))
             # for s in print_list:
             #     print('\t'+ str(s))
-            # tokens = list(best_action[0])
             # self.dialogue.lf_to_int()
             # for s in self.dialogue.lfs:
             #     print(s)
@@ -241,6 +251,7 @@ class NeuralSession(Session):
         if tokens is None:
             return None
         self.dialogue.add_utterance(self.agent, list(tokens))
+        # print('tokens', tokens)
         # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
         return self._tokens_to_event(tokens, output_data)
 
@@ -253,7 +264,7 @@ class NeuralSession(Session):
         """Compute the logprob of each generated utterance.
         """
         self.convert_to_int()
-        batches = self.batcher.create_batch([self.dialogue])
+        batches = self.batcher.create_batch([self.dialogue], for_value=True)
         # print('number of batches: ', len(batches))
         yield len(batches)
         for batch in batches:
@@ -262,7 +273,8 @@ class NeuralSession(Session):
                           batch['decoder_args'],
                           batch['context_data'],
                           self.env.vocab,
-                          num_context=Dialogue.num_context, cuda=self.env.cuda)
+                          num_context=Dialogue.num_context, cuda=self.env.cuda,
+                          for_value=batch['for_value'])
             yield batch
 
 
@@ -325,13 +337,13 @@ class PytorchNeuralSession(NeuralSession):
         return Batch(encoder_args, decoder_args, context_data,
                 self.vocab, num_context=num_context, cuda=self.cuda)
 
-    def generate(self, is_fake=False):
+    def generate(self, temperature=1, is_fake=False):
         if len(self.dialogue.agents) == 0:
             self.dialogue._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
             # TODO: Need we add an empty state?
         batch = self._create_batch()
 
-        output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake)
+        output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake, temperature=temperature)
 
         entity_tokens = self._output_to_tokens(output_data)
 

@@ -109,3 +109,4 @@ PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
 --dia-num 20 --state-length 2 --model-type tom --verbose \
 --load-critic-from checkpoint/slsl_critic/model_best.pt
 
+

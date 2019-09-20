@@ -106,7 +106,9 @@ class EntropyLoss(nn.Module):
         z0 = policy.sum(dim=1)
         # print('policy', logpolicy, policy)
         policy = policy / z0
-        loss = torch.sum(policy.mul(torch.log(z0) - logpolicy), dim=1)
+        logpolicy = torch.log(policy)
+        # loss = torch.sum(policy.mul(torch.log(z0) - logpolicy), dim=1)
+        loss = torch.sum(policy.mul(-logpolicy), dim=1)
         # print('policy', loss, logpolicy, policy)
         stats = self._stats(loss.mean(), enc_policy.shape[0])
         return loss, stats
@@ -116,7 +118,7 @@ class EntropyLoss(nn.Module):
 
 class RLTrainer(BaseTrainer):
     def __init__(self, agents, scenarios, train_loss, optim, training_agent=0, reward_func='margin',
-                 cuda=False, args=None, ent_coef=0.08, val_coef=0.1):
+                 cuda=False, args=None, ent_coef=0.05, val_coef=1):
         self.agents = agents
         self.scenarios = scenarios
 
@@ -190,8 +192,8 @@ class RLTrainer(BaseTrainer):
 
         return torch.cat([loss.view(-1),
                           nll.mean().view(-1),
-                          torch.ones(1) * stats.mean_loss(0),
-                          torch.ones(1) * stats.mean_loss(1)], ).view(1, -1).data.numpy()
+                          torch.ones(1, device=loss.device) * stats.mean_loss(0),
+                          torch.ones(1, device=loss.device) * stats.mean_loss(1)], ).view(1, -1).cpu().data.numpy()
 
     def _compute_loss(self, batch, policy=None, price=None, value=None, oracle=None, loss=None):
         if policy is not None:
@@ -199,6 +201,11 @@ class RLTrainer(BaseTrainer):
             pmean, pvar = price
             pmean = pmean.unsqueeze(1).mul(batch.target_pmask)
             pvar = pvar.unsqueeze(1).mul(batch.target_pmask)
+            # lsub = policy - policy.max(dim=-1).values
+            # print('logits_sub: ', lsub)
+            # p = lsub.exp()
+            # p = p / p.sum(dim=-1, keepdim=True)
+            # print('value', p, target_intent)
             return loss(policy, (pmean, pvar), target_intent.squeeze(1), batch.target_price, batch.target_pmask)
         elif value is not None:
             return loss(value, oracle)
@@ -240,7 +247,7 @@ class RLTrainer(BaseTrainer):
 
         critic.zero_grad()
         loss.backward()
-        nn.utils.clip_grad_norm(critic.parameters(), 1.)
+        nn.utils.clip_grad_norm_(critic.parameters(), 1.)
         self.optim.step()
 
         return stats
