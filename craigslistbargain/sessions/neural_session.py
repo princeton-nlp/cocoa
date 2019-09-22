@@ -13,6 +13,7 @@ from .session import Session
 from neural.preprocess import markers, Dialogue
 from neural.batcher_rl import Batch
 import copy
+import time
 
 class NeuralSession(Session):
     def __init__(self, agent, kb, env):
@@ -66,7 +67,7 @@ class NeuralSession(Session):
         # state = event.metadata.copy()
         # state = {'enc_output': event.metadata['enc_output']}
 
-        utterance_int = self.env.textint_map.text_to_int(utterance)
+        # utterance_int = self.env.textint_map.text_to_int(utterance)
         # state['action'] = utterance_int[0]
         state = None
         if another_dia is None:
@@ -134,6 +135,9 @@ class NeuralSession(Session):
     def get_value(self, all_events):
         all_dia = []
         # print('-'*5+'get_value:')
+
+        # print('in get value:')
+        # last_time = time.time()
         for e in all_events:
             # if info['policy'][act[0]].item() < 1e-7:
             #     continue
@@ -144,7 +148,10 @@ class NeuralSession(Session):
             # for i, s in enumerate(d.lf_tokens):
             #     print('\t[{}] {}\t{}'.format(d.agents[i], s, d.lfs[i]))
             all_dia.append(d)
+        # print('copy all dialogue: ', time.time() - last_time)
+        # last_time = time.time()
         batch = self._create_batch(other_dia=all_dia)
+        # print('create batch: ', time.time() - last_time)
 
         # get values
         # batch.mask_last_price()
@@ -155,9 +162,15 @@ class NeuralSession(Session):
 
 
     def send(self, temperature=1, is_fake=False):
+
+        last_time = time.time()
+
         tokens, output_data = self.generate(is_fake=is_fake, temperature=temperature)
 
+        # if self.tom:
+        #     print('generate costs {} time.'.format(time.time() - last_time))
         if is_fake:
+            tmp_time = time.time()
             # For the step of choosing U3
             p_mean = output_data['price_mean']
             p_logstd = output_data['price_logstd']
@@ -196,13 +209,14 @@ class NeuralSession(Session):
             #         print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
             #     for s in print_list:
             #         print('\t' + str(s))
-
+            # print('is fake: ',time.time()-tmp_time)
 
             info = {'values': values, 'probs': probs}
             # print('sum of probs', probs.sum())
             # info['values'] = values
             return (values.mul(probs)).sum()
 
+        last_time=time.time()
         if self.tom:
             # For the step of choosing U2
             # get parameters of normal distribution for price
@@ -216,6 +230,9 @@ class NeuralSession(Session):
 
             tom_policy = []
             tom_actions = []
+
+            avg_time = []
+
             for act in all_actions:
                 if output_data['policy'][0, act[0]].item() < 1e-7:
                     continue
@@ -223,7 +240,9 @@ class NeuralSession(Session):
                 tmp_tokens = self._output_to_tokens({'intent': act[0], 'price': act[1]})
                 self.dialogue.add_utterance(self.agent, tmp_tokens)
                 e = self._tokens_to_event(tmp_tokens, output_data)
+                tmp_time = time.time()
                 info = self.controller.fake_step(self.agent, e)
+                avg_time.append(time.time() - tmp_time)
                 self.dialogue.delete_last_utterance(delete_state=False)
                 self.controller.step_back(self.agent)
 
@@ -237,6 +256,8 @@ class NeuralSession(Session):
 
                 print_list.append((self.env.textint_map.int_to_text([act[0]]), act, tmp.item(), info.item(), output_data['policy'][0, act[0]].item()))
 
+            # print('fake_step costs {} time.'.format(np.mean(avg_time)))
+
             # Sample action from new policy
             final_action = torch.multinomial(torch.from_numpy(np.array(tom_policy),), 1).item()
             tokens = list(tom_actions[final_action])
@@ -247,6 +268,8 @@ class NeuralSession(Session):
             # self.dialogue.lf_to_int()
             # for s in self.dialogue.lfs:
             #     print(s)
+        # if self.tom:
+        #     print('the whole tom staff costs {} times.'.format(time.time() - last_time))
 
         if tokens is None:
             return None

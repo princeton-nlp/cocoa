@@ -324,6 +324,65 @@ class RLTrainer(BaseTrainer):
             tmp_model_dict = self.agents[self.training_agent].env.critic.state_dict()
             self.agents[self.training_agent^1].env.critic.load_state_dict(tmp_model_dict)
 
+    def get_temperature(self, epoch, batch_size, args):
+        if args.only_run:
+            return 1
+        half = args.num_dialogues // batch_size / 2
+        t_s, t_e = 0.3, 1
+        i_s, i_e = 0, half
+        return min(t_e, t_s + (t_e - t_s) * 1. * epoch / half)
+        # return min(1., 1.*epoch/half)
+
+    def sample_data(self, i, batch_size, args):
+        rewards = [0]*2
+        s_rewards = [0]*2
+        _batch_iters = []
+        _rewards = []
+        for j in range(batch_size):
+            # Rollout
+            scenario = self._get_scenario()
+            controller = self._get_controller(scenario, split='train')
+            controller.sessions[0].set_controller(controller)
+            controller.sessions[1].set_controller(controller)
+            example = controller.simulate(args.max_turns, verbose=args.verbose, temperature=self.get_temperature(i, batch_size, args))
+
+            for session_id, session in enumerate(controller.sessions):
+                # if args.only_run != True and session_id != self.training_agent:
+                #     continue
+                # Compute reward
+                reward = self.get_reward(example, session)
+                # Standardize the reward
+                all_rewards = self.all_rewards[session_id]
+                all_rewards.append(reward)
+                s_reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
+
+                rewards[session_id] = reward
+                s_rewards[session_id] = s_reward
+
+            for session_id, session in enumerate(controller.sessions):
+                # Only train one agent
+                if args.only_run != True and session_id != self.training_agent:
+                    continue
+
+                batch_iter = session.iter_batches()
+                T = next(batch_iter)
+                _batch_iters.append(list(batch_iter))
+                _rewards.append(rewards[session_id])
+
+            if args.verbose:
+                # if train_policy or args.model_type == 'tom':
+                from core.price_tracker import PriceScaler
+                for session_id, session in enumerate(controller.sessions):
+                    bottom, top = PriceScaler.get_price_range(session.kb)
+                    print('Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top))
+
+                strs = example.to_text()
+                for str in strs:
+                    print(str)
+                print("reward: [0]{}\nreward: [1]{}".format(rewards[0], rewards[1]))
+
+        return _batch_iters, _rewards, controller, example
+
     def learn(self, args):
         rewards = [None]*2
         s_rewards = [None]*2
@@ -347,55 +406,8 @@ class RLTrainer(BaseTrainer):
         save_every = max(1, save_every // batch_size)
         report_every = max(1, args.report_every // batch_size)
 
-        def get_temperature(epoch):
-            if args.only_run:
-                return 1
-            half = args.num_dialogues // batch_size /2
-            t_s, t_e = 0.3, 1
-            i_s, i_e = 0,  half
-            return min(t_e, t_s + (t_e-t_s) * 1.*epoch/half)
-            # return min(1., 1.*epoch/half)
-
-        def sample_data(i):
-            _batch_iters = []
-            _rewards = []
-            for j in range(batch_size):
-                # Rollout
-                scenario = self._get_scenario()
-                controller = self._get_controller(scenario, split='train')
-                controller.sessions[0].set_controller(controller)
-                controller.sessions[1].set_controller(controller)
-                example = controller.simulate(args.max_turns, verbose=args.verbose, temperature = get_temperature(i))
-
-                for session_id, session in enumerate(controller.sessions):
-                    # if args.only_run != True and session_id != self.training_agent:
-                    #     continue
-                    # Compute reward
-                    reward = self.get_reward(example, session)
-                    # Standardize the reward
-                    all_rewards = self.all_rewards[session_id]
-                    all_rewards.append(reward)
-                    s_reward = (reward - np.mean(all_rewards)) / max(1e-4, np.std(all_rewards))
-
-                    rewards[session_id] = reward
-                    s_rewards[session_id] = s_reward
-
-                for session_id, session in enumerate(controller.sessions):
-                    # Only train one agent
-                    if args.only_run != True and session_id != self.training_agent:
-                        continue
-
-                    batch_iter = session.iter_batches()
-                    T = next(batch_iter)
-                    _batch_iters.append(list(batch_iter))
-                    _rewards.append(rewards[session_id])
-
-            return _batch_iters, _rewards, controller, example
-
         for i in range(args.num_dialogues // batch_size):
-            controller = None
-            example = None
-            _batch_iters, _rewards, controller, example = sample_data(i)
+            _batch_iters, _rewards, controller, example = self.sample_data(i, batch_size, args)
 
                 # if train_policy:
                 #     self.update(batch_iter, reward, self.model, discount=args.discount_factor)
@@ -409,7 +421,7 @@ class RLTrainer(BaseTrainer):
                 loss = self.update_a2c(args, _batch_iters, _rewards, self.model, self.critic,
                                        discount=args.discount_factor, fix_policy=True)
                 if (k+1)%5 == 0:
-                    _batch_iters, _rewards, controller, example = sample_data(i)
+                    _batch_iters, _rewards, controller, example = self.sample_data(i, batch_size, args)
                 if loss[0,3].item() < 0.2:
                     break
             if k >=0:
@@ -422,7 +434,7 @@ class RLTrainer(BaseTrainer):
             #         loss = self.update_a2c(args, _batch_iters, _rewards, self.model, self.critic,
             #                                discount=args.discount_factor, fix_policy=True)
             #         if (k + 1) % 5 == 0:
-            #             _batch_iters, _rewards, controller, example = sample_data(i)
+            #             _batch_iters, _rewards, controller, example = self.sample_data(i, batch_size, args)
             #         if loss[0, 3].item() < 0.2:
             #             break
             #     print('Pretrained value function for {} rounds, and the final loss is {}.'.format(k + 1,
@@ -436,18 +448,6 @@ class RLTrainer(BaseTrainer):
 
             # print('verbose: ', args.verbose)
 
-            if args.verbose:
-                # if train_policy or args.model_type == 'tom':
-                from core.price_tracker import PriceScaler
-                for session_id, session in enumerate(controller.sessions):
-                    bottom, top = PriceScaler.get_price_range(session.kb)
-                    print('Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top))
-
-
-                strs = example.to_text()
-                for str in strs:
-                    print(str)
-                print("reward: [0]{}\nreward: [1]{}".format(self.all_rewards[0][-1], self.all_rewards[1][-1]))
                     # print("Standard reward: [0]{} [1]{}".format(s_rewards[0], s_rewards[1]))
 
             # Save logs on tensorboard

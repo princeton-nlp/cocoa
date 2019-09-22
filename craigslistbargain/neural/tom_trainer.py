@@ -63,6 +63,11 @@ class TomTrainer(Trainer):
             # Training_agent is the ToM model
             controller.sessions[self.training_agent].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
+            if args.verbose:
+                strs = example.to_text()
+                for str in strs:
+                    print(str)
+                print("reward: [0]{} [1]{}".format(self.all_rewards[0][-1], self.all_rewards[1][-1]))
             session = controller.sessions[self.training_agent]
             reward = self.get_reward(example, session)
             stats = Statistics(reward=reward)
@@ -91,6 +96,10 @@ class TomTrainer(Trainer):
     def learn(self, args):
         rewards = [None]*2
         s_rewards = [None]*2
+
+        # valid_stats = self.validate(args)
+        # print('valid result:{}'.format(valid_stats))
+        # quit()
 
         for i in range(args.num_dialogues):
             # Rollout

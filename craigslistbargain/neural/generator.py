@@ -134,7 +134,9 @@ class LFSampler(Sampler):
                 prob = d.log_prob(torch.from_numpy(np.array(p_list)).float().to(mean.device)).exp()
                 prob = prob / prob.sum(dim=-1, keepdim= True)
                 for j, p in enumerate(p_list):
-                    all_actions.append((i,p, prob[j].cpu().item()))
+                    pp = prob[j].cpu().item()
+                    if pp >= 1e-6:
+                        all_actions.append((i,p, pp))
 
             else:
                 for j in range(p_num):
