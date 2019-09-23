@@ -113,7 +113,7 @@ class MultiRunner:
                 self.conn.send(['done'])
             elif cmd[0] == 'simulate':
                 data = self.simulate(cmd[1:])
-                self.conn.send(['done', pickle.dumps(data[:2])])
+                self.conn.send(['done', pickle.dumps(data)])
                 # try:
                 # except Exception, err:
                 #     print(e)
@@ -210,6 +210,29 @@ class MultiManager():
                 self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[5], ii)
                 self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
 
+    def dump_examples(self, examples, verbose_strs, epoch, mode='train'):
+        # Dump with details
+        args = self.args
+        path_txt = '{root}/{model}_{mode}_example{epoch}.txt'.format(
+            root=args.model_path,
+            model=args.name,
+            mode=mode,
+            epoch=epoch)
+        path_pkl = '{root}/{model}_{mode}_example{epoch}.pkl'.format(
+            root=args.model_path,
+            model=args.name,
+            mode=mode,
+            epoch=epoch)
+
+        print('Save examples at {} and {}.'.format(path_txt, path_pkl))
+        with open(path_txt, 'w') as f:
+            for ex in verbose_strs:
+                f.write('-'*7+'\n')
+                for s in ex:
+                    f.write(s+'\n')
+        with open(path_pkl, 'wb') as f:
+            pickle.dump(examples, f)
+
     def run(self):
         self.run_local_workers()
         args = self.args
@@ -248,6 +271,8 @@ class MultiManager():
             for i, w in enumerate(self.worker_conn):
                 w.send(['simulate', epoch, batch_size, task_lists[i]])
 
+            train_examples = []
+            train_ex_str = []
             for i, w in enumerate(self.worker_conn):
                 info = w.recv()
                 if info[0] != 'done':
@@ -256,6 +281,10 @@ class MultiManager():
                 batches += data[0]
                 rewards[0] += data[1][0]
                 rewards[1] += data[1][1]
+                train_examples += data[2]
+                train_ex_str += data[3]
+
+            self.dump_examples(train_examples, train_ex_str, epoch)
 
             # Train the model
             self.worker_conn[0].send(['train', pickle.dumps((epoch, batches, rewards[0]))])
@@ -293,10 +322,16 @@ class MultiManager():
                 now += task_lists[i]
 
             valid_stats = RLStatistics()
+            valid_examples = []
+            valid_ex_str = []
             for i, w in enumerate(self.worker_conn):
                 valid_info = w.recv()
-                valid_stats.update(pickle.loads(valid_info[1]))
+                valid_info[1] = pickle.loads(valid_info[1])
+                valid_stats.update(valid_info[1][0])
+                valid_examples += valid_info[1][1]
+                valid_ex_str += valid_info[1][2]
 
+            self.dump_examples(valid_examples, valid_ex_str, epoch, 'dev')
             # Save the model
             self.worker_conn[0].send(['save_model', pickle.dumps((epoch, valid_stats))])
             self.worker_conn[0].recv()

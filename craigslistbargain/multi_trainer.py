@@ -33,14 +33,23 @@ class MultiTrainer(MultiRunner):
 
     def train(self, cmd):
         i, batches, rewards = cmd
+        pretrain_number = 3
+        for i in range(pretrain_number):
+            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                           discount=self.args.discount_factor, fix_policy=True)
+
         info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
                                        discount=self.args.discount_factor)
+
+        for i in range(pretrain_number):
+            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                           discount=self.args.discount_factor, fix_policy=True)
         return info
 
     def valid(self, cmd):
         start, length = cmd
-        valid_stats = self.trainer.validate(self.args, length, start=start)
-        return valid_stats
+        infos = self.trainer.validate(self.args, length, start=start)
+        return infos
 
     def save_model(self, cmd):
         i, valid_stats = cmd

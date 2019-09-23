@@ -258,6 +258,8 @@ class RLTrainer(BaseTrainer):
         total_stats = RLStatistics()
         valid_size = min(valid_size, 200)
         # print('='*20, 'VALIDATION', '='*20)
+        examples = []
+        verbose_str = []
         for scenario in self.scenarios[split][start:start+valid_size]:
             controller = self._get_controller(scenario, split=split)
             controller.sessions[0].set_controller(controller)
@@ -265,11 +267,14 @@ class RLTrainer(BaseTrainer):
             example = controller.simulate(args.max_turns, verbose=args.verbose)
             session = controller.sessions[self.training_agent]
             reward = self.get_reward(example, session)
+            rewards = [self.get_reward(example, controller.sessions[i]) for i in range(2)]
             stats = RLStatistics(reward=reward, n_words=1)
             total_stats.update(stats)
+            examples.append(example)
+            verbose_str.append(self.example_to_str(example, controller, rewards))
         # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
-        return total_stats
+        return total_stats, examples, verbose_str
 
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
 
@@ -333,6 +338,21 @@ class RLTrainer(BaseTrainer):
         return min(t_e, t_s + (t_e - t_s) * 1. * epoch / half)
         # return min(1., 1.*epoch/half)
 
+    def example_to_str(self, example, controller, rewards):
+        verbose_str = []
+        from core.price_tracker import PriceScaler
+        for session_id, session in enumerate(controller.sessions):
+            bottom, top = PriceScaler.get_price_range(session.kb)
+            s = 'Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top)
+            verbose_str.append(s)
+
+        strs = example.to_text()
+        for str in strs:
+            verbose_str.append(str)
+        s = "reward: [0]{}\nreward: [1]{}".format(rewards[0], rewards[1])
+        verbose_str.append(s)
+        return verbose_str
+
     def sample_data(self, i, batch_size, args, real_batch=None):
         if real_batch is None:
             real_batch = batch_size
@@ -340,6 +360,8 @@ class RLTrainer(BaseTrainer):
         s_rewards = [0]*2
         _batch_iters = []
         _rewards = [[], []]
+        examples = []
+        verbose_strs = []
         for j in range(real_batch):
             # Rollout
             scenario = self._get_scenario()
@@ -371,19 +393,18 @@ class RLTrainer(BaseTrainer):
                 T = next(batch_iter)
                 _batch_iters.append(list(batch_iter))
 
-            if args.verbose:
+
                 # if train_policy or args.model_type == 'tom':
-                from core.price_tracker import PriceScaler
-                for session_id, session in enumerate(controller.sessions):
-                    bottom, top = PriceScaler.get_price_range(session.kb)
-                    print('Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top))
 
-                strs = example.to_text()
-                for str in strs:
-                    print(str)
-                print("reward: [0]{}\nreward: [1]{}".format(rewards[0], rewards[1]))
+            examples.append(example)
+            verbose_str = self.example_to_str(example, controller, rewards)
 
-        return _batch_iters, _rewards, controller, example
+            if args.verbose:
+                for s in verbose_str:
+                    print(s)
+            verbose_strs.append(verbose_str)
+
+        return _batch_iters, _rewards, examples, verbose_strs
 
     def learn(self, args):
         rewards = [None]*2
@@ -409,7 +430,7 @@ class RLTrainer(BaseTrainer):
         report_every = max(1, args.report_every // batch_size)
 
         for i in range(args.num_dialogues // batch_size):
-            _batch_iters, _rewards, controller, example = self.sample_data(i, batch_size, args)
+            _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
 
                 # if train_policy:
                 #     self.update(batch_iter, reward, self.model, discount=args.discount_factor)
@@ -423,7 +444,7 @@ class RLTrainer(BaseTrainer):
                 loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
                                        discount=args.discount_factor, fix_policy=True)
                 if (k+1)%5 == 0:
-                    _batch_iters, _rewards, controller, example = self.sample_data(i, batch_size, args)
+                    _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
                 if loss[0,3].item() < 0.2:
                     break
             if k >=0:
@@ -498,7 +519,7 @@ class RLTrainer(BaseTrainer):
             # Save model
             if (i+1) % save_every == 0:
                 # TODO: valid in dev set
-                valid_stats = self.validate(args, 50 if args.only_run else 200)
+                valid_stats, _, _ = self.validate(args, 50 if args.only_run else 200)
                 if not args.only_run:
                     self.drop_checkpoint(args, i+1, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
                     if args.update_oppo:
@@ -507,7 +528,7 @@ class RLTrainer(BaseTrainer):
                     print('valid ', valid_stats.str_loss())
 
                 # if train_policy:
-                #     valid_stats = self.validate(args)
+                #     valid_stats, _ = self.validate(args)
                 #     self.drop_checkpoint(args, i, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
                 #     self.update_opponent('policy')
                 #
@@ -516,5 +537,5 @@ class RLTrainer(BaseTrainer):
                 #     self.drop_checkpoint(args, i, critic_stats, model_opt=self.agents[self.training_agent].env.model_args)
                 #     critic_stats = RLStatistics()
                 # else:
-                #     valid_stats = self.validate(args)
+                #     valid_stats, _ = self.validate(args)
                 #     print('valid result: ', valid_stats.str_loss())
