@@ -27,8 +27,8 @@ class LFSampler(Sampler):
 
         # for i,j in self.vocab.word_to_ind.items():
         #     print(i,j)
-        print('acc_rej:{}'.format(list(map(self.vocab.to_word, self.acc_or_rej))))
-        print('offer:{}'.format(list(map(self.vocab.to_word, self.offer))))
+        # print('acc_rej:{}'.format(list(map(self.vocab.to_word, self.acc_or_rej))))
+        # print('offer:{}'.format(list(map(self.vocab.to_word, self.offer))))
 
         # Draw the distribution of prices
         # p_list = [self.vocab.to_word(i).canonical.value for i in self.price_list]

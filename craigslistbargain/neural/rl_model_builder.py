@@ -84,14 +84,14 @@ def make_base_model(model_opt, mappings, gpu, checkpoint=None):
     src_dict = mappings['src_vocab']
     src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
     encoder = make_encoder(model_opt, src_embeddings, model_opt.hidden_size)
-    print('encoder', encoder)
+    # print('encoder', encoder)
 
     # Make decoder.
     tgt_dict = mappings['tgt_vocab']
 
 
     decoder = make_decoder(model_opt, model_opt.hidden_size, len(tgt_dict))
-    print('decoder', decoder)
+    # print('decoder', decoder)
 
 
     model = PolicyModel(encoder, decoder)
@@ -168,13 +168,13 @@ def make_critic_model(model_opt, mappings, gpu, encoder=None):
         src_dict = mappings['src_vocab']
         src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
         encoder = make_encoder(model_opt, src_embeddings, model_opt.hidden_size)
-    print('encoder', encoder)
+    # print('encoder', encoder)
 
     # Make decoder.
     tgt_dict = mappings['tgt_vocab']
 
     decoder = make_decoder(model_opt, model_opt.hidden_size, len(tgt_dict), output_value=True)
-    print('decoder', decoder)
+    # print('decoder', decoder)
 
     model = PolicyModel(encoder, decoder)
 

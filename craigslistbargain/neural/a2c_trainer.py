@@ -252,13 +252,13 @@ class RLTrainer(BaseTrainer):
                           torch.ones(1, device=final_loss.device) * policy_stats.mean_loss(1),
                           old_p_losses.mean().view(-1) ],).view(1,-1).cpu().data.numpy()
 
-    def validate(self, args, valid_size, valid_critic=False):
+    def validate(self, args, valid_size, valid_critic=False, start=0):
         split = 'dev'
         self.model.eval()
         total_stats = RLStatistics()
         valid_size = min(valid_size, 200)
         print('='*20, 'VALIDATION', '='*20)
-        for scenario in self.scenarios[split][:valid_size]:
+        for scenario in self.scenarios[split][start:start+valid_size]:
             controller = self._get_controller(scenario, split=split)
             controller.sessions[0].set_controller(controller)
             controller.sessions[1].set_controller(controller)
@@ -333,12 +333,14 @@ class RLTrainer(BaseTrainer):
         return min(t_e, t_s + (t_e - t_s) * 1. * epoch / half)
         # return min(1., 1.*epoch/half)
 
-    def sample_data(self, i, batch_size, args):
+    def sample_data(self, i, batch_size, args, real_batch=None):
+        if real_batch is None:
+            real_batch = batch_size
         rewards = [0]*2
         s_rewards = [0]*2
         _batch_iters = []
-        _rewards = []
-        for j in range(batch_size):
+        _rewards = [[], []]
+        for j in range(real_batch):
             # Rollout
             scenario = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
@@ -358,6 +360,7 @@ class RLTrainer(BaseTrainer):
 
                 rewards[session_id] = reward
                 s_rewards[session_id] = s_reward
+                _rewards[session_id].append(reward)
 
             for session_id, session in enumerate(controller.sessions):
                 # Only train one agent
@@ -367,7 +370,6 @@ class RLTrainer(BaseTrainer):
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
                 _batch_iters.append(list(batch_iter))
-                _rewards.append(rewards[session_id])
 
             if args.verbose:
                 # if train_policy or args.model_type == 'tom':
@@ -418,7 +420,7 @@ class RLTrainer(BaseTrainer):
                 #     critic_stats.update(stats)
             k = -1
             for k in range(pretrain_rounds):
-                loss = self.update_a2c(args, _batch_iters, _rewards, self.model, self.critic,
+                loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
                                        discount=args.discount_factor, fix_policy=True)
                 if (k+1)%5 == 0:
                     _batch_iters, _rewards, controller, example = self.sample_data(i, batch_size, args)
@@ -439,10 +441,10 @@ class RLTrainer(BaseTrainer):
             #             break
             #     print('Pretrained value function for {} rounds, and the final loss is {}.'.format(k + 1,
             #                                                                                       loss[0, 3].item()))
-            loss = self.update_a2c(args, _batch_iters, _rewards, self.model, self.critic,
+            loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
                                    discount=args.discount_factor)
             for k in range(pretrain_rounds):
-                loss = self.update_a2c(args, _batch_iters, _rewards, self.model, self.critic,
+                loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
                                        discount=args.discount_factor, fix_policy=True)
             history_train_losses[self.training_agent].append(loss)
 

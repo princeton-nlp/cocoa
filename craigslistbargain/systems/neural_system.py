@@ -47,7 +47,7 @@ class PytorchNeuralSystem(System):
 
         self.model_name = model_args.model
         vocab = mappings['utterance_vocab']
-        print(vocab.word_to_ind)
+        # print(vocab.word_to_ind)
         self.mappings = mappings
 
         generator = get_generator(model, vocab, Scorer(args.alpha), args, model_args)
@@ -82,7 +82,7 @@ class PytorchNeuralSystem(System):
             max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda,
             dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
             critic=critic, usetom=(name == 'tom'))
-        print('usetom?:', (name == 'tom'))
+        # print('usetom?:', (name == 'tom'))
 
     @classmethod
     def name(cls):

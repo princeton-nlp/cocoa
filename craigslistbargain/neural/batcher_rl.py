@@ -125,6 +125,7 @@ class Batch(object):
         # self.tgt_lengths = self.to_tensor(self.tgt_lengths, 'long', cuda)
         # if num_context > 0:
         #     self.context_inputs = self.to_variable(self.context_inputs, 'long', cuda)
+        self.vocab = None
 
     @classmethod
     def to_tensor(cls, data, dtype, cuda=False):
