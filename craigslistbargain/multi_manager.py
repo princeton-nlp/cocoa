@@ -3,6 +3,8 @@ import random
 import json
 import numpy as np
 
+import time
+
 from onmt.Utils import use_gpu
 
 from cocoa.core.util import read_json
@@ -218,7 +220,7 @@ class MultiManager():
 
         history_train_losses = [[], []]
 
-        batch_size = 50
+        batch_size = 100
 
         pretrain_rounds = 3
         if args.only_run:
@@ -235,10 +237,11 @@ class MultiManager():
         all_rewards = [[], []]
 
         num_worker = self.update_worker_list()
+        last_time = time.time()
         for epoch in range(max_epoch):
             batches = []
             rewards = [[], []]
-            print('Epoch {}/{} running...'.format(epoch,max_epoch))
+            print('='*5 + ' [Epoch {}/{} running.]'.format(epoch,max_epoch))
             task_lists = self.allocate_tasks(num_worker, batch_size)
 
             # Use workers to get trajectories
@@ -283,7 +286,7 @@ class MultiManager():
                 w.recv()
 
             # Valid new model
-            task_lists = self.allocate_tasks(num_worker, 200)
+            task_lists = self.allocate_tasks(num_worker, 50)
             now = 0
             for i, w in enumerate(self.worker_conn):
                 w.send(['valid', (now, task_lists[i])])
@@ -297,6 +300,9 @@ class MultiManager():
             # Save the model
             self.worker_conn[0].send(['save_model', pickle.dumps((epoch, valid_stats))])
             self.worker_conn[0].recv()
+
+            print('='*5 + ' [Epoch {} for {:.3f}s.]'.format(epoch, time.time() - last_time))
+            last_time = time.time()
 
         self.quit_all_workers()
         self.join_local_workers()

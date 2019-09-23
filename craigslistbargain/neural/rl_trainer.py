@@ -273,7 +273,7 @@ class RLTrainer(BaseTrainer):
         split = 'dev'
         self.model.eval()
         total_stats = RLStatistics()
-        print('='*20, 'VALIDATION', '='*20)
+        # print('='*20, 'VALIDATION', '='*20)
         for scenario in self.scenarios[split][:200]:
             controller = self._get_controller(scenario, split=split)
             controller.sessions[self.training_agent].set_controller(controller)
@@ -282,7 +282,7 @@ class RLTrainer(BaseTrainer):
             reward = self.get_reward(example, session)
             stats = RLStatistics(reward=reward, n_words=1)
             total_stats.update(stats)
-        print('='*20, 'END VALIDATION', '='*20)
+        # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         return total_stats
 

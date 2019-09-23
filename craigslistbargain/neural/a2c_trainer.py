@@ -257,7 +257,7 @@ class RLTrainer(BaseTrainer):
         self.model.eval()
         total_stats = RLStatistics()
         valid_size = min(valid_size, 200)
-        print('='*20, 'VALIDATION', '='*20)
+        # print('='*20, 'VALIDATION', '='*20)
         for scenario in self.scenarios[split][start:start+valid_size]:
             controller = self._get_controller(scenario, split=split)
             controller.sessions[0].set_controller(controller)
@@ -267,7 +267,7 @@ class RLTrainer(BaseTrainer):
             reward = self.get_reward(example, session)
             stats = RLStatistics(reward=reward, n_words=1)
             total_stats.update(stats)
-        print('='*20, 'END VALIDATION', '='*20)
+        # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         return total_stats
 
@@ -293,7 +293,7 @@ class RLTrainer(BaseTrainer):
 
     def checkpoint_path(self, episode, opt, stats):
         path=None
-        if opt.model_type == 'reinforce' or opt.model_type == 'a2c':
+        if opt.model_type == 'reinforce' or opt.model_type == 'a2c' or opt.model_type == 'tom':
             path = '{root}/{model}_reward{reward:.2f}_e{episode:d}.pt'.format(
                         root=opt.model_path,
                         model=opt.model_filename,
