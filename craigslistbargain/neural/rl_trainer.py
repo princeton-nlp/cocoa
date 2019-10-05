@@ -100,7 +100,7 @@ class EntropyLoss(nn.Module):
 
     def forward(self, enc_policy, enc_price, tgt_policy, tgt_price, pmask=None):
         logpolicy = enc_policy
-        logpolicy = logpolicy - logpolicy.max(dim=1, keepdim=True).values
+        logpolicy = logpolicy - logpolicy.max(dim=1, keepdim=True)[0]
         policy = logpolicy.exp() + 1e-6
         logpolicy = policy.log()
         z0 = policy.sum(dim=1)

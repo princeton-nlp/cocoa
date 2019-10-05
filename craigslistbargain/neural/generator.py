@@ -61,7 +61,7 @@ class LFSampler(Sampler):
         # policy.sub_(policy.max(1, keepdim=True)[0].expand(policy.size(0), policy.size(1)))
 
         # policy[batch.policy_mask == 0] = -100
-        policy.sub_(policy.max(1, keepdim=True).values.expand(-1, policy.size(1)))
+        policy.sub_(policy.max(1, keepdim=True)[0].expand(-1, policy.size(1)))
         policy = policy * temperature
         # mask = batch.policy_mask
         # policy[mask == 0] = -100.

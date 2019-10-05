@@ -32,16 +32,23 @@ class MultiTrainer(MultiRunner):
         return data
 
     def train(self, cmd):
-        i, batches, rewards = cmd
-        pretrain_number = 3
-        for i in range(pretrain_number):
+        epoch, batches, rewards, train_mode = cmd
+        if train_mode == 'normal':
+            pretrain_number = 3
+            for i in range(pretrain_number):
+                info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                               discount=self.args.discount_factor, fix_policy=True)
+
             info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                           discount=self.args.discount_factor, fix_policy=True)
+                                           discount=self.args.discount_factor)
 
-        info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                       discount=self.args.discount_factor)
-
-        for i in range(pretrain_number):
+            for i in range(pretrain_number):
+                info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                               discount=self.args.discount_factor, fix_policy=True)
+        elif train_mode == 'fix_value':
+            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                           discount=self.args.discount_factor, fix_value=True)
+        elif train_mode == 'fix_policy':
             info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
                                            discount=self.args.discount_factor, fix_policy=True)
         return info

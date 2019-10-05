@@ -82,31 +82,46 @@ PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
 
 
 Critic:
-mkdir checkpoint/slsl_critic;           
-PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
---model-path checkpoint/slsl_critic \
+--model-path checkpoint/test --mappings mappings/sl \
 --optim adagrad --learning-rate 0.01 \
 --agents pt-neural pt-neural \
---report-every 100 --max-turns 20 --num-dialogues 5000 \
+--report-every 50 --max-turns 20 --num-dialogues 500 \
 --sample --temperature 0.5 --max-length 20 --reward balance \
---dia-num 20 --state-length 2 --model-type critic
+--dia-num 20 --state-length 4 \
+--model lf2lf --model-type a2c --num-cpus 2
 
-Tom:
-PYTHONPATH=. python reinforce.py --schema-path data/craigslist-schema.json \
+A2c:
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
---agent-checkpoints checkpoint/rl/model_best.pt checkpoint/sl/model_best.pt \
---model-path checkpoint/rl \
---optim adagrad --learning-rate 0.001 \
---agents tom pt-neural \
---report-every 100 --max-turns 20 --num-dialogues 5000 \
+--agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/test --mappings mappings/sl \
+--optim adagrad --learning-rate 0.01 \
+--agents pt-neural pt-neural \
+--report-every 50 --max-turns 20 --num-dialogues 500 \
 --sample --temperature 0.5 --max-length 20 --reward balance \
---dia-num 20 --state-length 2 --model-type tom --verbose \
---load-critic-from checkpoint/slsl_critic/model_best.pt
+--dia-num 20 --state-length 4 \
+--model lf2lf --model-type a2c --num-cpus 2
+
+
+Tom:
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \     
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/a2c3/model_reward1.17_e18.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/tom --mappings mappings/sl \
+--optim adagrad --learning-rate 0.01 \
+--agents tom pt-neural \      
+--report-every 50 --max-turns 20 --num-dialogues 5000 \
+--sample --temperature 0.5 --max-length 20 --reward balance \
+--dia-num 20 --state-length 4 \
+--model lf2lf --model-type tom  --name tom_real --num-cpus 6 --gpuid 0
 
 

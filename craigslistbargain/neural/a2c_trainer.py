@@ -195,7 +195,7 @@ class RLTrainer(BaseTrainer):
         regular = torch.cat(penalties)
         return p_losses, e_losses, value_loss, regular, (old_p_losses, policy_stats)
 
-    def update_a2c(self, args, batch_iters, rewards, model, critic, discount=0.95, fix_policy=False):
+    def update_a2c(self, args, batch_iters, rewards, model, critic, discount=0.95, fix_policy=False, fix_value=False):
         p_losses, e_losses, value_loss, regular = None, None, None, None
         old_p_losses = None
         policy_stats = Statistics()
@@ -235,10 +235,11 @@ class RLTrainer(BaseTrainer):
 
         # if not self.model_type == "reinforce":
         if not args.only_run:
-            critic.zero_grad()
-            critic_loss.backward()
-            nn.utils.clip_grad_norm_(critic.parameters(), 1.)
-            self.optim['critic'].step()
+            if not fix_value:
+                critic.zero_grad()
+                critic_loss.backward()
+                nn.utils.clip_grad_norm_(critic.parameters(), 1.)
+                self.optim['critic'].step()
 
             if not fix_policy:
                 model.zero_grad()

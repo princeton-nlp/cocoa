@@ -287,7 +287,7 @@ class MultiManager():
             self.dump_examples(train_examples, train_ex_str, epoch)
 
             # Train the model
-            self.worker_conn[0].send(['train', pickle.dumps((epoch, batches, rewards[0]))])
+            self.worker_conn[0].send(['train', pickle.dumps((epoch, batches, rewards[0], self.args.train_mode))])
             train_info = self.worker_conn[0].recv()
             if train_info[0] != 'done':
                 print('Error on {}: {}.'.format(i, train_info))
