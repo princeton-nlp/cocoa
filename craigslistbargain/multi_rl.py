@@ -56,7 +56,7 @@ if __name__ == '__main__':
                        action='store_true',
                        help="Fix pretrained word embeddings.")
 
-    parser.add_argument('--train-mode', type=str, default='normal', choices=['normal', 'fix_value', 'fix_policy'],
+    parser.add_argument('--train-mode', type=str, default='normal', choices=['normal', 'fix_value', 'fix_policy', 'none'],
                         help='choices for different training mode.')
 
     parser.add_argument('--num-cpus', type=int, default=1)

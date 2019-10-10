@@ -246,9 +246,6 @@ class MultiManager():
         batch_size = 100
 
         pretrain_rounds = 3
-        if args.only_run:
-            batch_size = 1
-            pretrain_rounds = 0
 
         save_every = max(1, save_every // batch_size)
         report_every = max(1, args.report_every // batch_size)

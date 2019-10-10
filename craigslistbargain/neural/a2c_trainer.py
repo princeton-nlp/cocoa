@@ -387,7 +387,7 @@ class RLTrainer(BaseTrainer):
 
             for session_id, session in enumerate(controller.sessions):
                 # Only train one agent
-                if args.only_run != True and session_id != self.training_agent:
+                if session_id != self.training_agent:
                     continue
 
                 batch_iter = session.iter_batches()

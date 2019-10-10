@@ -51,6 +51,9 @@ class MultiTrainer(MultiRunner):
         elif train_mode == 'fix_policy':
             info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
                                            discount=self.args.discount_factor, fix_policy=True)
+        else:
+            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                           discount=self.args.discount_factor)
         return info
 
     def valid(self, cmd):
