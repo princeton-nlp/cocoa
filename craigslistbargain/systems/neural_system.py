@@ -75,13 +75,13 @@ class PytorchNeuralSystem(System):
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',
             'stop_symbol', 'remove_symbols', 'gt_prefix',
             'max_len', 'dialogue_batcher', 'cuda',
-            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom'])
+            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 'name'])
         self.env = Env(model, vocab, preprocessor, textint_map,
             stop_symbol=vocab.to_ind(markers.EOS), remove_symbols=remove_symbols,
             gt_prefix=1,
             max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda,
             dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
-            critic=critic, usetom=(name == 'tom'))
+            critic=critic, usetom=(name == 'tom'), name=name)
         # print('usetom?:', (name == 'tom'))
 
     @classmethod

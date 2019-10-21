@@ -283,6 +283,10 @@ class MultiManager():
 
             self.dump_examples(train_examples, train_ex_str, epoch)
 
+            # For debug
+            print("rewards:", np.mean(rewards[0]), np.mean(rewards[1]))
+            print("rewards_num:", len(rewards[0]), len(rewards[1]))
+
             # Train the model
             self.worker_conn[0].send(['train', pickle.dumps((epoch, batches, rewards[0], self.args.train_mode))])
             train_info = self.worker_conn[0].recv()

@@ -98,6 +98,7 @@ class RLTrainer(BaseTrainer):
                  cuda=False, args=None):
         super(RLTrainer, self).__init__(agents, scenarios, train_loss, optim,
                                         training_agent, reward_func, cuda, args)
+        # print('training_agent', training_agent)
         self.model_type = args.model_type
 
     def _run_batch_a2c(self, batch):
@@ -416,11 +417,11 @@ class RLTrainer(BaseTrainer):
         last_time = time.time()
 
         tensorboard_every = 1
-        save_every = 50
+        save_every = 100
 
         history_train_losses = [[],[]]
 
-        batch_size = 50
+        batch_size = 100
 
         pretrain_rounds = 3
         if args.only_run:

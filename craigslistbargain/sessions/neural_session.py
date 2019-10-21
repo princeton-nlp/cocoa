@@ -165,7 +165,10 @@ class NeuralSession(Session):
 
         last_time = time.time()
 
-        tokens, output_data = self.generate(is_fake=is_fake, temperature=temperature)
+        acpt_range = None
+        if self.env.name == 'pt-neural-r':
+            acpt_range = [0.3, 0.7]
+        tokens, output_data = self.generate(is_fake=is_fake, temperature=temperature, acpt_range=acpt_range)
 
         # if self.tom:
         #     print('generate costs {} time.'.format(time.time() - last_time))
@@ -360,13 +363,14 @@ class PytorchNeuralSession(NeuralSession):
         return Batch(encoder_args, decoder_args, context_data,
                 self.vocab, num_context=num_context, cuda=self.cuda)
 
-    def generate(self, temperature=1, is_fake=False):
+    def generate(self, temperature=1, is_fake=False, acpt_range=None):
         if len(self.dialogue.agents) == 0:
             self.dialogue._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
             # TODO: Need we add an empty state?
         batch = self._create_batch()
 
-        output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake, temperature=temperature)
+        output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake,
+                                                    temperature=temperature, acpt_range=acpt_range)
 
         entity_tokens = self._output_to_tokens(output_data)
 

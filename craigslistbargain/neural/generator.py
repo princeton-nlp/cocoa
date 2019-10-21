@@ -46,7 +46,7 @@ class LFSampler(Sampler):
         # self.all_actions = self._get_all_actions()
 
     def generate_batch(self, batch, gt_prefix=1, enc_state=None, whole_policy=False, special_actions=None,
-                       temperature=1):
+                       temperature=1, acpt_range=None):
         # This is to ensure we can stop at EOS for stateful models
         assert batch.size == 1
 
@@ -85,6 +85,24 @@ class LFSampler(Sampler):
         # price = p_mean
         # print(torch.cat([price.view(-1,1), p_mean.view(-1,1), p_logstd.view(-1,1)], dim=1))
         # price = price + LFSampler.var_for_price * torch.randn_like(price).abs()
+
+        # Use rule for Supervised learning agent
+        if acpt_range is not None:
+            assert len(acpt_range) == 2
+            # Check if last action is offer
+            if batch.encoder_intent[0, -1] in self.offer:
+                offer_price = batch.encoder_price[0, 0, -1].item()
+                policy = policy * 0
+
+                if (acpt_range[0] <= offer_price) and (offer_price <= acpt_range[1]):
+                    # Accept
+                    act_idx = self.acc_or_rej[0]
+                else:
+                    act_idx = self.acc_or_rej[1]
+
+                intent[0] = act_idx
+                policy[0, act_idx] = 1
+
 
         # TODO: Not correct, for multiple data.
         if intent not in self.price_actions:

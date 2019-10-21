@@ -30,6 +30,10 @@ def get_system(name, args, schema=None, timed=False, model_path=None):
         from .neural_system import PytorchNeuralSystem
         # assert model_path
         return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
+    elif name == 'pt-neural-r':
+        from .neural_system import PytorchNeuralSystem
+        # assert model_path
+        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
     elif name == 'ac':
         from .ac_system import PytorchNeuralACSystem
         assert model_path
