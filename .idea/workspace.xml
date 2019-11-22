@@ -1,31 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/batcher_rl.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_model_builder.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/neural/sl_trainer.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/train_sl.py" afterDir="false" />
+    <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="New ToM on A2C">
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/multi_manager_debug.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/craigslistbargain/tb2plt.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/core/dataset.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/dataset.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/model/vocab.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/model/vocab.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/neural/vocab_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/neural/vocab_builder.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/command" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/command" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/core/price_tracker.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/core/price_tracker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/batcher.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/batcher.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/multi_rl.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/multi_rl.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/a2c_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/a2c_trainer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/preprocess.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/preprocess.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/rl_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_trainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/tom_trainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/vocab_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/vocab_builder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/options.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/options.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/reinforce.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/reinforce.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/tom_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/onmt/Trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/onmt/Trainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/onmt/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/onmt/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/systems/neural_system.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/systems/neural_system.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -57,16 +43,17 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="SearchEverywhereHistoryKey" value="xrange&#9;null&#9;null" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/onmt" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/neural" />
     <property name="settings.editor.selected.configurable" value="terminal" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/craigslistbargain" />
       <recent name="$PROJECT_DIR$/craigslistbargain/neural" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/craigslistbargain/onmt" />
       <recent name="$PROJECT_DIR$/craigslistbargain/neural" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/onmt" />
       <recent name="$PROJECT_DIR$/craigslistbargain" />
       <recent name="$PROJECT_DIR$/craigslistbargain/systems" />
       <recent name="$PROJECT_DIR$/mutualfriends/systems" />
@@ -124,6 +111,70 @@
       <option name="presentableId" value="Default" />
       <updated>1553403282783</updated>
     </task>
+    <task id="LOCAL-00001" summary="RL Training finished.">
+      <created>1566594894508</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1566594894508</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Old version ToM">
+      <created>1568757146541</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1568757146541</updated>
+    </task>
+    <task id="LOCAL-00003" summary="New ToM on A2C">
+      <created>1569023410972</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1569023410972</updated>
+    </task>
+    <task id="LOCAL-00004" summary="optimize infer phase in tom">
+      <created>1569122962455</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1569122962455</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Finish the multiprocessing version">
+      <created>1569228596072</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1569228596072</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Add example logs and value function pre-training">
+      <created>1569276954000</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1569276954000</updated>
+    </task>
+    <task id="LOCAL-00007" summary="using torch1.0.1 &amp; training with fixed policy/value">
+      <created>1570286789598</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1570286789598</updated>
+    </task>
+    <task id="LOCAL-00008" summary="no-training mode">
+      <created>1570676469872</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1570676469872</updated>
+    </task>
+    <task id="LOCAL-00009" summary="New ToM on A2C">
+      <created>1571671712696</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1571671712696</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -141,5 +192,16 @@
         </entry>
       </map>
     </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="RL Training finished." />
+    <MESSAGE value="Old version ToM" />
+    <MESSAGE value="optimize infer phase in tom" />
+    <MESSAGE value="Finish the multiprocessing version" />
+    <MESSAGE value="Add example logs and value function pre-training" />
+    <MESSAGE value="using torch1.0.1 &amp; training with fixed policy/value" />
+    <MESSAGE value="no-training mode" />
+    <MESSAGE value="New ToM on A2C" />
+    <option name="LAST_COMMIT_MESSAGE" value="New ToM on A2C" />
   </component>
 </project>

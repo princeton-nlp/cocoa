@@ -72,16 +72,18 @@ class PytorchNeuralSystem(System):
         Dialogue.mappings = mappings
         Dialogue.num_context = model_args.num_context
 
+
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',
             'stop_symbol', 'remove_symbols', 'gt_prefix',
             'max_len', 'dialogue_batcher', 'cuda',
-            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 'name'])
+            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 'name', 'price_strategy', 'tom_type'])
         self.env = Env(model, vocab, preprocessor, textint_map,
             stop_symbol=vocab.to_ind(markers.EOS), remove_symbols=remove_symbols,
             gt_prefix=1,
             max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda,
             dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
-            critic=critic, usetom=(name == 'tom'), name=name)
+            critic=critic, usetom=(name == 'tom'), name=name,
+            price_strategy=args.price_strategy, tom_type=args.tom_type)
         # print('usetom?:', (name == 'tom'))
 
     @classmethod

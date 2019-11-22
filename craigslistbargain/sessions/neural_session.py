@@ -30,6 +30,13 @@ class NeuralSession(Session):
         self.kb_context_batch = self.batcher.create_context_batch([self.dialogue], self.batcher.kb_pad)
         self.max_len = 100
 
+        # SL agent type
+        # min/expect
+        # price strategy: high/low/decay
+        self.tom_type = env.tom_type
+        self.price_strategy = env.price_strategy
+        self.acpt_range = [0.3, 0.7]
+
         # Tom
         self.tom = False
         self.controller = None
@@ -167,7 +174,7 @@ class NeuralSession(Session):
 
         acpt_range = None
         if self.env.name == 'pt-neural-r':
-            acpt_range = [0.3, 0.7]
+            acpt_range = self.acpt_range
         tokens, output_data = self.generate(is_fake=is_fake, temperature=temperature, acpt_range=acpt_range)
 
         # if self.tom:
@@ -217,7 +224,25 @@ class NeuralSession(Session):
             info = {'values': values, 'probs': probs}
             # print('sum of probs', probs.sum())
             # info['values'] = values
-            return (values.mul(probs)).sum()
+
+            # For the min one
+            minone = torch.zeros_like(probs, device=probs.device)
+            minone[values.argmin().item(), 0] = 1
+            maxone = torch.zeros_like(probs, device=probs.device)
+            maxone[values.argmax().item(), 0] = 1
+
+            if self.tom_type == 'expectation':
+                # If use expectation here
+                return (values.mul(probs)).sum()
+            elif self.tom_type == 'competitive':
+                # If use max here
+                return (values.mul(minone)).sum()
+            elif self.tom_type == 'cooperative':
+                # If use max here
+                return (values.mul(maxone)).sum()
+            else:
+                print('Unknown tom type: ', self.tom_type)
+                assert NotImplementedError()
 
         last_time=time.time()
         if self.tom:
@@ -371,6 +396,27 @@ class PytorchNeuralSession(NeuralSession):
 
         output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake,
                                                     temperature=temperature, acpt_range=acpt_range)
+        # SL Agent with rule-based price action
+        if self.env.name == 'pt-neural-r' and self.price_strategy != 'neural' and output_data['price'] is not None:
+            # TODO: what is the range of price?
+            # print(output_data['price'])
+            oldp = output_data['price'].item()
+            prange = [0,1]
+            prange = acpt_range
+            if self.price_strategy == 'high':
+                p = prange[1]
+            elif self.price_strategy == 'low':
+                p = prange[0]
+            elif self.price_strategy == 'decay':
+                factor = batch.encoder_dianum[0,-1].item()
+                # print(batch.encoder_dianum)
+                # print(factor, prange)
+                p = prange[0]*(factor) + prange[1]*(1-factor)
+            else:
+                print('Unknown price strategy: ', self.price_strategy)
+                assert NotImplementedError()
+            output_data['price'] = output_data['price'] / oldp * p
+            # print('after:', p, output_data['price'])
 
         entity_tokens = self._output_to_tokens(output_data)
 

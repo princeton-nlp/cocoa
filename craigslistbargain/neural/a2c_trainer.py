@@ -257,6 +257,7 @@ class RLTrainer(BaseTrainer):
     def validate(self, args, valid_size, valid_critic=False, start=0):
         split = 'dev'
         self.model.eval()
+        self.critic.eval()
         total_stats = RLStatistics()
         valid_size = min(valid_size, 200)
         # print('='*20, 'VALIDATION', '='*20)
@@ -276,6 +277,7 @@ class RLTrainer(BaseTrainer):
             verbose_str.append(self.example_to_str(example, controller, rewards))
         # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
+        self.critic.train()
         return total_stats, examples, verbose_str
 
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
@@ -432,7 +434,20 @@ class RLTrainer(BaseTrainer):
         report_every = max(1, args.report_every // batch_size)
 
         for i in range(args.num_dialogues // batch_size):
-            _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
+            _batch_iters, _rewards, example, train_ex_str = self.sample_data(i, batch_size, args)
+            # print('reward is:', _rewards)
+            # print(np.mean(_rewards[0]), np.mean(_rewards[1]))
+            # print(np.mean(self.all_rewards[0][-tensorboard_every*batch_size:]), np.mean(self.all_rewards[1][-tensorboard_every*batch_size:]))
+
+            path_txt = '{root}/{model}_example{epoch}.txt'.format(
+                root=args.model_path,
+                model=args.name,
+                epoch=i)
+            with open(path_txt, 'w') as f:
+                for ex in train_ex_str:
+                    f.write('-' * 7 + '\n')
+                    for s in ex:
+                        f.write(s + '\n')
 
                 # if train_policy:
                 #     self.update(batch_iter, reward, self.model, discount=args.discount_factor)
@@ -445,10 +460,10 @@ class RLTrainer(BaseTrainer):
             for k in range(pretrain_rounds):
                 loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
                                        discount=args.discount_factor, fix_policy=True)
-                if (k+1)%5 == 0:
-                    _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
-                if loss[0,3].item() < 0.2:
-                    break
+                # if (k+1)%5 == 0:
+                #     _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
+                # if loss[0,3].item() < 0.2:
+                #     break
             if k >=0:
                 print('Pretrained value function for {} rounds, and the final loss is {}.'.format(k+1, loss[0,3].item()))
             # if loss[0, 3].item() >= 0.3:
@@ -479,9 +494,9 @@ class RLTrainer(BaseTrainer):
             if (i + 1) % tensorboard_every == 0:
                 ii = (i+1)*batch_size
                 for j in range(2):
-                    self.writer.add_scalar('agent{}/reward'.format(j), np.mean(self.all_rewards[j][-tensorboard_every:]), ii)
-                    if len(history_train_losses[j]) >= tensorboard_every:
-                        tmp = np.concatenate(history_train_losses[j][-tensorboard_every:], axis=0)
+                    self.writer.add_scalar('agent{}/reward'.format(j), np.mean(self.all_rewards[j][-tensorboard_every*batch_size:]), ii)
+                    if len(history_train_losses[j]) >= tensorboard_every*batch_size:
+                        tmp = np.concatenate(history_train_losses[j][-tensorboard_every*batch_size:], axis=0)
                         tmp = np.mean(tmp, axis=0)
                         self.writer.add_scalar('agent{}/total_loss'.format(j), tmp[0], ii)
                         self.writer.add_scalar('agent{}/policy_loss'.format(j), tmp[1], ii)
@@ -525,6 +540,7 @@ class RLTrainer(BaseTrainer):
                 if not args.only_run:
                     self.drop_checkpoint(args, i+1, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
                     if args.update_oppo:
+                        print('update oppo!')
                         self.update_opponent(['policy', 'critic'])
                 else:
                     print('valid ', valid_stats.str_loss())

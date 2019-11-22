@@ -20,6 +20,8 @@ from neural import build_optim
 from multi_manager import MultiManager
 from multi_trainer import MultiTrainer
 
+from multi_manager_debug import MultiManager as MultiManager_DEBUG, MultiRunner as MultiTrainer_DEBUG
+
 import options
 
 
@@ -43,6 +45,12 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='rl', type=str, help='Name of this experiment.')
 
     parser.add_argument('--mappings', help='Path to vocab mappings')
+
+    parser.add_argument('--tom-type', choices=['expectation', 'competitive', 'cooperative'], type=str, default='expectation',
+                        help='tom inference type')
+    parser.add_argument('--price-strategy', choices=['high', 'low', 'decay', 'neural'], type=str,
+                        default='neural',
+                        help='supervise agent price strategy.')
     # Initialization
     parser.add_argument('--pretrained-wordvec', nargs='+', default=['', ''],
                        help="""If a valid path is specified, then this will load
@@ -59,7 +67,9 @@ if __name__ == '__main__':
     parser.add_argument('--train-mode', type=str, default='normal', choices=['normal', 'fix_value', 'fix_policy', 'none'],
                         help='choices for different training mode.')
 
-    parser.add_argument('--num-cpus', type=int, default=1)
+    parser.add_argument('--num-cpus', type=int, default=1, help='number of cpu threads(worker)')
+
+    parser.add_argument('--debug', action='store_true', default=False)
 
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
@@ -68,6 +78,10 @@ if __name__ == '__main__':
     options.add_model_arguments(parser)
     args = parser.parse_args()
 
-    manager = MultiManager(args.num_cpus, args, MultiTrainer)
-    manager.run()
+    if args.debug:
+        manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
+        manager.learn()
+    else:
+        manager = MultiManager(args.num_cpus, args, MultiTrainer)
+        manager.run()
 

@@ -113,7 +113,7 @@ class LFSampler(Sampler):
                "price": price,
                "policy": policy,
                "price_mean": p_mean,
-               "price_logstd": p_logstd
+               "price_logstd": p_logstd,
                }
 
         ret["batch"] = batch

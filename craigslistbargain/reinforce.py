@@ -63,6 +63,13 @@ if __name__ == '__main__':
                        action='store_true',
                        help="Fix pretrained word embeddings.")
 
+
+    parser.add_argument('--tom-type', choices=['expectation', 'competitive', 'cooperative'], type=str, default='expectation',
+                        help='tom inference type')
+    parser.add_argument('--price-strategy', choices=['high', 'low', 'decay', 'neural'], type=str,
+                        default='neural',
+                        help='supervise agent price strategy.')
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)
