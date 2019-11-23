@@ -96,8 +96,8 @@ run REINFORCE with a given reward function.
 First, let's generate the training and validation scenarios.
 We will directly get those from the training and validation data.
 ```
-PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/train-luis-post.json --scenarios data/train-scenarios.json
-PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/dev-luis-post.json --scenarios data/dev-scenarios.json
+PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/train-luis-post-new.json --scenarios data/train-scenarios.json
+PYTHONPATH=. python ../scripts/chat_to_scenarios.py --chats data/dev-luis-post-new.json --scenarios data/dev-scenarios.json
 ```
 Now, we can run self-play and REINFORCE with a reward function, e.g. `margin`.
 ```
