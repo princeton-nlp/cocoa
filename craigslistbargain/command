@@ -19,8 +19,8 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --model-path checkpoint/rl --mappings mappings/sl \
 --optim adagrad --learning-rate 0.01 \
 --agents pt-neural pt-neural-r \
---report-every 50 --max-turns 20 --num-dialogues 5000 \
---sample --temperature 0.5 --max-length 20 --reward balance \
+--report-every 50 --max-turns 20 --num-dialogues 10000 \
+--sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
 --model lf2lf --model-type a2c --name rl --price-strategy decay --gpuid 0
 
@@ -33,8 +33,8 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --model-path checkpoint/tom --mappings mappings/sl \
 --optim adagrad --learning-rate 0.01 \
 --agents tom pt-neural-r \
---report-every 50 --max-turns 20 --num-dialogues 5000 \
---sample --temperature 0.5 --max-length 20 --reward balance \
+--report-every 50 --max-turns 20 --num-dialogues 10000 \
+--sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
 --model lf2lf --model-type tom --name tom --price-strategy decay --tom-type expectation --gpuid 0
 
