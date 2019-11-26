@@ -85,7 +85,7 @@ class PriceScaler(object):
         w, c = cls.get_parameters(b, t)
         assert w != 0
         p = (p - c) / w
-        p = int(p)
+        p = round(p)
         if isinstance(price, Entity):
             return price._replace(canonical=price.canonical._replace(value=p))
         else:
