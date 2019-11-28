@@ -1,17 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="New ToM on A2C">
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/multi_manager_debug.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/craigslistbargain/tb2plt.py" afterDir="false" />
+    <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="price round to integer">
+      <change beforePath="$PROJECT_DIR$/.idea/cocoa.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/cocoa.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/command" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/command" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/multi_rl.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/multi_rl.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/a2c_trainer.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/a2c_trainer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/generator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/reinforce.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/reinforce.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/systems/neural_system.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/systems/neural_system.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -43,8 +36,8 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="SearchEverywhereHistoryKey" value="xrange&#9;null&#9;null" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/neural" />
-    <property name="settings.editor.selected.configurable" value="terminal" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="settings.editor.selected.configurable" value="reference.settingsdialog.IDE.editor.colors" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
@@ -174,7 +167,28 @@
       <option name="project" value="LOCAL" />
       <updated>1571671712696</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="price round to integer">
+      <created>1574772970926</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1574772970926</updated>
+    </task>
+    <task id="LOCAL-00011" summary="update requirements info">
+      <created>1574852448529</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1574852448529</updated>
+    </task>
+    <task id="LOCAL-00012" summary="update requirements with specific version">
+      <created>1574918314791</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1574918314791</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -202,6 +216,9 @@
     <MESSAGE value="using torch1.0.1 &amp; training with fixed policy/value" />
     <MESSAGE value="no-training mode" />
     <MESSAGE value="New ToM on A2C" />
-    <option name="LAST_COMMIT_MESSAGE" value="New ToM on A2C" />
+    <MESSAGE value="price round to integer" />
+    <MESSAGE value="update requirements info" />
+    <MESSAGE value="update requirements with specific version" />
+    <option name="LAST_COMMIT_MESSAGE" value="update requirements with specific version" />
   </component>
 </project>
