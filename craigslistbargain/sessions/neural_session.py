@@ -57,8 +57,9 @@ class NeuralSession(Session):
         #             curr_turns.append(self.env.textint_map.text_to_int(turn, stage))
         self.dialogue.lf_to_int()
 
+    # Using another dialogue with semi-event
     def receive(self, event, another_dia=None):
-        if event.action in Event.decorative_events:
+        if isinstance(event, Event) and event.action in Event.decorative_events:
             return
         # print(event.data)
         # Parse utterance
@@ -77,10 +78,11 @@ class NeuralSession(Session):
         # utterance_int = self.env.textint_map.text_to_int(utterance)
         # state['action'] = utterance_int[0]
         state = None
+        # print(event.agent, self.dialogue.agent)
         if another_dia is None:
             self.dialogue.add_utterance_with_state(event.agent, utterance, state)
         else:
-            another_dia.add_utterance_with_state(event.agent, utterance, state)
+            another_dia.add_utterance_with_state(self.dialogue.agent ^ 1, utterance, state)
 
 
     def _has_entity(self, tokens):
@@ -96,7 +98,7 @@ class NeuralSession(Session):
         s = re.sub(r" n't ", r"n't ", s)
         return s
 
-    def _tokens_to_event(self, tokens, output_data):
+    def _tokens_to_event(self, tokens, output_data, semi_event=False):
         # if self.agent == 0 :
         #     try:
         #         tokens = [0, 0]
@@ -108,11 +110,21 @@ class NeuralSession(Session):
 
         if isinstance(tokens, tuple):
             tokens = list(tokens)
-        if isinstance(tokens[0], int):
-            tokens[0] = self.env.vocab.to_word(tokens[0])
 
         if isinstance(tokens[1], float):
             tokens[1] = CanonicalEntity(type='price', value=tokens[1])
+
+        if semi_event:
+            # From scale to real price
+            # print('semi_event: {}->'.format(tokens[1]),end='')
+            if tokens[1] is not None:
+                tokens[1] = self.builder.get_price_number(tokens[1], self.kb)
+            # print('{}.'.format(tokens[1]))
+            return tokens
+
+        if isinstance(tokens[0], int):
+            tokens[0] = self.env.vocab.to_word(tokens[0])
+
 
         if len(tokens) > 1 and tokens[0] == markers.OFFER and is_entity(tokens[1]):
             try:
@@ -142,21 +154,42 @@ class NeuralSession(Session):
     def get_value(self, all_events):
         all_dia = []
         # print('-'*5+'get_value:')
-
+        #
         # print('in get value:')
-        # last_time = time.time()
+        lt0 = last_time = time.time()
+        time_list = None
         for e in all_events:
+            tmp_tlist = []
             # if info['policy'][act[0]].item() < 1e-7:
             #     continue
             d = copy.deepcopy(self.dialogue)
+            # tmp_tlist.append(time.time() - lt0)
+            # lt0 = time.time()
             self.receive(e, another_dia=d)
+            # tmp_tlist.append(time.time() - lt0)
+            # lt0 = time.time()
             d.lf_to_int()
+            # tmp_tlist.append(time.time() - lt0)
+            # lt0 = time.time()
             # print('='*5)
             # for i, s in enumerate(d.lf_tokens):
             #     print('\t[{}] {}\t{}'.format(d.agents[i], s, d.lfs[i]))
             all_dia.append(d)
+            # tmp_tlist.append(time.time() - lt0)
+            # lt0 = time.time()
+
+            # if time_list is None:
+            #     time_list = []
+            #     for i in range(len(tmp_tlist)):
+            #         time_list.append([])
+            # for i in range(len(tmp_tlist)):
+            #     time_list[i].append(tmp_tlist[i])
+
         # print('copy all dialogue: ', time.time() - last_time)
-        # last_time = time.time()
+        # print('for each step: ',end='')
+        # for i in range(len(time_list)):
+        #     print('{} '.format(np.sum(time_list[i])), end='')
+        last_time = time.time()
         batch = self._create_batch(other_dia=all_dia)
         # print('create batch: ', time.time() - last_time)
 
@@ -191,9 +224,14 @@ class NeuralSession(Session):
             new_all_actions = []
 
             for act in all_actions:
+                # TODO: remove continue for min/max tom
                 if output_data['policy'][0, act[0]].item() < 1e-7:
                     continue
-                e = self._tokens_to_event(act[:2], output_data)
+                # Use semi-event here
+                #   *For semi-events we only need to transform the price (keep intent as integer)
+                # From [0,1] to real price
+                e = self._tokens_to_event(act[:2], output_data, semi_event=True)
+                # e = self._tokens_to_event(act[:2], output_data)
                 all_events.append(e)
                 new_all_actions.append(act)
             all_actions = new_all_actions
@@ -267,6 +305,7 @@ class NeuralSession(Session):
                 # use fake step to get opponent policy
                 tmp_tokens = self._output_to_tokens({'intent': act[0], 'price': act[1]})
                 self.dialogue.add_utterance(self.agent, tmp_tokens)
+                # From [0,1] to real price
                 e = self._tokens_to_event(tmp_tokens, output_data)
                 tmp_time = time.time()
                 info = self.controller.fake_step(self.agent, e)

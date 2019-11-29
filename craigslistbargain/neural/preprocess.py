@@ -471,6 +471,16 @@ class Preprocessor(object):
         '''
         Tokenize, link entities
         '''
+        from cocoa.core.event import Event
+        # Process semi-event
+        if not isinstance(e, Event):
+            if len(e) < 2 or e[1] is None:
+                return e
+            else:
+                # print('e is:', e)
+                e[1] = PriceScaler._scale_price(kb, e[1])
+                return e
+
         if e.action == 'message':
             # Lower, tokenize, link entity
             entity_tokens = self.lexicon.link_entity(tokenize(e.data), kb=kb, scale=True, price_clip=4.)

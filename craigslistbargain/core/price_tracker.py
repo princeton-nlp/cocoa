@@ -79,6 +79,8 @@ class PriceScaler(object):
 
     @classmethod
     # TODO: this is operated on canonical entities, need to be consistent!
+    # INPUT: a scale form 0 to 1
+    # OUTPUT: price is entity with real price
     def unscale_price(cls, kb, price):
         p = PriceTracker.get_price(price)
         b, t = cls.get_price_range(kb)
@@ -91,6 +93,8 @@ class PriceScaler(object):
         else:
             return price._replace(value=p)
 
+    # INPUT: real price (float number)
+    # OUTPUT: price is a float number in [0, 1]
     @classmethod
     def _scale_price(cls, kb, p):
         b, t = cls.get_price_range(kb)

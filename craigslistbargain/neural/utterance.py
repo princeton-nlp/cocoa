@@ -15,6 +15,7 @@ class UtteranceBuilder(BaseUtteranceBuilder):
         tokens = [x for x in tokens if not x in category_markers]
         return tokens
 
+    # Get real price in str type
     def _entity_to_str(self, entity_token, kb):
         if entity_token[0] is None:
             return None
@@ -28,6 +29,7 @@ class UtteranceBuilder(BaseUtteranceBuilder):
         human_readable_price = "${}".format(price)
         return human_readable_price
 
+    # Get real price in float type
     def get_price_number(self, entity, kb):
         raw_price = PriceScaler.unscale_price(kb, entity)
         return entity_to_value(raw_price)
