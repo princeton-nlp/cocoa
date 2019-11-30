@@ -200,7 +200,9 @@ class DialogueBatcher(object):
         num_turns = dialogues[0].num_turns
         return num_turns
 
-    def _get_turn_batch_at(self, dialogues, STAGE, i, step_back=1):
+    # i == -1: the last item
+    # attached_events: for tom search process
+    def _get_turn_batch_at(self, dialogues, STAGE, i, step_back=1, attached_events=None):
         # For RL setting, we use lf as turns.
         if STAGE == 0:
             # encoder pad
@@ -209,8 +211,14 @@ class DialogueBatcher(object):
             # decoder & target pad
             pad = self.mappings['tgt_vocab'].to_ind(markers.PAD)
 
+        attached_role = None
+        if attached_events is not None:
+            attached_events, attached_role = attached_events
+
         if i == -1:
             i = len(dialogues[0].lfs)-1
+            if attached_events is not None:
+                i = i + 1
 
         if i is None:
             # Return all turns
@@ -222,13 +230,15 @@ class DialogueBatcher(object):
             return turns
         else:
             if STAGE != -1:
+                # STAGE == ENC: encoder batch
                 intents = []
                 prices = []
-                for d in dialogues:
+
+                def get_turns():
                     intent = [self.pad]*(max(0, step_back-i-1))
                     price = [None]*(max(0, step_back-i-1))
-                    for j in range(max(0, i+1-step_back), i+1):
-                        tmp = d.lfs[j]
+                    for j in range(max(0, i + 1 - step_back), i + 1):
+                        tmp = lfs[j]
                         intent.append(tmp['intent'])
                         if STAGE == 0:
                             price.append(tmp.get('price'))
@@ -240,19 +250,45 @@ class DialogueBatcher(object):
                     # price = np.array(price)
                     intents.append(intent)
                     prices.append(price)
+
+                for d in dialogues:
+                    if attached_events is not None:
+                        for e in attached_events:
+                            lfs = d.lfs.copy()
+
+                            # print('lfs: ', lfs)
+                            lfs.append(e)
+                            # print('lfs: ', lfs)
+                            get_turns()
+
+                    else:
+                        lfs = d.lfs
+                        get_turns()
+
                 # if step_back == 2:
                 #     print(step_back-i-1, i+1-step_back, i+1, intents)
                 turns = {'intent': intents, 'price': prices}
                 return turns
             else:
+                # STAGE==ROLE: role batch
                 roles = []
-                for d in dialogues:
-                    if d.roles[i] is None:
-                        roles.append([0,0])
+
+                def get_roles():
+                    if droles[i] is None:
+                        roles.append([0, 0])
                     else:
-                        tmp = [0,0]
-                        tmp[d.roles[i]] = 1
+                        tmp = [0, 0]
+                        tmp[droles[i]] = 1
                         roles.append(tmp)
+                for d in dialogues:
+                    if attached_events is not None:
+                        droles = d.roles.copy()
+                        droles.append(attached_role)
+                        for j in range(len(attached_events)):
+                            get_roles()
+                    else:
+                        droles = d.roles
+                        get_roles()
                 return roles
 
     def create_context_batch(self, dialogues, pad):

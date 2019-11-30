@@ -158,23 +158,32 @@ class NeuralSession(Session):
         # print('in get value:')
         lt0 = last_time = time.time()
         time_list = None
-        for e in all_events:
-            tmp_tlist = []
+        # for e in all_events:
+        #     tmp_tlist = []
+
             # if info['policy'][act[0]].item() < 1e-7:
             #     continue
-            d = copy.deepcopy(self.dialogue)
+
+            # d = copy.deepcopy(self.dialogue)
+
             # tmp_tlist.append(time.time() - lt0)
             # lt0 = time.time()
-            self.receive(e, another_dia=d)
+
+            # self.receive(e, another_dia=d)
+
             # tmp_tlist.append(time.time() - lt0)
             # lt0 = time.time()
-            d.lf_to_int()
+
+            # d.lf_to_int()
+
             # tmp_tlist.append(time.time() - lt0)
             # lt0 = time.time()
             # print('='*5)
             # for i, s in enumerate(d.lf_tokens):
             #     print('\t[{}] {}\t{}'.format(d.agents[i], s, d.lfs[i]))
-            all_dia.append(d)
+
+            # all_dia.append(d)
+
             # tmp_tlist.append(time.time() - lt0)
             # lt0 = time.time()
 
@@ -185,19 +194,27 @@ class NeuralSession(Session):
             # for i in range(len(tmp_tlist)):
             #     time_list[i].append(tmp_tlist[i])
 
+        attached_events = []
+        for e in all_events:
+            e = self.env.preprocessor.process_event(e, self.kb)
+            attached_events.append({'intent': e[0], 'price': e[1], 'original_price': None})
+
         # print('copy all dialogue: ', time.time() - last_time)
         # print('for each step: ',end='')
         # for i in range(len(time_list)):
         #     print('{} '.format(np.sum(time_list[i])), end='')
-        last_time = time.time()
-        batch = self._create_batch(other_dia=all_dia)
+        # last_time = time.time()
+        batch = self._create_batch(attached_events=(attached_events, self.dialogue.agent^1))
         # print('create batch: ', time.time() - last_time)
+        last_time = time.time()
 
         # get values
         # batch.mask_last_price()
         e_intent, e_price, e_pmask = batch.encoder_intent, batch.encoder_price, batch.encoder_pmask
-        # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
+        # print('event number:', len(all_events))
+        # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent.shape, e_price.shape, e_pmask.shape))
         values = self.critic(e_intent, e_price, e_pmask, batch.encoder_dianum)
+        # print('inference: ', time.time() - last_time)
         return values
 
 
@@ -383,7 +400,7 @@ class PytorchNeuralSession(NeuralSession):
         inputs = np.array(inputs, dtype=np.int32).reshape([1, -1])
         return inputs
 
-    def _create_batch(self, other_dia=None):
+    def _create_batch(self, other_dia=None, attached_events=None):
         num_context = Dialogue.num_context
 
         # All turns up to now
@@ -392,7 +409,8 @@ class PytorchNeuralSession(NeuralSession):
             dias = [self.dialogue]
         else:
             dias = other_dia
-        encoder_turns = self.batcher._get_turn_batch_at(dias, Dialogue.ENC, -1, step_back=self.batcher.state_length)
+        encoder_turns = self.batcher._get_turn_batch_at(dias, Dialogue.ENC, -1, step_back=self.batcher.state_length,
+                                                        attached_events=attached_events)
 
         encoder_inputs = self.batcher.get_encoder_inputs(encoder_turns)
         # print('intent in sess: ', encoder_inputs[0])
@@ -405,10 +423,14 @@ class PytorchNeuralSession(NeuralSession):
                     }
 
 
-        roles = self.batcher._get_turn_batch_at(dias, Dialogue.ROLE, -1)
+        roles = self.batcher._get_turn_batch_at(dias, Dialogue.ROLE, -1,
+                                                attached_events=attached_events)
         if self.batcher.dia_num:
             for a in roles:
-                a.append(len(dias[0].lfs) / self.batcher.dia_num)
+                if attached_events is not None:
+                    a.append(len(dias[0].lfs)+1 / self.batcher.dia_num)
+                else:
+                    a.append(len(dias[0].lfs) / self.batcher.dia_num)
             encoder_args['dia_num'] = roles
             # encoder_args['dia_num'] = [len(dias[0].lfs) / self.batcher.dia_num] * len(encoder_inputs[0])
 
