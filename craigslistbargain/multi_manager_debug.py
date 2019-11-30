@@ -396,7 +396,7 @@ class MultiManager():
 
         num_worker = self.update_worker_list()
         last_time = time.time()
-        for epoch in range(max_epoch):
+        for epoch in range(args.start_epoch, max_epoch):
             batches = []
             rewards = [[], []]
             print('=' * 5 + ' [Epoch {}/{} running.]'.format(epoch, max_epoch))
