@@ -339,7 +339,7 @@ class RLTrainer(BaseTrainer):
         half = args.num_dialogues // batch_size / 2
         t_s, t_e = 0.3, 1
         i_s, i_e = 0, half
-        return min(t_e, t_s + (t_e - t_s) * 1. * epoch / half)
+        return min(t_e, t_s + (t_e - t_s) * 1. * epoch / args.warmup_epochs)
         # return min(1., 1.*epoch/half)
 
     def example_to_str(self, example, controller, rewards):

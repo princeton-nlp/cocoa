@@ -72,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true', default=False)
 
     parser.add_argument('--start-epoch', type=int, default=0, help='start from specific epoch.')
+    parser.add_argument('--warmup-epochs', type=int, default=25, help='epoch number of using randomness actions')
 
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
