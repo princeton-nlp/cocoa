@@ -83,6 +83,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--start-epoch', type=int, default=0, help='start from specific epoch.')
     parser.add_argument('--warmup-epochs', type=int, default=25, help='epoch number of using randomness actions')
+    parser.add_argument('--start-port', type=int, default=7000, help='start port address for socket transport')
 
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)

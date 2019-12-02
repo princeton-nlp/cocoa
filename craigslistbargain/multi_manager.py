@@ -160,7 +160,7 @@ class MultiManager():
         self.args = args
 
         for i in range(num_cpu):
-            addr = ('localhost', 7000+i)
+            addr = ('localhost', args.start_port+i)
             self.worker_addr.append(addr)
             self.local_workers.append(multiprocessing.Process(target=execute_runner, args=(worker_class, args, addr)))
         # self.trainer = multiprocessing.Process(target=execute_runner, args=(trainer_class, args))
