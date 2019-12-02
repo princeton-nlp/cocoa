@@ -2,6 +2,7 @@ import argparse
 import random
 import json
 import numpy as np
+import sys
 
 from onmt.Utils import use_gpu
 
@@ -24,6 +25,15 @@ from multi_manager_debug import MultiManager as MultiManager_DEBUG, MultiRunner 
 
 import options
 
+def dump_args():
+    # dump all the args at checkpoints
+    fpath = '{}/{}.txt'.format(args.model_path, args.name)
+    print('dumped args at {}'.format(fpath))
+    with open(fpath, 'w') as f:
+        for s in sys.argv:
+            if s[0] == '-':
+                f.write('\n')
+            f.write(s+' ')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(conflict_handler='resolve')
@@ -81,7 +91,11 @@ if __name__ == '__main__':
     options.add_model_arguments(parser)
     args = parser.parse_args()
 
+    dump_args()
+
     if args.debug:
+        # Single thread
+        print('[Info] Running in debug mode.')
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
         manager.learn()
     else:
