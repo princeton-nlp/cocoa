@@ -5,6 +5,7 @@ import options
 
 def get_system(name, args, schema=None, timed=False, model_path=None):
     from core.price_tracker import PriceTracker
+    print(args.price_tracker_model)
     lexicon = PriceTracker(args.price_tracker_model)
 
     if name == 'rulebased':

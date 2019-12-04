@@ -35,62 +35,14 @@
     "end_survey": 1,
     "skip_chat_enabled": false,
     "num_chats_per_scenario": {
-        "rulebased": 1,
-        "human": 1,
-        "sl-words": 1,
-        "rl-words-margin": 1,
-        "rl-words-length": 1,
-        "rl-words-fair": 1,
-        "sl-states": 1,
-        "rl-states-margin": 1,
-        "rl-states-length": 1,
-        "rl-states-fair": 1
+        "rl-neural": 1
         },
-    "debug": false,
+    "debug": true,
     "models": {
-        "rulebased": {
-            "active": true,
-            "type": "rulebased"
-        },
-        "sl-words": {
-            "active": true,
-            "type": "pt-neural",
-            "checkpoint": "scr/checkpoint/seq2seq/model_best.pt"
-        },
-        "rl-words-margin": {
-            "active": true,
-            "type": "pt-neural",
-            "checkpoint": "scr/checkpoint/seq2seq-margin/model_best.pt"
-        },
-        "rl-words-fair": {
-            "active": true,
-            "type": "pt-neural",
-            "checkpoint": "scr/checkpoint/seq2seq-fair/model_best.pt"
-        },
-        "rl-words-length": {
-            "active": true,
-            "type": "pt-neural",
-            "checkpoint": "scr/checkpoint/seq2seq-length/model_best.pt"
-        },
-        "sl-states": {
+	"rl-neural": {
             "active": true,
             "type": "hybrid",
-            "checkpoint": "scr/checkpoint/lf2lf/model_best.pt"
-        },
-        "rl-states-margin": {
-            "active": true,
-            "type": "hybrid",
-            "checkpoint": "scr/checkpoint/lf2lf-margin/model_best.pt"
-        },
-        "rl-states-fair": {
-            "active": true,
-            "type": "hybrid",
-            "checkpoint": "scr/checkpoint/lf2lf-fair/model_best.pt"
-        },
-        "rl-states-length": {
-            "active": true,
-            "type": "hybrid",
-            "checkpoint": "scr/checkpoint/lf2lf-length/model_best.pt"
+            "checkpoint": "checkpoint/rl_neural/model_best.pt"
         }
     }
 }

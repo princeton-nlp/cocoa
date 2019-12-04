@@ -80,7 +80,7 @@ def add_systems(args, config_dict, schema, debug=False):
     systems = {HumanSystem.name(): HumanSystem()}
     pairing_probabilities = {}
     timed = False if debug else True
-    for (sys_name, info) in config_dict.iteritems():
+    for (sys_name, info) in config_dict.items():
         if "active" not in info.keys():
             warnings.warn("active status not specified for bot %s - assuming that bot is inactive." % sys_name)
         if info["active"]:
@@ -97,9 +97,9 @@ def add_systems(args, config_dict, schema, debug=False):
                 prob = float(info['prob'])
                 pairing_probabilities[sys_name] = prob
                 total_probs += prob
-    print '{} systems loaded'.format(len(systems))
+    print('{} systems loaded'.format(len(systems)))
     for name in systems:
-        print name
+        print(name)
 
     # TODO: clean up pairing probabilities (obsolete)
     if total_probs > 1.0:
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     else:
         app.config['task_icon'] = params['icon']
 
-    print "App setup complete"
+    print("App setup complete")
 
     server = WSGIServer(('', args.port), app, log=WebLogger.get_logger(), error_log=error_log_file)
     atexit.register(cleanup, flask_app=app)
