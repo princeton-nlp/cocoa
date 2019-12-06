@@ -42,7 +42,7 @@ def make_encoder(opt, embeddings, output_size, fix_emb=False,):
             bert_encoder = MeanEncoder(bert_output_size, output_size)
         else:
             bert_encoder = RNNEncoder(bert_output_size, output_size)
-        uencoder = UtteranceEncoder(bert_encoder, output_size, output_size=output_size, model_path=opt.bert_model_path)
+        uencoder = UtteranceEncoder(bert_encoder, output_size, output_size=output_size, model_path=opt.bert_model_path, use_gpu=len(opt.gpuid)>0)
         encoder = StateUtteranceEncoder(encoder, uencoder, input_size=output_size*2, output_size=output_size)
 
     return encoder

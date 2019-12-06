@@ -2,11 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="price round to integer">
-      <change beforePath="$PROJECT_DIR$/.idea/cocoa.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/cocoa.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/cocoa/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/controller.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/command" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/command" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/rl_model_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_model_builder.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" afterDir="false" />
     </list>
-    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -32,12 +33,19 @@
     <sorting>DEFINITION_ORDER</sorting>
   </component>
   <component name="ProjectId" id="1OYVgEmR2xyziK0PrMGMmhnv6Qa" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showExcludedFiles" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
   <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="SearchEverywhereHistoryKey" value="xrange&#9;null&#9;null" />
+    <property name="TODO_SCOPE" value="Current File" />
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="settings.editor.selected.configurable" value="reference.settingsdialog.IDE.editor.colors" />
+    <property name="settings.editor.selected.configurable" value="preferences.lookFeel" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
@@ -51,18 +59,6 @@
       <recent name="$PROJECT_DIR$/craigslistbargain/systems" />
       <recent name="$PROJECT_DIR$/mutualfriends/systems" />
     </key>
-  </component>
-  <component name="RunDashboard">
-    <option name="ruleStates">
-      <list>
-        <RuleState>
-          <option name="name" value="ConfigurationTypeDashboardGroupingRule" />
-        </RuleState>
-        <RuleState>
-          <option name="name" value="StatusDashboardGroupingRule" />
-        </RuleState>
-      </list>
-    </option>
   </component>
   <component name="RunManager">
     <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true">
@@ -92,6 +88,18 @@
         <item itemvalue="Python.main" />
       </list>
     </recent_temporary>
+  </component>
+  <component name="ServiceViewManager">
+    <option name="viewStates">
+      <list>
+        <serviceView>
+          <treeState>
+            <expand />
+            <select />
+          </treeState>
+        </serviceView>
+      </list>
+    </option>
   </component>
   <component name="SvnConfiguration">
     <configuration />
@@ -188,7 +196,63 @@
       <option name="project" value="LOCAL" />
       <updated>1574918314791</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="price round to integer">
+      <created>1574945308401</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1574945308402</updated>
+    </task>
+    <task id="LOCAL-00014" summary="Using semi-event for tom search process&#10;  * time consuming -&gt; 1/3 old version">
+      <created>1575036444495</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1575036444495</updated>
+    </task>
+    <task id="LOCAL-00015" summary="optimize get_value()">
+      <created>1575115859769</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1575115859769</updated>
+    </task>
+    <task id="LOCAL-00016" summary="new argument: --start-epoch">
+      <created>1575116312838</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1575116312838</updated>
+    </task>
+    <task id="LOCAL-00017" summary="add argument: epoch number of warming up">
+      <created>1575189677156</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1575189677156</updated>
+    </task>
+    <task id="LOCAL-00018" summary="feature: dump args in checkpoint folder">
+      <created>1575265632861</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1575265632861</updated>
+    </task>
+    <task id="LOCAL-00019" summary="new argument: --start-port">
+      <created>1575271050758</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1575271050758</updated>
+    </task>
+    <task id="LOCAL-00020" summary="add utterance on sl">
+      <created>1575599428554</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1575599428554</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -216,9 +280,35 @@
     <MESSAGE value="using torch1.0.1 &amp; training with fixed policy/value" />
     <MESSAGE value="no-training mode" />
     <MESSAGE value="New ToM on A2C" />
-    <MESSAGE value="price round to integer" />
     <MESSAGE value="update requirements info" />
     <MESSAGE value="update requirements with specific version" />
-    <option name="LAST_COMMIT_MESSAGE" value="update requirements with specific version" />
+    <MESSAGE value="price round to integer" />
+    <MESSAGE value="Using semi-event for tom search process&#10;  * time consuming -&gt; 1/3 old version" />
+    <MESSAGE value="optimize get_value()" />
+    <MESSAGE value="new argument: --start-epoch" />
+    <MESSAGE value="add argument: epoch number of warming up" />
+    <MESSAGE value="feature: dump args in checkpoint folder" />
+    <MESSAGE value="new argument: --start-port" />
+    <MESSAGE value="add utterance on sl" />
+    <option name="LAST_COMMIT_MESSAGE" value="add utterance on sl" />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="516" y="108" key="CommitChangelistDialog2" timestamp="1575599428366">
+      <screen x="0" y="23" width="1792" height="1097" />
+    </state>
+    <state x="516" y="108" key="CommitChangelistDialog2/262.-1057.2560.1057/0.23.1792.1097@0.23.1792.1097" timestamp="1575599428366" />
+    <state x="179" y="122" key="DiffContextDialog" timestamp="1575599346270">
+      <screen x="0" y="23" width="1792" height="1097" />
+    </state>
+    <state x="179" y="122" key="DiffContextDialog/262.-1057.2560.1057/0.23.1792.1097@0.23.1792.1097" timestamp="1575599346270" />
+    <state x="504" y="367" key="com.intellij.ide.util.TipDialog" timestamp="1575544928449">
+      <screen x="0" y="23" width="1792" height="1097" />
+    </state>
+    <state x="504" y="367" key="com.intellij.ide.util.TipDialog/0.23.1792.1097@0.23.1792.1097" timestamp="1575544928449" />
+    <state x="511" y="297" width="769" height="548" key="find.popup" timestamp="1575602063556">
+      <screen x="0" y="23" width="1792" height="1097" />
+    </state>
+    <state x="511" y="297" width="769" height="548" key="find.popup/0.23.1792.1097@0.23.1792.1097" timestamp="1575602063556" />
+    <state x="511" y="297" width="769" height="548" key="find.popup/1792.572.960.681/0.23.1792.1097@0.23.1792.1097" timestamp="1575584013151" />
   </component>
 </project>
