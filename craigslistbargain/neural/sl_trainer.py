@@ -188,6 +188,8 @@ class SLTrainer(BaseTrainer):
         # Set model in training mode.
         self.model.train()
 
+        self.use_utterance = False
+
         # Summary writer for tensorboard
         self.writer = SummaryWriter(logdir='logs/{}'.format(args.name))
 
@@ -214,7 +216,10 @@ class SLTrainer(BaseTrainer):
         e_intent, e_price, e_pmask = batch.encoder_intent, batch.encoder_price, batch.encoder_pmask
         # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
 
-        policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum)
+        if self.use_utterance:
+            policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, utterance=batch.msgs)
+        else:
+            policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, )
         return policy, price, pvar
 
     def learn(self, opt, data, report_func):
@@ -227,6 +232,8 @@ class SLTrainer(BaseTrainer):
         print('\nStart training...')
         print(' * number of epochs: %d' % opt.epochs)
         print(' * batch size: %d' % opt.batch_size)
+
+        self.use_utterance = opt.use_utterance
 
         self.policy_data = data.policy
         self.policy_model = None
@@ -338,7 +345,7 @@ class SLTrainer(BaseTrainer):
         for batch in valid_iter:
             if batch is None:
                 continue
-            policy, price, pvar = self._run_batch(batch)
+            policy, price, pvar = self._run_batch(batch, )
             loss, batch_stats = self._compute_loss(batch, policy, (price, pvar), self.train_loss)
             stats.update(batch_stats)
 

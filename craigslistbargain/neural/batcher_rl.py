@@ -15,7 +15,8 @@ def pad_list_to_array(l, fillvalue, dtype):
 
 class Batch(object):
     def __init__(self, encoder_args, decoder_args, context_data, vocab,
-                time_major=True, num_context=None, cuda=False, for_value=False):
+                time_major=True, num_context=None, cuda=False, for_value=False, msgs=None):
+        self.msgs = msgs
         self.vocab = vocab
         self.num_context = num_context
         self.encoder_intent = encoder_args['intent']
@@ -52,6 +53,9 @@ class Batch(object):
             if self.encoder_intent[i][-1] == offer_idx:
                 self.policy_mask[i, :] = 0
                 self.policy_mask[i,[acc_idx, rej_idx]] = 1
+            elif self.encoder_intent[i][-1] in [acc_idx, rej_idx]:
+                self.policy_mask[i, :] = 0
+                self.policy_mask[i, [quit_idx, ]] = 1
             else:
                 self.policy_mask[i, [acc_idx, rej_idx, pad_idx, none_idx, unk_idx, quit_idx, start_idx]] = 0
         # else:
@@ -229,7 +233,27 @@ class DialogueBatcher(object):
                     turns[k].append(j[k])
             return turns
         else:
-            if STAGE != -1:
+            if STAGE == 3:
+                msgs = []
+
+                def get_msgs():
+                    if isinstance(dmsgs[i], str):
+                        msgs.append(dmsgs[i])
+                    else:
+                        msgs.append('')
+
+                for d in dialogues:
+                    if attached_events is not None:
+                        dmsgs = d.msgs.copy()
+                        # TODO: attached msg
+                        dmsgs.append(None)
+                        for j in range(len(attached_events)):
+                            get_msgs()
+                    else:
+                        dmsgs = d.msgs
+                        get_msgs()
+                return msgs
+            elif STAGE != -1:
                 # STAGE == ENC: encoder batch
                 intents = []
                 prices = []
@@ -368,12 +392,15 @@ class DialogueBatcher(object):
 
     def _create_one_batch(self, encoder_turns=None, decoder_turns=None,
             target_turns=None, agents=None, uuids=None, kbs=None, kb_context=None,
-            num_context=None, encoder_tokens=None, decoder_tokens=None, i=None, roles=None, for_value=False):
+            num_context=None, encoder_tokens=None, decoder_tokens=None, i=None, roles=None, for_value=False,
+            encoder_msgs=None):
         # encoder_context = self.get_encoder_context(encoder_turns, num_context)
 
         # print('encoder_turns: ', encoder_turns)
         encoder_intent, encoder_price, encoder_price_mask = self.get_encoder_inputs(encoder_turns)
         target_intent, target_price, target_price_mask = self.make_decoder_inputs_and_targets(decoder_turns, target_turns)
+
+        msgs = encoder_msgs
 
         encoder_args = {
                 'intent': encoder_intent,
@@ -404,7 +431,8 @@ class DialogueBatcher(object):
                 'encoder_args': encoder_args,
                 'decoder_args': decoder_args,
                 'context_data': context_data,
-                'for_value':    for_value
+                'for_value':    for_value,
+                'msgs':         msgs,
                 }
         return batch
 
@@ -491,12 +519,14 @@ class DialogueBatcher(object):
                 kb_context=dialogue_data['kb_context'],
                 num_context=self.num_context,
                 i=i,
+                encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSG, i),
                 )
                 for i in encode_turn_ids
             ]
 
         # bath_seq: A sequence of batches that can be processed in turn where
         # the state of each batch is passed on to the next batch
+        # TODO: both case will add one
         if for_value and not (num_turns-1 in encode_turn_ids):
             i = num_turns-1
             batch_seq.append(self._create_one_batch(
@@ -511,7 +541,9 @@ class DialogueBatcher(object):
                 kbs=dialogue_data['kbs'],
                 kb_context=dialogue_data['kb_context'],
                 num_context=self.num_context,
-                i=i, for_value=True))
+                i=i, for_value=True,
+                encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSGS, i),
+                ))
 
         return batch_seq
 

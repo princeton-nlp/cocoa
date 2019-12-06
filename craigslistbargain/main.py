@@ -107,6 +107,9 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='sl', type=str, help='Name of this experiment.')
 
     parser.add_argument('--agent-checkpoint', type=str, default=None, help='Directory to learned models')
+    parser.add_argument('--use-utterance', default=False, action='store_true', help='using utterance as input')
+    parser.add_argument('--bert-model-path', default=None, type=str, help='Directory of bert pretrained model path')
+    parser.add_argument('--bert-encoder', default='mean', choices=['mean','rnn'], help='bert encoder type')
 
     options.add_data_generator_arguments(parser)
     options.add_model_arguments(parser)

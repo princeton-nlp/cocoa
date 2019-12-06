@@ -85,6 +85,8 @@ class Dialogue(object):
     TARGET = 2
     num_stages = 3  # encoding, decoding, target
 
+    MSG = 3
+
     def __init__(self, agent, kb, uuid, model='seq2seq', hidden_price=True, update_agree=True):
         '''
         Dialogue data that is needed by the model.
@@ -164,7 +166,7 @@ class Dialogue(object):
         utterance = utterance.copy()
         # Always start from the partner agent
         if len(self.agents) == 0 and agent == self.agent:
-            self._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
+            self._add_utterance(1 - self.agent, [], lf={'intent': 'start'}, msg='')
         # Try to process lf from utterance
         if lf is None:
             lf = self.process_lf(utterance)
@@ -352,6 +354,7 @@ class Dialogue(object):
         '''
         self.agents = self._pad_list(self.agents, num_turns, None)
         self.roles = self._pad_list(self.roles, num_turns, None)
+        self.msgs = self._pad_list(self.msgs, num_turns, '')
         for turns in self.turns:
             self._pad_list(turns, num_turns, [])
         self.lfs = self._pad_list(self.lfs, num_turns, {'intent': self.mappings['lf_vocab'].to_ind(markers.PAD), 'price': None})
@@ -666,6 +669,8 @@ class DataGenerator(object):
                             batch['decoder_args'],
                             batch['context_data'],
                             self.mappings['utterance_vocab'],
-                            num_context=self.num_context, cuda=cuda)
+                            num_context=self.num_context, cuda=cuda,
+                            msgs=batch['msgs'],
+                            )
             # End of dialogue
             yield None

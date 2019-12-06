@@ -9,7 +9,9 @@ import onmt
 import onmt.io
 import onmt.Models
 import onmt.modules
-from onmt.RLModels import StateEncoder, PolicyDecoder, PolicyModel, ValueModel, ValueDecoder
+from onmt.RLModels import StateEncoder, UtteranceEncoder, StateUtteranceEncoder, \
+    MeanEncoder, RNNEncoder, \
+    PolicyDecoder, PolicyModel, ValueModel, ValueDecoder
 from onmt.Utils import use_gpu
 
 from cocoa.io.utils import read_pickle
@@ -20,16 +22,30 @@ def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
     return nn.Embedding(len(word_dict), emb_length)
 
 
-def make_encoder(opt, embeddings, output_size, fix_emb=False):
+def make_encoder(opt, embeddings, output_size, fix_emb=False,):
     """
     Various encoder dispatcher function.
     Args:
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
-    return StateEncoder(embeddings, output_size=output_size,
+
+    encoder = StateEncoder(embeddings, output_size=output_size,
                         state_length=opt.state_length, extra_size=3 if opt.dia_num>0 else 0,
                         fix_emb=fix_emb)
+    if opt.use_utterance:
+
+        # TODO: use function to get the size?
+        bert_output_size = 768
+
+        if opt.bert_encoder == 'mean':
+            bert_encoder = MeanEncoder(bert_output_size, output_size)
+        else:
+            bert_encoder = RNNEncoder(bert_output_size, output_size)
+        uencoder = UtteranceEncoder(bert_encoder, output_size, output_size=output_size, model_path=opt.bert_model_path)
+        encoder = StateUtteranceEncoder(encoder, uencoder, input_size=output_size*2, output_size=output_size)
+
+    return encoder
 
 
 def make_decoder(opt, encoder_size, intent_size, output_value=False):
