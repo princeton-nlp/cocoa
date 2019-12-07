@@ -287,13 +287,13 @@ class NeuralSession(Session):
 
                 print_list.append((self.env.textint_map.int_to_text([act[0]]), act, probs[i, 0].item(), values[i, 0].item()))
 
-            if len(self.dialogue.lf_tokens) >= 2 and self.dialogue.lf_tokens[-2]['intent'] == 'offer':
-                print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
-                for i, s in enumerate(self.dialogue.lf_tokens):
-                    print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
-                for s in print_list:
-                    print('\t' + str(s))
-            print('is fake: ',time.time()-tmp_time)
+            # if len(self.dialogue.lf_tokens) >= 2 and self.dialogue.lf_tokens[-2]['intent'] == 'offer':
+            #     print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
+            #     for i, s in enumerate(self.dialogue.lf_tokens):
+            #         print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
+            #     for s in print_list:
+            #         print('\t' + str(s))
+            # print('is fake: ',time.time()-tmp_time)
 
             info = {'values': values, 'probs': probs}
             # print('sum of probs', probs.sum())
