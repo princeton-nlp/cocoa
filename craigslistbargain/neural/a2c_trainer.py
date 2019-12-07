@@ -260,6 +260,7 @@ class RLTrainer(BaseTrainer):
         self.model.eval()
         self.critic.eval()
         total_stats = RLStatistics()
+        oppo_total_stats = RLStatistics()
         valid_size = min(valid_size, 200)
         # print('='*20, 'VALIDATION', '='*20)
         examples = []
@@ -272,14 +273,16 @@ class RLTrainer(BaseTrainer):
             session = controller.sessions[self.training_agent]
             reward = self.get_reward(example, session)
             rewards = [self.get_reward(example, controller.sessions[i]) for i in range(2)]
-            stats = RLStatistics(reward=reward, n_words=1)
+            stats = RLStatistics(reward=rewards[0], n_words=1)
+            oppo_stats = RLStatistics(reward=rewards[1], n_words=1)
             total_stats.update(stats)
+            oppo_total_stats.update(oppo_stats)
             examples.append(example)
             verbose_str.append(self.example_to_str(example, controller, rewards))
         # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         self.critic.train()
-        return total_stats, examples, verbose_str
+        return [total_stats, oppo_total_stats], examples, verbose_str
 
     def save_best_checkpoint(self, checkpoint, opt, valid_stats):
 
@@ -549,6 +552,7 @@ class RLTrainer(BaseTrainer):
             if (i+1) % save_every == 0:
                 # TODO: valid in dev set
                 valid_stats, _, _ = self.validate(args, 50 if args.only_run else 200)
+                valid_stats = valid_stats[0]
                 if not args.only_run:
                     self.drop_checkpoint(args, i+1, valid_stats, model_opt=self.agents[self.training_agent].env.model_args)
                     if args.update_oppo:

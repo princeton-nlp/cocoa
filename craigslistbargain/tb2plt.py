@@ -1,16 +1,34 @@
 
 # Load scalar from tensorboard logs and render with matplotlib
+#   * extract_rewards_from_example(file_name):
+#       Get rewards from specific examples file
+#   * load_from_tensorboard
+#       Get logs (include rewards) from tensorboard
 
 from tensorboard.backend.event_processing import event_accumulator
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 import os
+import re
 
 edge = 0.17
 left_e = 0.19
 up_e = 0.92
 right_e = 0.98
+
+def extract_rewards_from_example(file_name='result.txt'):
+    r = re.compile('([-+]?\d+\.\d+)')
+    with open(file_name,'r') as f:
+        data = f.readlines()
+    rewards = [[], []]
+    for d in data:
+        if d.find('reward: [0]') != -1:
+            rewards[0].append(float(r.findall(d)[0]))
+        if d.find('reward: [1]') != -1:
+            rewards[1].append(float(r.findall(d)[0]))
+    return [np.mean(rewards[0]), np.mean(rewards[1])]
+    # print('rewards: {}, {}'.format(np.mean(rewards[0]), np.mean(rewards[1])))
 
 def get_args():
     parser = argparse.ArgumentParser(conflict_handler='resolve')

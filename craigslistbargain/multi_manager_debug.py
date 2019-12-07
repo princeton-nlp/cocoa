@@ -253,6 +253,10 @@ class MultiManager():
                 self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[5], ii)
                 self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
 
+    def _draw_tensorboard_valid(self, ii, all_rewards):
+        for j in range(2):
+            self.writer.add_scalar('agent{}/dev_reward'.format(j), all_rewards[j], ii)
+
     def dump_examples(self, examples, verbose_strs, epoch, mode='train'):
         # Dump with details
         args = self.args
@@ -358,7 +362,7 @@ class MultiManager():
             valid_info = worker.send(['valid', (0, 200)])
             valid_stats, _, _ = pickle.loads(valid_info[1])
 
-            worker.send(['save_model', pickle.dumps((i, valid_stats))])
+            worker.send(['save_model', pickle.dumps((i, valid_stats[0]))])
             # # Save model
             # if (i + 1) % save_every == 0:
             #     # TODO: valid in dev set
@@ -453,21 +457,26 @@ class MultiManager():
             task_lists = self.allocate_tasks(num_worker, 50)
             now = 0
 
-            valid_stats = RLStatistics()
+            valid_stats = [RLStatistics(), RLStatistics()]
             valid_examples = []
             valid_ex_str = []
             for i, w in enumerate(self.worker_conn):
                 valid_info = w.send(['valid', (now, task_lists[i])])
                 now += task_lists[i]
                 valid_info[1] = pickle.loads(valid_info[1])
-                valid_stats.update(valid_info[1][0])
+                for j in range(2):
+                    valid_stats[j].update(valid_info[1][0][j])
                 valid_examples += valid_info[1][1]
                 valid_ex_str += valid_info[1][2]
 
             self.dump_examples(valid_examples, valid_ex_str, epoch, 'dev')
             # Save the model
-            self.worker_conn[0].send(['save_model', pickle.dumps((epoch, valid_stats))])
+            self.worker_conn[0].send(['save_model', pickle.dumps((epoch, valid_stats[0]))])
             # self.worker_conn[0].recv()
+
+            # Draw dev rewards on tensorboard
+            dev_rewards = [valid_stats[j].mean_reward() for j in range(2)]
+            self._draw_tensorboard_valid((epoch + 1) * batch_size, dev_rewards)
 
             print('=' * 5 + ' [Epoch {} for {:.3f}s.]'.format(epoch, time.time() - last_time))
             last_time = time.time()
