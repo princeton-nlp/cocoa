@@ -527,7 +527,7 @@ class DialogueBatcher(object):
         # bath_seq: A sequence of batches that can be processed in turn where
         # the state of each batch is passed on to the next batch
         # TODO: both case will add one
-        if for_value and not (num_turns-1 in encode_turn_ids):
+        if for_value: # and not (num_turns-1 in encode_turn_ids):
             i = num_turns-1
             batch_seq.append(self._create_one_batch(
                 encoder_turns=self._get_turn_batch_at(dialogues, ENC, i, step_back=self.state_length),
@@ -542,7 +542,7 @@ class DialogueBatcher(object):
                 kb_context=dialogue_data['kb_context'],
                 num_context=self.num_context,
                 i=i, for_value=True,
-                encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSGS, i),
+                encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSG, i),
                 ))
 
         return batch_seq

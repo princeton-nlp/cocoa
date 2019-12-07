@@ -311,7 +311,8 @@ class Dialogue(object):
 
         for i, r in enumerate(self.roles):
             if self.roles is not None:
-                self.roles[i] = 0 if r == 'seller' else 1
+                if isinstance(self.roles[i], str):
+                    self.roles[i] = 0 if r == 'seller' else 1
         # if self.need_output:
         # print('token_turns weird: ')
         # for i, t in enumerate(self.token_turns):

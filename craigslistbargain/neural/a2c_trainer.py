@@ -100,6 +100,7 @@ class RLTrainer(BaseTrainer):
                                         training_agent, reward_func, cuda, args)
         # print('training_agent', training_agent)
         self.model_type = args.model_type
+        self.use_utterance = False
 
     def _run_batch_a2c(self, batch):
         value = self._run_batch_critic(batch)

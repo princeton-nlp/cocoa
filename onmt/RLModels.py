@@ -272,7 +272,10 @@ class PolicyModel(nn.Module):
     def forward(self, e_intent, e_price, e_pmask, e_extra=None, utterance=None):
         """
         """
-        enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra, utterance)
+        if utterance is not None:
+            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra, utterance)
+        else:
+            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra)
         if self.fix_encoder:
             enc_final = enc_final.detach()
         policy, price, price_var = self.decoder(enc_final)
@@ -293,7 +296,10 @@ class ValueModel(nn.Module):
         # encoder.eval()
 
     def forward(self, e_intent, e_price, e_pmask, e_extra=None, utterance=None):
-        enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra, utterance)
+        if utterance is not None:
+            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra, utterance)
+        else:
+            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra)
         if self.fix_encoder:
             enc_final = enc_final.detach()
         value = self.decoder(enc_final)

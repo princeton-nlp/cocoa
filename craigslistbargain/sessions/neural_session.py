@@ -57,6 +57,10 @@ class NeuralSession(Session):
         #             curr_turns.append(self.env.textint_map.text_to_int(turn, stage))
         self.dialogue.lf_to_int()
 
+    def receive_quit(self):
+        e = Event.QuitEvent(self.agent ^ 1, time=self.timestamp())
+        self.receive(e)
+
     # Using another dialogue with semi-event
     def receive(self, event, another_dia=None):
         if isinstance(event, Event) and event.action in Event.decorative_events:
@@ -268,13 +272,13 @@ class NeuralSession(Session):
 
                 print_list.append((self.env.textint_map.int_to_text([act[0]]), act, probs[i, 0].item(), values[i, 0].item()))
 
-            # if self.dialogue.lf_tokens[-1]['intent'] == 'offer':
-            #     print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
-            #     for i, s in enumerate(self.dialogue.lf_tokens):
-            #         print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
-            #     for s in print_list:
-            #         print('\t' + str(s))
-            # print('is fake: ',time.time()-tmp_time)
+            if len(self.dialogue.lf_tokens) >= 2 and self.dialogue.lf_tokens[-2]['intent'] == 'offer':
+                print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
+                for i, s in enumerate(self.dialogue.lf_tokens):
+                    print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
+                for s in print_list:
+                    print('\t' + str(s))
+            print('is fake: ',time.time()-tmp_time)
 
             info = {'values': values, 'probs': probs}
             # print('sum of probs', probs.sum())
@@ -370,6 +374,10 @@ class NeuralSession(Session):
     def iter_batches(self):
         """Compute the logprob of each generated utterance.
         """
+        # print('------------dialouge ', self.agent)
+        # for i, t in enumerate(self.dialogue.token_turns):
+        #     print(self.dialogue.agents[i], t)
+        # print('')
         self.convert_to_int()
         batches = self.batcher.create_batch([self.dialogue], for_value=True)
         # print('number of batches: ', len(batches))

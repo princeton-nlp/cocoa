@@ -88,6 +88,16 @@ class Controller(object):
                 num_turns += 1
                 if self.game_over() or (max_turns and num_turns >= max_turns):
                     game_over = True
+                    # Let another one providing a quit action (for trainning value function)
+                    partner = agent ^ 1
+                    other_session = self.sessions[partner]
+
+                    # for self u2 = rej/acpt: add u3 quit
+                    session.receive_quit()
+
+                    # for opponent u2 = offer: add u3 rej/acpt
+                    other_session.receive(event)
+
                     break
 
                 for partner, other_session in enumerate(self.sessions):
@@ -173,7 +183,7 @@ class Controller(object):
     def get_chat_id(self):
         return self.chat_id
 
-    def game_over(self):
+    def F(self):
         """Whether the game/session reaches the terminal state.
         """
         raise NotImplementedError

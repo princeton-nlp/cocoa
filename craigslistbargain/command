@@ -10,6 +10,10 @@ mkdir checkpoint/sl; mkdir mappings/sl;PYTHONPATH=. python main.py --schema-path
 --epochs 15 --report-every 500 \
 --cache cache/sl --ignore-cache --state-length 4 --dia-num 20
 
+# With utterance as input:
+* --use-utterance
+* --bert-model-path [path] (optional, if pretrain model saved)
+
 # Reinforcement Learning(mult_rl.py / reinforce.py)
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \
