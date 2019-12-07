@@ -11,10 +11,10 @@ from cocoa.systems.human_system import HumanSystem
 from cocoa.web.views.utils import format_message
 
 from core.controller import Controller
-from states import FinishedState, UserChatState, WaitingState, SurveyState
-from utils import Status, UnexpectedStatusException, ConnectionTimeoutException, StatusTimeoutException, NoSuchUserException, Messages, current_timestamp_in_seconds, User
-from db_reader import DatabaseReader
-from logger import WebLogger
+from .states import FinishedState, UserChatState, WaitingState, SurveyState
+from .utils import Status, UnexpectedStatusException, ConnectionTimeoutException, StatusTimeoutException, NoSuchUserException, Messages, current_timestamp_in_seconds, User
+from .db_reader import DatabaseReader
+from .logger import WebLogger
 
 
 class DatabaseManager(object):
@@ -61,7 +61,7 @@ class DatabaseManager(object):
         """
         conn = sqlite3.connect(self.db_file)
         c = conn.cursor()
-        for sid, scenario in scenario_db.scenarios_map.iteritems():
+        for sid, scenario in scenario_db.scenarios_map.items():
             for agent_type in systems.keys():
                 if update:
                     c.execute('''INSERT OR IGNORE INTO scenario VALUES (?,?, "[]", "[]")''', (sid, agent_type))

@@ -24,6 +24,9 @@ class NeuralSession(Session):
         self.generator = env.dialogue_generator
         self.cuda = env.cuda
 
+        # utterance generator
+        self.uttr_gen = env.nlg_module.gen
+
         self.batcher = self.env.dialogue_batcher
         self.dialogue = Dialogue(agent, kb, None)
         self.dialogue.kb_context_to_int()
@@ -68,7 +71,12 @@ class NeuralSession(Session):
         # print(event.data)
         # Parse utterance
         utterance = self.env.preprocessor.process_event(event, self.kb)
-        # print('utterance is:', utterance)
+
+        # e.g. sentences are here!!
+        # when message is offer / accept / reject we do not have "real_uttr"
+        # need to be added into state in your ways
+        # if "real_uttr" in event.metadata.keys():
+        #     print(">>> received sentence", event.metadata["real_uttr"])
 
         # Empty message
         if utterance is None:
@@ -133,7 +141,7 @@ class NeuralSession(Session):
         if len(tokens) > 1 and tokens[0] == markers.OFFER and is_entity(tokens[1]):
             try:
                 price = self.builder.get_price_number(tokens[1], self.kb)
-                return self.offer({'price': price}, metadata=output_data)
+                return self.offer({'price': price}, metadata={"output_data": output_data})
             except ValueError:
                 # return None
                 pass
@@ -144,16 +152,23 @@ class NeuralSession(Session):
 
         if len(tokens) > 0:
             if tokens[0] == markers.ACCEPT:
-                return self.accept(metadata=output_data)
+                return self.accept(metadata={"output_data": output_data})
             elif tokens[0] == markers.REJECT:
-                return self.reject(metadata=output_data)
+                return self.reject(metadata={"output_data": output_data})
             elif tokens[0] == markers.QUIT:
-                return self.quit(metadata=output_data)
+                return self.quit(metadata={"output_data": output_data})
 
         while len(tokens) > 0 and tokens[-1] == None: tokens = tokens[:-1]
         s = self.attach_punct(' '.join(tokens))
         # print 'send:', s
-        return self.message(s, metadata=output_data)
+        
+        # print(">>> sender's intent: ", tokens)
+        role = self.kb.facts['personal']['Role']
+        category = self.kb.facts['item']['Category']
+        real_uttr = self.uttr_gen(tokens, role, category)
+        # print(">>> sender's uttr: ", real_uttr)
+
+        return self.message(s, metadata={"output_data": output_data, "real_uttr": real_uttr})
 
     def get_value(self, all_events):
         all_dia = []
@@ -364,6 +379,7 @@ class NeuralSession(Session):
         self.dialogue.add_utterance(self.agent, list(tokens))
         # print('tokens', tokens)
         # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
+         
         return self._tokens_to_event(tokens, output_data)
 
 

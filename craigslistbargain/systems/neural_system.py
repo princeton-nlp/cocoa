@@ -14,6 +14,7 @@ from neural import rl_model_builder, get_data_generator, make_model_mappings
 from neural.preprocess import markers, TextIntMap, Preprocessor, Dialogue
 from neural.batcher_rl import DialogueBatcherFactory
 from neural.utterance import UtteranceBuilder
+from neural.nlg import IRNLG
 import options
 
 
@@ -52,6 +53,8 @@ class PytorchNeuralSystem(System):
 
         generator = get_generator(model, vocab, Scorer(args.alpha), args, model_args)
         builder = UtteranceBuilder(vocab, args.n_best, has_tgt=True)
+        
+        nlg_module = IRNLG(args)
 
         preprocessor = Preprocessor(schema, price_tracker, model_args.entity_encoding_form,
                 model_args.entity_decoding_form, model_args.entity_target_form)
@@ -76,14 +79,15 @@ class PytorchNeuralSystem(System):
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',
             'stop_symbol', 'remove_symbols', 'gt_prefix',
             'max_len', 'dialogue_batcher', 'cuda',
-            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 'name', 'price_strategy', 'tom_type'])
+            'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 
+            'name', 'price_strategy', 'tom_type', 'nlg_module'])
         self.env = Env(model, vocab, preprocessor, textint_map,
             stop_symbol=vocab.to_ind(markers.EOS), remove_symbols=remove_symbols,
             gt_prefix=1,
             max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda,
             dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
             critic=critic, usetom=(name == 'tom'), name=name,
-            price_strategy=args.price_strategy, tom_type=args.tom_type)
+            price_strategy=args.price_strategy, tom_type=args.tom_type, nlg_module=nlg_module)
         # print('usetom?:', (name == 'tom'))
 
     @classmethod

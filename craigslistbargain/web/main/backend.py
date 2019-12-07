@@ -8,7 +8,7 @@ from cocoa.web.main.utils import Status, Messages
 from cocoa.web.views.utils import format_message
 
 from analysis.utils import reject_transcript
-from db_reader import DatabaseReader
+from .db_reader import DatabaseReader
 from core.event import Event
 
 class DatabaseManager(BaseDatabaseManager):

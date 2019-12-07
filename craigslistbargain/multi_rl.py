@@ -86,6 +86,9 @@ if __name__ == '__main__':
     parser.add_argument('--start-port', type=int, default=7000, help='start port address for socket transport')
     parser.add_argument('--use-utterance', action='store_true', default=False, help='use data generator')
 
+    parser.add_argument('--nlg-dir', type=str, default='data/nlg_templates_dict.json',
+                        help='directory of templates for IR-based NLG')
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)

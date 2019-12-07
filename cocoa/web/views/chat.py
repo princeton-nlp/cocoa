@@ -2,7 +2,7 @@ import time
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, Markup
 from flask import current_app as app
 
-from utils import generate_userid, userid, format_message
+from .utils import generate_userid, userid, format_message
 from cocoa.web.main.utils import Status
 from cocoa.core.event import Event
 
