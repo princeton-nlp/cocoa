@@ -74,6 +74,9 @@ if __name__ == '__main__':
     parser.add_argument('--start-epoch', type=int, default=0, help='start from specific epoch.')
     parser.add_argument('--warmup-epochs', type=int, default=25, help='epoch number of using randomness actions')
 
+    parser.add_argument('--nlg-dir', type=str, default='data/nlg_templates_dict.json',
+                        help='directory of templates for IR-based NLG')
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)

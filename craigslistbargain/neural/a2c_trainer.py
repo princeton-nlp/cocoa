@@ -341,6 +341,16 @@ class RLTrainer(BaseTrainer):
         i_s, i_e = 0, half
         return min(t_e, t_s + (t_e - t_s) * 1. * epoch / args.warmup_epochs)
         # return min(1., 1.*epoch/half)
+    
+    def example_to_text(self, exmaple):
+        ret = []
+        for i, e in enumerate(exmaple.events):
+            if "real_uttr" in e.metadata.keys():
+                ret.append("[{}: {}]\t{}\t{}\t\"{}\"".format(e.time, e.agent, e.action, e.data, e.metadata["real_uttr"]))
+            else:
+                ret.append("[{}: {}]\t{}\t{}".format(e.time, e.agent, e.action, e.data))
+        return ret 
+        
 
     def example_to_str(self, example, controller, rewards):
         verbose_str = []
@@ -349,8 +359,9 @@ class RLTrainer(BaseTrainer):
             bottom, top = PriceScaler.get_price_range(session.kb)
             s = 'Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top)
             verbose_str.append(s)
+        verbose_str.append("They are negotiating for "+session.kb.facts['item']['Category'])
 
-        strs = example.to_text()
+        strs = self.example_to_text(example)
         for str in strs:
             verbose_str.append(str)
         s = "reward: [0]{}\nreward: [1]{}".format(rewards[0], rewards[1])
