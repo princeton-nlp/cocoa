@@ -172,7 +172,7 @@ class MultiManager():
             self.worker_addr.append(addr)
             if len(args.gpuid) > 0:
                 length = len(args.gpuid)
-                tmp_args = args.copy()
+                tmp_args = argparse.Namespace(**vars(args))
                 tmp_args.gpuid = [args.gpuid[i % length]]
             else:
                 tmp_args = args
