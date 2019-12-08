@@ -36,6 +36,8 @@ import multiprocessing.connection
 import pickle
 import numpy as np
 
+from torch import cuda
+
 def execute_runner(runner, args, addr):
     runner(args, addr).run()
 
@@ -46,6 +48,12 @@ class MultiRunner:
         self.conn = multiprocessing.connection.Client(self.addr)
 
     def init_trainer(self, args):
+        if args.gpuid:
+            print('Running with GPU {}.'.format(args.gpuid[0]))
+            cuda.set_device(args.gpuid[0])
+        else:
+            print('Running with CPU.')
+
         if args.random_seed:
             random.seed(args.random_seed+os.getpid())
             np.random.seed(args.random_seed+os.getpid())
@@ -162,7 +170,13 @@ class MultiManager():
         for i in range(num_cpu):
             addr = ('localhost', args.start_port+i)
             self.worker_addr.append(addr)
-            self.local_workers.append(multiprocessing.Process(target=execute_runner, args=(worker_class, args, addr)))
+            if len(args.gpuid) > 0:
+                length = len(args.gpuid)
+                tmp_args = args.copy()
+                tmp_args.gpuid = [args.gpuid[i % length]]
+            else:
+                tmp_args = args
+            self.local_workers.append(multiprocessing.Process(target=execute_runner, args=(worker_class, tmp_args, addr)))
         # self.trainer = multiprocessing.Process(target=execute_runner, args=(trainer_class, args))
         self.trainer = self.local_workers[0]
 

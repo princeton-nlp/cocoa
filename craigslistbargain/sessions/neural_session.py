@@ -212,6 +212,32 @@ class NeuralSession(Session):
             #         time_list.append([])
             # for i in range(len(tmp_tlist)):
             #     time_list[i].append(tmp_tlist[i])
+        a_r = [self.acc_idx, self.rej_idx]
+        qt = [self.quit_idx]
+        if all_events[0][0] in a_r:
+            # print('a_r', a_r)
+            # print('unknown: ', all_events, self.dialogue.token_turns[-1])
+            price = None
+            for t in self.dialogue.token_turns[-1]:
+                if is_entity(t):
+                    price = self.builder.get_price_number(t, self.kb)
+            values = []
+            for e in all_events:
+                r = self.controller.get_margin_reward(price=price, agent=self.agent, is_agreed=e[0] == self.acc_idx)
+                values.append(r)
+
+            # print('value:', values, price)
+            return torch.tensor(values, device=next(self.critic.parameters()).device).view(-1,1)
+
+        if all_events[0][0] in qt:
+            is_agreed = ('accept' in self.dialogue.token_turns[-1])
+            # print(is_agreed)
+            values = [self.controller.get_margin_reward(price=None, agent=self.agent, is_agreed=is_agreed)]
+            # print('qt:', all_events, self.dialogue.token_turns[-1])
+            # print('value:', values)
+            # quit()
+            return torch.tensor(values, device=next(self.critic.parameters()).device).view(-1,1)
+
 
         attached_events = []
         for e in all_events:
@@ -413,6 +439,9 @@ class PytorchNeuralSession(NeuralSession):
     def __init__(self, agent, kb, env):
         super(PytorchNeuralSession, self).__init__(agent, kb, env)
         self.vocab = env.vocab
+        self.quit_idx = self.vocab.to_ind('quit')
+        self.acc_idx = self.vocab.to_ind('accept')
+        self.rej_idx = self.vocab.to_ind('reject')
 
         self.new_turn = False
         self.end_turn = False

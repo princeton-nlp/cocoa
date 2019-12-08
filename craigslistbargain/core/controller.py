@@ -48,6 +48,35 @@ class Controller(BaseController):
             self.quit = True
             self.outcomes[event.agent] = False
 
+    def get_margin_reward(self, price, agent, is_agreed=True):
+        # No agreement
+        if not is_agreed:
+            return -0.5
+
+        if price is None:
+            if self.offers[0] is not None:
+                price = self.offers[0]['price']
+            elif self.offers[1] is not None:
+                price = self.offers[1]['price']
+            else:
+                print('Incorrect tom')
+                raise NotImplementedError()
+
+        rewards = {}
+        targets = {}
+        kbs = [self.sessions[i].kb for i in range(2)]
+        for agent_id in (0, 1):
+            kb = kbs[agent_id]
+            targets[kb.role] = kb.target
+
+        midpoint = (targets['seller'] + targets['buyer']) / 2.
+
+        norm_factor = abs(midpoint - targets['seller'])
+        rewards['seller'] = (price - midpoint) / norm_factor
+        # Zero sum
+        rewards['buyer'] = -1. * rewards['seller']
+        return rewards[self.sessions[agent].kb.role]
+
     def get_outcome(self):
         offer = None
         reward = 0

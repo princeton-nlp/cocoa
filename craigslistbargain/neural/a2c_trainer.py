@@ -338,7 +338,7 @@ class RLTrainer(BaseTrainer):
             self.agents[self.training_agent^1].env.critic.load_state_dict(tmp_model_dict)
 
     def get_temperature(self, epoch, batch_size, args):
-        if args.only_run:
+        if args.only_run or args.warmup_epochs == 0:
             return 1
         half = args.num_dialogues // batch_size / 2
         t_s, t_e = 0.3, 1
