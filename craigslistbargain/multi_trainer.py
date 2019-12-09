@@ -57,8 +57,13 @@ class MultiTrainer(MultiRunner):
         return info
 
     def valid(self, cmd):
-        start, length = cmd
-        infos = self.trainer.validate(self.args, length, start=start)
+        if len(cmd) == 2:
+            start, length = cmd
+            infos = self.trainer.validate(self.args, length, start=start)
+        else:
+            start, length, split, exchange = cmd
+            infos = self.trainer.validate(self.args, length, start=start, split=split, exchange=exchange)
+
         return infos
 
     def save_model(self, cmd):

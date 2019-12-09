@@ -255,14 +255,14 @@ class RLTrainer(BaseTrainer):
     def _get_scenario(self, scenario_id=None, split='train'):
         scenarios = self.scenarios[split]
         if scenario_id is None:
-            scenario = random.choice(scenarios)
-        else:
-            scenario = scenarios[scenario_id % len(scenarios)]
-        return scenario
+            # scenario = random.choice(scenarios)
+            scenario_id = random.choice(range(len(scenarios)))
+        scenario = scenarios[scenario_id % len(scenarios)]
+        return scenario, scenario_id
 
-    def _get_controller(self, scenario, split='train'):
+    def _get_controller(self, scenario, split='train', rate=0.5):
         # Randomize
-        if random.random() < 0.5:
+        if random.random() < rate:
             scenario = copy.deepcopy(scenario)
             scenario.kbs = (scenario.kbs[1], scenario.kbs[0])
         sessions = [self.agents[0].new_session(0, scenario.kbs[0]),
@@ -361,7 +361,7 @@ class RLTrainer(BaseTrainer):
 
         for i in range(args.num_dialogues):
             # Rollout
-            scenario = self._get_scenario()
+            scenario, _ = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
             # print('set controller for{} {}.'.format(self.training_agent, controller))
             controller.sessions[0].set_controller(controller)

@@ -224,9 +224,13 @@ class MultiManager():
                 self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[5], ii)
                 self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
 
-    def _draw_tensorboard_valid(self, ii, all_rewards):
+    def _draw_tensorboard_valid(self, ii, all_rewards, split='dev', exchange=None):
+        if exchange is None:
+            exchange = ''
+        else:
+            exchange = '_'+str(exchange)
         for j in range(2):
-            self.writer.add_scalar('agent{}/dev_reward'.format(j), all_rewards[j], ii)
+            self.writer.add_scalar('agent{}/{}{}_reward'.format(j, split, exchange), all_rewards[j], ii)
 
     def dump_examples(self, examples, verbose_strs, epoch, mode='train'):
         # Dump with details
@@ -362,6 +366,51 @@ class MultiManager():
 
             print('='*5 + ' [Epoch {} for {:.3f}s.]'.format(epoch, time.time() - last_time))
             last_time = time.time()
+
+        self.quit_all_workers()
+        self.join_local_workers()
+
+    def get_dialogues(self):
+        args = self.args
+        num_dialogues = min(50, args.num_dialogues)
+        self.run_local_workers()
+        epoch = 0
+
+        num_worker = self.update_worker_list()
+        last_time = time.time()
+
+        def get_dialogues(split='dev', exchange=False):
+            # Valid new model
+            task_lists = self.allocate_tasks(num_worker, num_dialogues)
+            now = 0
+            for i, w in enumerate(self.worker_conn):
+                w.send(['valid', (now, task_lists[i], split, exchange)])
+                now += task_lists[i]
+
+            valid_stats = [RLStatistics(), RLStatistics()]
+            valid_examples = []
+            valid_ex_str = []
+            for i, w in enumerate(self.worker_conn):
+                valid_info = w.recv()
+                valid_info[1] = pickle.loads(valid_info[1])
+                for j in range(2):
+                    valid_stats[j].update(valid_info[1][0][j])
+                valid_examples += valid_info[1][1]
+                valid_ex_str += valid_info[1][2]
+
+            self.dump_examples(valid_examples, valid_ex_str, epoch, '{}_{}'.format(split, exchange))
+
+            # Draw dev rewards on tensorboard
+            # dev_rewards = [valid_stats[j].mean_reward() for j in range(2)]
+            # self._draw_tensorboard_valid((epoch + 1) * batch_size, dev_rewards)
+
+        get_dialogues('train', False)
+        get_dialogues('train', True)
+        get_dialogues('dev', False)
+        get_dialogues('dev', True)
+
+        print('=' * 5 + ' [{:.3f}s.]'.format(time.time() - last_time))
+        last_time = time.time()
 
         self.quit_all_workers()
         self.join_local_workers()

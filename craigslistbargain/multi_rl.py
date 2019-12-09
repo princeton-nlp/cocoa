@@ -89,6 +89,8 @@ if __name__ == '__main__':
     parser.add_argument('--nlg-dir', type=str, default='data/nlg_templates_dict.json',
                         help='directory of templates for IR-based NLG')
 
+    parser.add_argument('--get-dialogues', default=False, action='store_true')
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)
@@ -103,6 +105,9 @@ if __name__ == '__main__':
         print('[Info] Running in debug mode.')
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
         manager.learn()
+    elif args.get_dialogues:
+        manager = MultiManager(args.num_cpus, args, MultiTrainer)
+        manager.get_dialogues()
     else:
         manager = MultiManager(args.num_cpus, args, MultiTrainer)
         manager.run()

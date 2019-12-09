@@ -1,8 +1,18 @@
 # Example:
-# python tb2plt.py --dir apex_logs/ --agent0 a2c_decay3 a2c_decay4 --agent1 tom2 tom3 --show --max-epoch 90 \
-#       --agent1-move 50 --agent1-leftclip 50 --draw-type rl
+# python tb2plt.py --dir p_logs/ \
+# --agent0 rl_decay.1 rl_dacay.2 rl_dacay.3 rl_decay.4 rl_decay.5 \
+# --agent1 tom_decay.1.b tom_decay.2.b tom_decay.3.b tom_decay.4.b tom_decay.6.b \
+# --show --max-epoch 90 --agent1-move 50 --agent1-leftclip 50 --draw-type rl
 
-# python tb2plt.py --dir apex_logs/ --agent0 a2c_decay3 a2c_decay4 --agent1 tom2 tom3 --show --max-epoch 90
+
+# python tb2plt.py --dir apex_logs/ \
+# --agent0 a2c_decay3 a2c_decay4 rl_decay.1 rl_dacay.2 rl_dacay.3 \
+# --agent1 tom2 tom3 tom_decay4 tom_decay5 tom_decay6\
+#               --show --max-epoch 50
+# python tb2plt.py --dir apex_logs/ \
+# --agent0 rl_decay.5 rl_dacay.2 rl_dacay.3 rl_decay.1 rl_decay.4 \
+# --agent1 tom2 tom3 tom_decay4 tom_decay5 tom_decay6\
+#               --show --max-epoch 90
 
 
 # Load scalar from tensorboard logs and render with matplotlib

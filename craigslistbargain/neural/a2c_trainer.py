@@ -255,8 +255,13 @@ class RLTrainer(BaseTrainer):
                           torch.ones(1, device=final_loss.device) * policy_stats.mean_loss(1),
                           old_p_losses.mean().view(-1) ],).view(1,-1).cpu().data.numpy()
 
-    def validate(self, args, valid_size, valid_critic=False, start=0):
-        split = 'dev'
+    def validate(self, args, valid_size, valid_critic=False, start=0, split='dev', exchange=None):
+        rate = 0.5
+        if exchange is not None:
+            if exchange:
+                rate = 1
+            else:
+                rate = 0
         self.model.eval()
         self.critic.eval()
         total_stats = RLStatistics()
@@ -265,8 +270,8 @@ class RLTrainer(BaseTrainer):
         # print('='*20, 'VALIDATION', '='*20)
         examples = []
         verbose_str = []
-        for scenario in self.scenarios[split][start:start+valid_size]:
-            controller = self._get_controller(scenario, split=split)
+        for sid, scenario in enumerate(self.scenarios[split][start:start+valid_size]):
+            controller = self._get_controller(scenario, split=split, rate=rate)
             controller.sessions[0].set_controller(controller)
             controller.sessions[1].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose)
@@ -278,7 +283,7 @@ class RLTrainer(BaseTrainer):
             total_stats.update(stats)
             oppo_total_stats.update(oppo_stats)
             examples.append(example)
-            verbose_str.append(self.example_to_str(example, controller, rewards))
+            verbose_str.append(self.example_to_str(example, controller, rewards, sid+start))
         # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         self.critic.train()
@@ -356,9 +361,11 @@ class RLTrainer(BaseTrainer):
         return ret 
         
 
-    def example_to_str(self, example, controller, rewards):
+    def example_to_str(self, example, controller, rewards, sid=None):
         verbose_str = []
         from core.price_tracker import PriceScaler
+        if sid is not None:
+            verbose_str.append('[Scenario id: {}]'.format(sid))
         for session_id, session in enumerate(controller.sessions):
             bottom, top = PriceScaler.get_price_range(session.kb)
             s = 'Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top)
@@ -383,7 +390,7 @@ class RLTrainer(BaseTrainer):
         verbose_strs = []
         for j in range(real_batch):
             # Rollout
-            scenario = self._get_scenario()
+            scenario, sid = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
             controller.sessions[0].set_controller(controller)
             controller.sessions[1].set_controller(controller)
@@ -416,7 +423,7 @@ class RLTrainer(BaseTrainer):
                 # if train_policy or args.model_type == 'tom':
 
             examples.append(example)
-            verbose_str = self.example_to_str(example, controller, rewards)
+            verbose_str = self.example_to_str(example, controller, rewards, sid)
 
             if args.verbose:
                 for s in verbose_str:
