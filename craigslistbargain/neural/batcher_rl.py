@@ -250,7 +250,7 @@ class DialogueBatcher(object):
                     turns[k].append(j[k])
             return turns
         else:
-            if STAGE == 1:
+            if STAGE == 2:
                 # Tokens
                 tokens = []
 
@@ -530,7 +530,7 @@ class DialogueBatcher(object):
             self._create_one_batch(
                 # encoder_turns=encoder_turns_all[:i+1],
                 encoder_turns=self._get_turn_batch_at(dialogues, LF, i, step_back=self.state_length),
-                decoder_turns=self._get_turn_batch_at(dialogues, LF, i+1),
+                decoder_turns=self._get_turn_batch_at(dialogues, DEC, i+1),
                 # target_turns=self._get_turn_batch_at(dialogues, LF, i+1),
                 # encoder_tokens=self._get_token_turns_at(dialogues, i),
                 encoder_tokens=self._get_turn_batch_at(dialogues, TOKEN, i),
@@ -554,7 +554,7 @@ class DialogueBatcher(object):
             i = num_turns-1
             batch_seq.append(self._create_one_batch(
                 encoder_turns=self._get_turn_batch_at(dialogues, LF, i, step_back=self.state_length),
-                decoder_turns=self._get_turn_batch_at(dialogues, LF, i),
+                decoder_turns=self._get_turn_batch_at(dialogues, DEC, i),
                 # target_turns=self._get_turn_batch_at(dialogues, TARGET, i),
                 encoder_tokens=self._get_turn_batch_at(dialogues, TOKEN, i),
                 # decoder_tokens=self._get_token_turns_at(dialogues, i),

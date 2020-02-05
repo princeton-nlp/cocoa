@@ -88,7 +88,8 @@ class Dialogue(object):
     MSG = 3
 
     LF = 0
-    TOKEN = 1
+    # DEC = 1
+    TOKEN = 2
 
     LF_EMPTY = None
 
