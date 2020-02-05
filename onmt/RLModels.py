@@ -17,20 +17,17 @@ import transformers
 
 class MeanEncoder(nn.Module):
 
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, ):
         super(MeanEncoder, self).__init__()
-        self.encoder = nn.Sequential(nn.Linear(input_size, output_size), nn.ReLU(output_size))
-
 
     def forward(self, x):
         x = torch.mean(x, dim=1)
-        x = self.encoder(x)
         return x
 
 
 class RNNEncoder(nn.Module):
 
-    def __init__(self, input_size, output_size, hidden_size=64, num_layers=1):
+    def __init__(self, input_size, hidden_size=64, num_layers=1):
         super(RNNEncoder, self).__init__()
         self.rnn = nn.RNN(
             input_size=input_size,
@@ -38,7 +35,7 @@ class RNNEncoder(nn.Module):
             num_layers=num_layers,
             batch_first=True,
         )
-        self.output_layer = nn.Sequential(nn.Linear(hidden_size, output_size), nn.ReLU(output_size))
+        self.output_layer = nn.Sequential(nn.Linear(hidden_size, input_size), nn.ReLU(input_size))
 
     def forward(self, x, h_state):
         r_out, h_state = self.rnn(x, h_state)
@@ -48,7 +45,7 @@ class RNNEncoder(nn.Module):
         return h_state
 
 
-class UtteranceEncoder(nn.Module):
+class UtteranceBertEncoder(nn.Module):
 
     def __init__(self, encoder, encoder_output_size, output_size=64, model_path=None, use_gpu=False):
         super(UtteranceEncoder, self).__init__()
@@ -75,6 +72,7 @@ class UtteranceEncoder(nn.Module):
             input_ids.append(self.tokenizer.encode(i, add_special_tokens=True))
             max_length = max(max_length, len(input_ids[-1]))
         for i in input_ids:
+            # add <pad>
             while len(i) < max_length:
                 i.append(0)
         input_ids = torch.tensor(input_ids)
@@ -88,17 +86,41 @@ class UtteranceEncoder(nn.Module):
         return hidden_state
 
 
+class UtteranceEncoder(nn.Module):
+    def __init__(self, encoder, embedding, fix_emb=False):
+        super(UtteranceEncoder, self).__init__()
+
+        self.fix_emb = fix_emb
+        self.emb = embedding
+
+        self.encoder = encoder
+        self.output_size = embedding.embedding_dim
+
+    # utterance: (batch_size, )
+    def forward(self, utterances):
+        if self.fix_emb:
+            with torch.no_grad():
+                hidden_state = self.emb(utterances)
+        else:
+            # print('self.emb.embedding_dim', self.emb.embedding_dim)
+            hidden_state = self.emb(utterances)
+        hidden_state = self.encoder(hidden_state)
+        return hidden_state
+
+
 class StateEncoder(nn.Module):
 
-    def __init__(self, embedding, output_size=64, num_layer=1, hidden_size=64, state_length=2,
-                 extra_size=0, fix_emb=False, ):
+    def __init__(self, intent_size, output_size=64, num_layer=1, hidden_size=64, state_length=2,
+                 extra_size=0, ):
         super(StateEncoder, self).__init__()
-        self.embeddings = embedding
         self.state_length = state_length
         self.extra_size = extra_size
-        self.fix_emb = fix_emb
+        self.intent_size = intent_size
+        self.output_size = output_size
 
-        last_size = embedding.embedding_dim*state_length + state_length + extra_size
+        # intent | price | roles | number of history
+        last_size = intent_size*state_length + state_length + extra_size
+
         hidden_layers = []
         for i in range(num_layer):
             hidden_layers += [nn.Linear(last_size, hidden_size), nn.ReLU(hidden_size)]
@@ -108,10 +130,12 @@ class StateEncoder(nn.Module):
 
     def forward(self, e_intent, e_price, e_pmask, e_extra=None):
         # (batch, emb_dim * state_num)
+        batch_size = e_intent.shape[0]
         old_et = e_intent
-        e_intent = self.embeddings(e_intent).view(-1, self.embeddings.embedding_dim*self.state_length)
-        if self.fix_emb:
-            e_intent = e_intent.detach()
+        e_intent = e_intent.reshape(-1, 1)
+        e_intent = torch.zeros((e_intent.shape[0], self.intent_size), device=e_intent.device).scatter(1, e_intent, 1)
+        e_intent = e_intent.reshape(batch_size, -1)
+        # e_intent = self.embeddings(e_intent).view(-1, self.embeddings.embedding_dim*self.state_length)
         # print(e_price.shape, e_pmask.shape)
         e_price = e_price.mul(e_pmask).view(-1, self.state_length)
         # print(e_price.shape)

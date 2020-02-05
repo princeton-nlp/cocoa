@@ -217,7 +217,7 @@ class SLTrainer(BaseTrainer):
         # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
 
         if self.use_utterance:
-            policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, utterance=batch.msgs)
+            policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, utterance=batch.encoder_tokens)
         else:
             policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, )
         return policy, price, pvar

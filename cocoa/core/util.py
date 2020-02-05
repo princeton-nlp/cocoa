@@ -3,6 +3,7 @@ import ujson as json
 import string
 import pickle
 import numpy as np
+import os
 
 def random_multinomial(probs):
     target = random.random()
@@ -21,6 +22,8 @@ def read_json(path):
     return json.load(open(path))
 
 def write_json(raw, path):
+    if not os.path.exists(os.path.dirname(path)):
+        os.mkdir(os.path.dirname(path))
     with open(path, 'w') as out:
         print(json.dumps(raw), end='', file=out)
 
@@ -29,6 +32,8 @@ def read_pickle(path):
         return pickle.load(fin)
 
 def write_pickle(obj, path):
+    if not os.path.exists(os.path.dirname(path)):
+        os.mkdir(os.path.dirname(path))
     with open(path, 'wb') as fout:
         pickle.dump(obj, fout)
 

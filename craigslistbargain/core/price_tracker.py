@@ -93,8 +93,6 @@ class PriceScaler(object):
         else:
             return price._replace(value=p)
 
-    # INPUT: real price (float number)
-    # OUTPUT: price is a float number in [0, 1]
     @classmethod
     def _scale_price(cls, kb, p):
         b, t = cls.get_price_range(kb)
@@ -106,16 +104,19 @@ class PriceScaler(object):
         # print("scale_result:{}".format(p))
         return p
 
+    # INPUT: real price (float number)
+    # OUTPUT: price is a float number in [0, 1]
     @classmethod
     def scale_price(cls, kb, price):
         """Scale the price such that bottomline=0 and target=1.
 
         Args:
-            price (Entity)
+            price (float)
         """
-        p = PriceTracker.get_price(price)
-        p = cls._scale_price(kb, p)
-        return price._replace(canonical=price.canonical._replace(value=p))
+        # p = PriceTracker.get_price(price)
+        p = cls._scale_price(kb, price)
+        # return price._replace(canonical=price.canonical._replace(value=p))
+        return p
 
 class PriceTracker(object):
     def __init__(self, model_path):
@@ -128,6 +129,8 @@ class PriceTracker(object):
             return token.canonical.value
         elif isinstance(token, CanonicalEntity):
             return token.value
+        elif isinstance(token, float):
+            return token
         else:
             return None
 
@@ -186,6 +189,7 @@ class PriceTracker(object):
                             number = None
                     if number is not None and price_clip is not None:
                         scaled_price = PriceScaler._scale_price(kb, number)
+                        # TODO: less than 10%?
                         if abs(scaled_price) > price_clip:
                             number = None
             except ValueError:

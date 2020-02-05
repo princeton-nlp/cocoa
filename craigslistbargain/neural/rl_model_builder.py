@@ -22,7 +22,7 @@ def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
     return nn.Embedding(len(word_dict), emb_length)
 
 
-def make_encoder(opt, embeddings, output_size, fix_emb=False,):
+def make_encoder(opt, embeddings, intent_size, output_size, fix_emb=False,):
     """
     Various encoder dispatcher function.
     Args:
@@ -30,20 +30,19 @@ def make_encoder(opt, embeddings, output_size, fix_emb=False,):
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
 
-    encoder = StateEncoder(embeddings, output_size=output_size,
-                        state_length=opt.state_length, extra_size=3 if opt.dia_num>0 else 0,
-                        fix_emb=fix_emb)
+    encoder = StateEncoder(intent_size=intent_size, output_size=output_size,
+                        state_length=opt.state_length, extra_size=3 if opt.dia_num>0 else 0 )
     if opt.use_utterance:
 
         # TODO: use function to get the size?
         bert_output_size = 768
 
         if opt.bert_encoder == 'mean':
-            bert_encoder = MeanEncoder(bert_output_size, output_size)
+            utters_encoder = MeanEncoder(output_size)
         else:
-            bert_encoder = RNNEncoder(bert_output_size, output_size)
-        uencoder = UtteranceEncoder(bert_encoder, output_size, output_size=output_size, model_path=opt.bert_model_path, use_gpu=len(opt.gpuid)>0)
-        encoder = StateUtteranceEncoder(encoder, uencoder, input_size=output_size*2, output_size=output_size)
+            utters_encoder = RNNEncoder(output_size)
+        uencoder = UtteranceEncoder(utters_encoder, embeddings, fix_emb=fix_emb)
+        encoder = StateUtteranceEncoder(encoder, uencoder, input_size=output_size+embeddings.embedding_dim, output_size=output_size)
 
     return encoder
 
@@ -96,17 +95,19 @@ def make_base_model(model_opt, mappings, gpu, checkpoint=None):
     Returns:
         the NMTModel.
     """
+    intent_size = mappings['lf_vocab'].size
+
     # Make encoder.
-    src_dict = mappings['src_vocab']
+    src_dict = mappings['utterance_vocab']
     src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
-    encoder = make_encoder(model_opt, src_embeddings, model_opt.hidden_size)
+    encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size)
     # print('encoder', encoder)
 
     # Make decoder.
     tgt_dict = mappings['tgt_vocab']
 
 
-    decoder = make_decoder(model_opt, model_opt.hidden_size, len(tgt_dict))
+    decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size)
     # print('decoder', decoder)
 
 
@@ -115,9 +116,9 @@ def make_base_model(model_opt, mappings, gpu, checkpoint=None):
 
     # Make Critic.
     # critic_embeddings = src_embeddings
-    critic_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
-    value_encoder = make_encoder(model_opt, critic_embeddings, model_opt.hidden_size, fix_emb=True)
-    value_decoder = make_decoder(model_opt, model_opt.hidden_size, len(tgt_dict), output_value=True)
+    # critic_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
+    value_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size, fix_emb=True)
+    value_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, output_value=True)
     critic = ValueModel(value_encoder, value_decoder)
     # model.critic = critic
 

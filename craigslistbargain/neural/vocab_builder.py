@@ -75,11 +75,12 @@ def build_lf_vocab(dialogues, special_symbols=[], entity_forms=[], except_words=
 def create_mappings(dialogues, schema, entity_forms, model_type, only_act=True):
 
     # remove all useless mapping
-    if only_act:
-        except_words = category_markers + sequence_markers
-        except_words.remove(markers.PAD)
+    except_words = category_markers + sequence_markers
+    except_words.remove(markers.PAD)
 
-    utterance_vocab = build_utterance_vocab(dialogues, sequence_markers, entity_forms, except_words=except_words)
+    uttter_except_words = category_markers + sequence_markers
+
+    utterance_vocab = build_utterance_vocab(dialogues, sequence_markers, entity_forms, except_words=uttter_except_words)
     kb_vocab, cat_vocab = build_kb_vocab(dialogues, [markers.PAD])
     if model_type == "tom":
         lf_vocab = build_lf_vocab(dialogues, sequence_markers, entity_forms, except_words=except_words)
@@ -87,7 +88,7 @@ def create_mappings(dialogues, schema, entity_forms, model_type, only_act=True):
         # lf_vocab = build_lf_vocab_simple(dialogues)
         lf_vocab = build_lf_vocab(dialogues, sequence_markers, entity_forms, except_words=except_words)
 
-    return {'utterance_vocab': lf_vocab,
+    return {'utterance_vocab': utterance_vocab,
             'kb_vocab': kb_vocab,
             'cat_vocab': cat_vocab,
             'lf_vocab': lf_vocab,

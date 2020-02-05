@@ -108,6 +108,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--agent-checkpoint', type=str, default=None, help='Directory to learned models')
     parser.add_argument('--use-utterance', default=False, action='store_true', help='using utterance as input')
+
+    # Use simple model instead of bert
+
     parser.add_argument('--bert-model-path', default=None, type=str, help='Directory of bert pretrained model path')
     parser.add_argument('--bert-encoder', default='mean', choices=['mean','rnn'], help='bert encoder type')
 
@@ -129,7 +132,9 @@ if __name__ == '__main__':
 
     loading_timer = tm.time()
 
+    # What is schema?
     schema = Schema(model_args.schema_path, None)
+
     data_generator = get_data_generator(args, model_args, schema)
     mappings = data_generator.mappings
     if args.vocab_only:

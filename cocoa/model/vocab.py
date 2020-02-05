@@ -6,7 +6,8 @@ class Vocabulary(object):
 
     # UNK = '<unk>'
     # TODO: Pay attenaion! We used luis data, so change the unkown marker.
-    UNK = 'unknown'
+    UNK = '<unknown>'
+    PAD = '<pad>'
 
     def __init__(self, offset=0, unk=True, max_bound=3, mini_step=0.01, discrete_price=False, except_words=[]):
         self.word_to_ind = {}
@@ -22,7 +23,9 @@ class Vocabulary(object):
         if discrete_price:
             self._init_prices()
 
+        self.unk = False
         if unk:
+            self.unk = True
             self.add_word(self.UNK, special=True)
 
     def _init_prices(self):
@@ -55,12 +58,9 @@ class Vocabulary(object):
             self.special_words.add(word)
 
     def finish(self, freq_threshold=0, size_threshold=None):
-        if freq_threshold > 0:
-            self.word_count = {word:count for word, count in self.word_count.items()\
-                               if count < freq_threshold}
-        self.word_count = Counter(self.word_count)
-        self.ind_to_word = [w for w, c in self.word_count.most_common(size_threshold)]
-        self.word_to_ind = {w: i for i, w in enumerate(self.ind_to_word)}
+        # Let <pad> be index 0
+        self.word_to_ind = {self.PAD: 0}
+        self.ind_to_word = [self.PAD]
 
         # Make sure special words are included
         n = len(self.ind_to_word)
@@ -68,6 +68,18 @@ class Vocabulary(object):
             if w not in self.word_to_ind:
                 self.ind_to_word.append(w)
                 self.word_to_ind[w] = n
+                n += 1
+
+        # Add other words with threshold
+        if freq_threshold > 0:
+            self.word_count = {word: count for word, count in self.word_count.items()\
+                               if count < freq_threshold}
+        self.word_count = Counter(self.word_count)
+        old_wti = self.word_to_ind.copy()
+        for w, c in self.word_count.most_common(size_threshold):
+            if w not in old_wti:
+                self.word_to_ind[w] = n
+                self.ind_to_word.append(w)
                 n += 1
 
         self.size = len(self.ind_to_word)
@@ -86,6 +98,15 @@ class Vocabulary(object):
         if not self.discrete_price and isinstance(word, CanonicalEntity):
             # Use float value as price
             return word.value
+
+        ind = self.word_to_ind.get(word)
+        if ind is None:
+            ind = self.word_to_ind.get(self.UNK)
+        if ind is not None:
+            return ind
+        else:
+            print(self.ind_to_word)
+            raise KeyError(str(word))
 
         if word in self.word_to_ind:
             return self.word_to_ind[word]

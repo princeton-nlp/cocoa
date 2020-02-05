@@ -25,8 +25,10 @@ def build_utterance_vocab(dialogues, special_symbols=[], entity_forms=[], except
         assert dialogue.is_int is False
         for turn in dialogue.token_turns:
             for token in turn:
+                # only add words
                 if is_entity(token):
-                    _add_entity(token)
+                    # _add_entity(token)
+                    pass
                 else:
                     vocab.add_word(token)
 

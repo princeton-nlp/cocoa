@@ -87,6 +87,11 @@ class Dialogue(object):
 
     MSG = 3
 
+    LF = 0
+    TOKEN = 1
+
+    LF_EMPTY = None
+
     def __init__(self, agent, kb, uuid, model='seq2seq', hidden_price=True, update_agree=True):
         '''
         Dialogue data that is needed by the model.
@@ -104,15 +109,21 @@ class Dialogue(object):
         self.description = tokenize(re.sub(r'[^\w0-9]', ' ', ' '.join(kb.facts['item']['Description'])))
         # token_turns: tokens and entitys (output of entity linking)
         self.token_turns = []
+        self.tokens = []
         # parsed logical forms
         self.lf_tokens = []
         self.lfs = []
+
+        self.modified = []
+        self.last_prices = [[], []]
+
         # turns: input tokens of encoder, decoder input and target, later converted to integers
         self.turns = [[], [], []]
         # entities: has the same structure as turns, non-entity tokens are None
         self.entities = []
         self.agents = []
         self.roles = []
+        self.rid = []
         self.is_int = False  # Whether we've converted it to integers
         self.num_context = None
 
@@ -129,7 +140,13 @@ class Dialogue(object):
 
     @property
     def num_lfs(self):
-        return len(self.lf_tokens)
+        return len(self.lfs)
+
+    @staticmethod
+    def lf_empty():
+        if Dialogue.LF_EMPTY is None:
+            Dialogue.LF_EMPTY = {'intent': 'start'}
+        return Dialogue.LF_EMPTY
 
     def join_turns(self):
         for i, utterances in enumerate(self.turns):
@@ -148,37 +165,35 @@ class Dialogue(object):
     def num_tokens(self):
         return sum([len(t) for t in self.token_turns])
 
-    def process_lf(self, utterance):
-        if len(utterance) > 1:
-            return {'intent': utterance[0], 'price': utterance[1]}
-        return {'intent': utterance[0]}
+    def process_lf(self, lf_raw):
+        intent, price = lf_raw.get('intent'), lf_raw.get('price')
+        if intent is not None:
+            if self.lfint_map is not None:
+                intent = self.lfint_map.vocab.to_ind(intent)
 
-        lf = self.textint_map.text_to_int(utterance)
-        intent = lf[0]
-        if (len(lf) > 1):
-            price = lf[1]
-        else:
-            price = None
-        # print("process lf: ", intent, price)
+        if price is not None:
+            price = PriceScaler.scale_price(self.kb, price)
         return {'intent': intent, 'price': price}
 
+    # Input lf is raw lf here, {'intent': 'offer', 'price': Entity() }
     def add_utterance(self, agent, utterance, lf=None, msg=None):
         utterance = utterance.copy()
         # Always start from the partner agent
         if len(self.agents) == 0 and agent == self.agent:
-            self._add_utterance(1 - self.agent, [], lf={'intent': 'start'}, msg='')
+            self._add_utterance(1 - self.agent, [], lf=self.lf_empty(), msg='')
         # Try to process lf from utterance
         if lf is None:
             lf = self.process_lf(utterance)
         if lf is []:
             print('[] case: ', utterance, lf)
             assert True
+        lf = self.process_lf(lf)
         # print("lf {}".format(lf))
         self._add_utterance(agent, utterance, lf=lf, msg=msg)
 
     def add_utterance_with_state(self, agent, utterance, state, lf=None):
         self.states.append(state)
-        self.add_utterance(agent,utterance, lf)
+        self.add_utterance(agent, utterance, lf)
 
     def delete_last_utterance(self, delete_state=True):
         if delete_state:
@@ -189,8 +204,10 @@ class Dialogue(object):
         self.roles.pop()
         self.token_turns.pop()
         self.entities.pop()
-        # self.lfs.pop()
+        self.lfs.pop()
+        self.tokens.pop()
         self.lf_tokens.pop()
+        self.modified.pop()
 
     @classmethod
     def scale_price(cls, kb, utterance):
@@ -202,6 +219,7 @@ class Dialogue(object):
         return s
 
     def lf_to_tokens(self, kb, lf):
+        # Should NOT be used now.
         intent = lf['intent']
         if intent == 'accept':
             intent = markers.ACCEPT
@@ -263,14 +281,21 @@ class Dialogue(object):
 
             self.token_turns.append(utterance)
             self.entities.append(entities)
-            # self.lfs.append(lf)
             self.lf_tokens.append(lf)
+            self.modified.append(True)
             self.msgs.append(msg)
         else:
             self.token_turns[-1].extend(utterance)
             self.entities[-1].extend(entities)
             # self.lfs[-1].extend(lf)
             self.lf_tokens.append(lf)
+            print('Not new turn!')
+            print(agent, utterance, lf, msg)
+
+            print(self.lf_tokens)
+            print(self.token_turns)
+            print(self.agents)
+            assert False
 
     def kb_context_to_int(self):
         self.category = self.mappings['cat_vocab'].to_ind(self.category)
@@ -278,18 +303,30 @@ class Dialogue(object):
         self.description = map(self.mappings['kb_vocab'].to_ind, self.description)
 
     def lf_to_int(self):
-        self.lfs = []
+        '''
+        Used by Dialogue.convert_to_int() and NeuralSession.conver_to_int()
+        :return:
+        '''
         last_price = [0]*2
         last_price[self.agent] = 1
+        if len(self.last_prices[0]) > 0:
+            last_price = [self.last_prices[i][-1] for i in range(2)]
 
         self.need_output = False
 
         for i, lf in enumerate(self.lf_tokens):
+            if not self.modified[i]:
+                continue
 
-            self.lfs.append(lf)
-            tmp_lf = {}
-            for k in lf:
-                tmp_lf[k] = self.mappings['lf_vocab'].to_ind(lf[k])
+            self.modified[i] = False
+            self.lfs.append(lf.copy())
+            self.tokens.append(self.textint_map.text_to_int(self.token_turns[i], 'encoding'))
+
+            tmp_lf = self.lfs[-1]
+            # for k in lf:
+            #     tmp_lf[k] = self.mappings['lf_vocab'].to_ind(lf[k])
+            if not isinstance(tmp_lf['intent'], int):
+                tmp_lf['intent'] = self.lfint_map.vocab.to_ind(tmp_lf['intent'])
 
             tmp_lf['original_price'] = tmp_lf.get('price')
             # Add last price
@@ -302,17 +339,28 @@ class Dialogue(object):
                     agt = self.agents[i]
                     last_price[agt] = last_price[agt ^ 1]
 
+                if i >= len(self.agents):
+                    print('error i{} >= len(agents){}'.format(i, len(self.agents)))
+                    print(self.lf_tokens)
+                    print(self.token_turns)
+                    print(self.agents)
                 tmp_lf['price'] = last_price[self.agents[i]]
 
                 if tmp_lf['price'] <= -1:
                     self.need_output = True
 
+                # Update last_prices
+                for agt in range(2):
+                    if len(self.last_prices[agt]) <= i:
+                        assert len(self.last_prices[agt]) == i
+                        self.last_prices[agt].append(last_price[agt])
+                    else:
+                        self.last_prices[agt][-1] = last_price[agt]
+
             self.lfs[i] = tmp_lf
 
-        for i, r in enumerate(self.roles):
-            if self.roles is not None:
-                if isinstance(self.roles[i], str):
-                    self.roles[i] = 0 if r == 'seller' else 1
+            self.rid.append(0 if self.roles[i] == 'seller' else 1)
+
         # if self.need_output:
         # print('token_turns weird: ')
         # for i, t in enumerate(self.token_turns):
@@ -321,6 +369,9 @@ class Dialogue(object):
         #     print(i)
 
     def convert_to_int(self):
+        '''
+        Used by DataGenerator, in SL part.
+        '''
         if self.is_int:
             return
 
@@ -337,10 +388,9 @@ class Dialogue(object):
                     portion.append(self.textint_map.text_to_int(turn, stage))
 
         elif self.model in ['tom']:
-            for turn, lf, in zip(self.token_turns, self.lf_tokens):
-                self.turns[0].append(self.textint_map.text_to_int(turn, 'encoding'))
-                self.turns[1].append(lf)
-                self.turns[2].append(lf)
+            for token, lf, in zip(self.tokens, self.lfs):
+                self.turns[0].append(lf)
+                self.turns[1].append(token)
 
         self.is_int = True
 
@@ -352,13 +402,32 @@ class Dialogue(object):
     def pad_turns(self, num_turns):
         '''
         Pad turns to length num_turns.
+        * Should NOT be used in RL part.
+        * pad_turns used after convert_to_int and in 'create_batches'
         '''
-        self.agents = self._pad_list(self.agents, num_turns, None)
-        self.roles = self._pad_list(self.roles, num_turns, None)
-        self.msgs = self._pad_list(self.msgs, num_turns, '')
-        for turns in self.turns:
-            self._pad_list(turns, num_turns, [])
-        self.lfs = self._pad_list(self.lfs, num_turns, {'intent': self.mappings['lf_vocab'].to_ind(markers.PAD), 'price': None})
+        # self.msgs = self._pad_list(self.msgs, num_turns, '')
+        # self.token_turns = self._pad_list(self.token_turns, num_turns, '<pad>')
+        if len(self.lfs) == 0:
+            print('lfs is zero', self.is_int, self.modified)
+            print('nums', num_turns, self.num_turns, self.num_lfs)
+
+        # Need to pad lfs and turns by hand
+        self._pad_list(self.turns[1], num_turns, [])
+        # pad_intent = self.lfint_map.vocab.to_ind(markers.PAD)
+        # Default Settings
+        pad_intent = 0
+        pad_lfs = [{'intent': pad_intent, 'price': self.last_prices[0][-1]},
+                   {'intent': pad_intent, 'price': self.last_prices[1][-1]}]
+
+        # self.token_turns = self._pad_list(self.token_turns, num_turns, ['<pad>'])
+        self.tokens = self._pad_list(self.tokens, num_turns, [0])
+
+        for i in range(len(self.lfs), num_turns):
+            self.agents.append(self.agents[-1] ^ 1)
+            self.roles.append(self.agent_to_role[self.agents[i]])
+            self.rid.append(0 if self.roles[-1] == 'seller' else 1)
+            self.turns[0].append(pad_lfs[self.agents[i]])
+            self.lfs.append(pad_lfs[self.agents[i]])
 
     def get_price_turns(self, pad):
         '''
@@ -410,8 +479,15 @@ class Preprocessor(object):
              utterance.  Models with "sum" should be summarized to only include
              selected keywords, models with "seq" will keep the full sequence.
         '''
+
+        # Remove entities here
         if stage is None:
-            return [self.get_entity_form(x, 'canonical') if is_entity(x) else x for x in utterance]
+            ret = []
+            for x in utterance:
+                if not is_entity(x):
+                    ret.append(x)
+            # ret = [self.get_entity_form(x, 'canonical') if is_entity(x) else x for x in utterance]
+            return ret
         else:
             if stage == 'encoding':
                 summary = self.summarize(utterance) if self.model in ["sum2sum", "sum2seq"] else utterance
@@ -425,7 +501,12 @@ class Preprocessor(object):
                 else:
                     summary = utterance
 
-            return [self.get_entity_form(x, self.entity_forms[stage]) if is_entity(x) else x for x in summary]
+            # return [self.get_entity_form(x, self.entity_forms[stage]) if is_entity(x) else x for x in summary]
+            ret = []
+            for x in utterance:
+                if not is_entity(x):
+                    ret.append(x)
+            return ret
 
     def lf_to_tokens(self, kb, lf):
         lf = lf.copy()
@@ -456,15 +537,25 @@ class Preprocessor(object):
         for agent in (0, 1):
             dialogue = Dialogue(agent, kbs[agent], ex.ex_id, model=self.model)
             for e in ex.events:
+
                 if self.model in ('lf2lf',):
+                    lf = e.metadata
+                    utterance = self.process_event(e, dialogue.kb)
+                else:
+                    # No utterance
                     lf = e.metadata
                     assert lf is not None
                     utterance, lf = self.lf_to_tokens(dialogue.kb, lf)
-                else:
-                    lf = e.metadata
-                    utterance = self.process_event(e, dialogue.kb)
+
                 if utterance:
-                    dialogue.add_utterance(e.agent, utterance, lf=lf, msg=e.data)
+                    dialogue.add_utterance(e.agent, utterance, lf=lf)
+                else:
+                    print(e.data, e.metadata, e.action)
+                    print('dialogue: ')
+                    for i in dialogue.token_turns:
+                        print(i)
+                    assert False
+
             yield dialogue
 
     @classmethod
@@ -508,9 +599,14 @@ class Preprocessor(object):
         elif e.action == 'reject':
             entity_tokens = [markers.REJECT]
             return entity_tokens
+        elif e.action == 'None':
+            # Empty sentence
+            entity_tokens = [markers.NONE]
+            return entity_tokens
         else:
-            raise ValueError('Unknown event action.')
+            raise ValueError('Unknown event action.' + str(e.action) + str(e.data) + str(e.metadata))
 
+    # Skip examples which are too short
     @classmethod
     def skip_example(cls, example):
         tokens = {0: 0, 1: 0}
@@ -550,6 +646,7 @@ class DataGenerator(object):
         self.ignore_cache = ignore_cache
         if (not os.path.exists(cache)) or ignore_cache:
             # NOTE: each dialogue is made into two examples from each agent's perspective
+            # Generate dialogue structure from examples
             self.dialogues = {k: preprocessor.preprocess(v)  for k, v in examples.items() if v}
 
             for fold, dialogues in self.dialogues.items():
@@ -562,9 +659,9 @@ class DataGenerator(object):
         self.textint_map = TextIntMap(self.mappings['utterance_vocab'], preprocessor)
         # if model == 'tom':
         self.lfint_map = TextIntMap(self.mappings['lf_vocab'], preprocessor)
-
         Dialogue.mappings = self.mappings
         Dialogue.textint_map = self.textint_map
+        Dialogue.lfint_map = self.lfint_map
         Dialogue.preprocessor = preprocessor
         Dialogue.num_context = num_context
 
@@ -614,7 +711,7 @@ class DataGenerator(object):
 
     def dialogue_sort_score(self, d):
         # Sort dialogues by number o turns
-        return len(d.lfs[0])
+        return len(d.lf_tokens)
 
     def create_dialogue_batches(self, dialogues, batch_size):
         dialogue_batches = []
@@ -671,7 +768,7 @@ class DataGenerator(object):
                             batch['context_data'],
                             self.mappings['utterance_vocab'],
                             num_context=self.num_context, cuda=cuda,
-                            msgs=batch['msgs'],
+                            # msgs=batch['msgs'],
                             )
             # End of dialogue
             yield None

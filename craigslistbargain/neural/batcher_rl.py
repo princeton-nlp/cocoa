@@ -22,6 +22,7 @@ class Batch(object):
         self.encoder_intent = encoder_args['intent']
         self.encoder_price = encoder_args['price']
         self.encoder_pmask = encoder_args['price_mask']
+        self.encoder_tokens = context_data['encoder_tokens']
 
         use_dianum = False
         if encoder_args.get('dia_num') is not None:
@@ -44,7 +45,7 @@ class Batch(object):
         acc_idx = self.vocab.to_ind('accept')
         rej_idx = self.vocab.to_ind('reject')
         none_idx = self.vocab.to_ind('None')
-        unk_idx = self.vocab.to_ind('unkown')
+        unk_idx = self.vocab.to_ind('unknown')
         quit_idx = self.vocab.to_ind('quit')
         pad_idx = self.vocab.to_ind(markers.PAD)
         start_idx = self.vocab.to_ind('start')
@@ -67,9 +68,10 @@ class Batch(object):
         self.size = len(self.encoder_intent)
         self.context_data = context_data
 
-        unsorted_attributes = ['encoder_intent', 'encoder_price',
+        unsorted_attributes = ['encoder_intent', 'encoder_price', 'encoder_tokens',
                                'title_inputs', 'desc_inputs']
-        batch_major_attributes = ['encoder_intent', 'decoder_price', 'title_inputs', 'desc_inputs']
+        batch_major_attributes = ['encoder_intent', 'encoder_price', 'encoder_tokens',
+                                  'title_inputs', 'desc_inputs']
 
         if use_dianum:
             unsorted_attributes += ['encoder_dianum']
@@ -97,6 +99,8 @@ class Batch(object):
         #             setattr(self, attr, np.swapaxes(getattr(self, attr), 0, 1))
 
         # To tensor/variable
+        self.encoder_tokens = self.pad_tokens(self.encoder_tokens)
+        self.encoder_tokens = self.to_variable(self.encoder_tokens, 'long', cuda)
         self.encoder_intent = self.to_variable(self.encoder_intent, 'long', cuda)
         self.encoder_price = self.to_variable(self.encoder_price, 'float', cuda).unsqueeze(1)
         self.encoder_pmask = self.to_variable(self.encoder_pmask, 'float', cuda).unsqueeze(1)
@@ -130,6 +134,18 @@ class Batch(object):
         # if num_context > 0:
         #     self.context_inputs = self.to_variable(self.context_inputs, 'long', cuda)
         self.vocab = None
+
+    @staticmethod
+    def pad_tokens(encoder_tokens):
+        max_len = 0
+        new_tokens = []
+        for t in encoder_tokens:
+            max_len = max(max_len, len(t))
+        for t in encoder_tokens:
+            new_tokens.append(t.copy())
+            while len(new_tokens[-1]) < max_len:
+                new_tokens[-1].append(0)
+        return new_tokens
 
     @classmethod
     def to_tensor(cls, data, dtype, cuda=False):
@@ -226,6 +242,7 @@ class DialogueBatcher(object):
 
         if i is None:
             # Return all turns
+            # Format: {'intent': [0, 1, ...], 'price': [0.0, 0.5, ...]}
             tmp = [self._get_turn_batch_at(dialogues, STAGE, i, step_back=step_back) for i in range(dialogues[0].num_turns)]
             turns = {'intent': [], 'price': []}
             for k in turns:
@@ -233,26 +250,28 @@ class DialogueBatcher(object):
                     turns[k].append(j[k])
             return turns
         else:
-            if STAGE == 3:
-                msgs = []
+            if STAGE == 1:
+                # Tokens
+                tokens = []
 
-                def get_msgs():
-                    if isinstance(dmsgs[i], str):
-                        msgs.append(dmsgs[i])
-                    else:
-                        msgs.append('')
+                # def get_msgs():
+                #     if isinstance(dmsgs[i], str):
+                #         msgs.append(dmsgs[i])
+                #     else:
+                #         msgs.append('')
 
                 for d in dialogues:
-                    if attached_events is not None:
-                        dmsgs = d.msgs.copy()
-                        # TODO: attached msg
-                        dmsgs.append(None)
-                        for j in range(len(attached_events)):
-                            get_msgs()
-                    else:
-                        dmsgs = d.msgs
-                        get_msgs()
-                return msgs
+                    # print('echo d.tokens: ', i, len(d.tokens), d.tokens)
+                    if i >= len(d.tokens):
+                        print('all length', i, len(d.tokens), len(d.token_turns), len(d.lf_tokens), len(d.lfs))
+                    tokens.append(d.tokens[i])
+                    # if attached_events is not None:
+                    #     msgs.append(d.tokens[i])
+                    # else:
+                    #
+                    #     dmsgs = d.msgs
+                    #     get_msgs()
+                return tokens
             elif STAGE != -1:
                 # STAGE == ENC: encoder batch
                 intents = []
@@ -287,6 +306,8 @@ class DialogueBatcher(object):
 
                     else:
                         lfs = d.lfs
+                        if len(lfs) == 0:
+                            print('tt', len(d.lfs), len(d.lf_tokens), len(d.token_turns), len(d.tokens))
                         get_turns()
 
                 # if step_back == 2:
@@ -306,12 +327,12 @@ class DialogueBatcher(object):
                         roles.append(tmp)
                 for d in dialogues:
                     if attached_events is not None:
-                        droles = d.roles.copy()
+                        droles = d.rid.copy()
                         droles.append(attached_role)
                         for j in range(len(attached_events)):
                             get_roles()
                     else:
-                        droles = d.roles
+                        droles = d.rid
                         get_roles()
                 return roles
 
@@ -406,7 +427,7 @@ class DialogueBatcher(object):
                 'intent': encoder_intent,
                 'price': encoder_price,
                 'price_mask': encoder_price_mask,
-                # 'context': encoder_context,
+                'tokens': encoder_tokens,
                 }
         if self.dia_num:
             for a in roles:
@@ -463,7 +484,7 @@ class DialogueBatcher(object):
         if not hasattr(dialogues[0], 'token_turns'):
             return None
         # Return None for padded turns
-        return [dialogue.token_turns[i] if i < len(dialogue.token_turns) else ''
+        return [dialogue.token_turns[i] if i < len(dialogue.token_turns) else ['<pad>']
                 for dialogue in dialogues]
 
     def _get_dialogue_data(self, dialogues):
@@ -497,6 +518,7 @@ class DialogueBatcher(object):
 
         dialogue_class = type(dialogues[0])
         ENC, DEC, TARGET = dialogue_class.ENC, dialogue_class.DEC, dialogue_class.TARGET
+        LF, TOKEN = dialogue_class.LF, dialogue_class.TOKEN
         ROLE = dialogue_class.ROLE
 
         encode_turn_ids = self.get_encoding_turn_ids(num_turns)
@@ -507,11 +529,12 @@ class DialogueBatcher(object):
         batch_seq = [
             self._create_one_batch(
                 # encoder_turns=encoder_turns_all[:i+1],
-                encoder_turns=self._get_turn_batch_at(dialogues, ENC, i, step_back=self.state_length),
-                decoder_turns=self._get_turn_batch_at(dialogues, DEC, i+1),
-                target_turns=self._get_turn_batch_at(dialogues, TARGET, i+1),
-                encoder_tokens=self._get_token_turns_at(dialogues, i),
-                decoder_tokens=self._get_token_turns_at(dialogues, i+1),
+                encoder_turns=self._get_turn_batch_at(dialogues, LF, i, step_back=self.state_length),
+                decoder_turns=self._get_turn_batch_at(dialogues, LF, i+1),
+                # target_turns=self._get_turn_batch_at(dialogues, LF, i+1),
+                # encoder_tokens=self._get_token_turns_at(dialogues, i),
+                encoder_tokens=self._get_turn_batch_at(dialogues, TOKEN, i),
+                # decoder_tokens=self._get_token_turns_at(dialogues, i+1),
                 roles=self._get_turn_batch_at(dialogues, ROLE, i),
                 agents=dialogue_data['agents'],
                 uuids=dialogue_data['uuids'],
@@ -519,7 +542,7 @@ class DialogueBatcher(object):
                 kb_context=dialogue_data['kb_context'],
                 num_context=self.num_context,
                 i=i,
-                encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSG, i),
+                # encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSG, i),
                 )
                 for i in encode_turn_ids
             ]
@@ -530,11 +553,11 @@ class DialogueBatcher(object):
         if for_value: # and not (num_turns-1 in encode_turn_ids):
             i = num_turns-1
             batch_seq.append(self._create_one_batch(
-                encoder_turns=self._get_turn_batch_at(dialogues, ENC, i, step_back=self.state_length),
-                decoder_turns=self._get_turn_batch_at(dialogues, DEC, i),
-                target_turns=self._get_turn_batch_at(dialogues, TARGET, i),
-                encoder_tokens=self._get_token_turns_at(dialogues, i),
-                decoder_tokens=self._get_token_turns_at(dialogues, i),
+                encoder_turns=self._get_turn_batch_at(dialogues, LF, i, step_back=self.state_length),
+                decoder_turns=self._get_turn_batch_at(dialogues, LF, i),
+                # target_turns=self._get_turn_batch_at(dialogues, TARGET, i),
+                encoder_tokens=self._get_turn_batch_at(dialogues, TOKEN, i),
+                # decoder_tokens=self._get_token_turns_at(dialogues, i),
                 roles=self._get_turn_batch_at(dialogues, ROLE, i),
                 agents=dialogue_data['agents'],
                 uuids=dialogue_data['uuids'],
@@ -542,7 +565,7 @@ class DialogueBatcher(object):
                 kb_context=dialogue_data['kb_context'],
                 num_context=self.num_context,
                 i=i, for_value=True,
-                encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSG, i),
+                # encoder_msgs=self._get_turn_batch_at(dialogues, dialogue_class.MSG, i),
                 ))
 
         return batch_seq
