@@ -82,17 +82,17 @@ class Statistics(object):
 
 class Weighted_MSELoss(nn.Module):
     def forward(self, src, x):
-        mean, logstd = src
-        mean = mean.view(-1, 1)
-        logstd = logstd.view(-1, 1)
-        x = x.view(-1, 1)
-        std = logstd.exp()
+        mean = src
+        mean = mean.reshape(-1, 1)
+        # logstd = logstd.view(-1, 1)
+        x = x.reshape(-1, 1)
+        # std = logstd.exp()
         # print((1./std)**2)
-        neglogp0 = 0.5 * torch.sum(((x - mean) / std)**2, dim=1)
-        neglogp0 = 0.5 * torch.sum(((x - mean)) ** 2, dim=1)
+        # neglogp0 = 0.5 * torch.sum(((x - mean) / std)**2, dim=1)
+        # neglogp0 = 0.5 * torch.sum(((x - mean)) ** 2, dim=1)
         # print('p and label: ',x, mean)
-        neglogp1 = 0.5 * np.log(2.0 * np.pi) * x.shape[1]
-        neglogp2 = logstd.sum(dim=1)
+        # neglogp1 = 0.5 * np.log(2.0 * np.pi) * x.shape[1]
+        # neglogp2 = logstd.sum(dim=1)
         # neglogp = neglogp0 + neglogp1 + neglogp2
         neglogp = 0.5 * torch.sum(((x - mean)) ** 2, dim=1)
         # print('p and label: ', neglogp0)
@@ -113,6 +113,7 @@ class SimpleLoss(nn.Module):
         self.use_nll = inp_with_sfmx
 
     def _get_correct_num(self, enc_policy, tgt_intents):
+        # TODO: what is this?
         enc_policy = enc_policy.argmax(dim=1)
         tmp = (enc_policy == tgt_intents).cpu().numpy()
         tgt = tgt_intents.data.cpu().numpy()
@@ -124,6 +125,8 @@ class SimpleLoss(nn.Module):
         if pmask is None:
             pmask = torch.ones_like(tgt_price)
         alpha = 1
+        tgt_policy = tgt_policy.reshape(-1)
+        # print('intent error:', enc_policy, tgt_policy)
         loss0 = self.criterion_intent(enc_policy, tgt_policy)
         loss1 = self.criterion_price(enc_price, tgt_price).mul(pmask)
         # if SimpleLoss.debug and torch.mean(tgt_price).item() != 1:
@@ -204,23 +207,24 @@ class SLTrainer(BaseTrainer):
         # if batch.target_intent.device.type == 'cuda':
         #     target_intent = target_intent.cuda()
         # target_intent = target_intent.scatter_(1, batch.target_intent, 1)
-        target_intent = batch.target_intent
-        pmean, pvar = price
-        pmean = pmean.unsqueeze(1).mul(batch.target_pmask)
-        pvar = pvar.unsqueeze(1).mul(batch.target_pmask)
+        act_intent = batch.act_intent
+        pmean = price
+        pmean = pmean.reshape(batch_size, 1).mul(batch.act_price_mask)
         # print('(policy, price, target_intent, batch.target_price)', (policy, price, target_intent, batch.target_price))
-        return loss(policy, (pmean, pvar), target_intent.squeeze(1), batch.target_price, batch.target_pmask)
+        return loss(policy, pmean, act_intent.reshape(batch_size, -1), batch.act_price, batch.act_price_mask)
 
     def _run_batch(self, batch, dec_state=None, enc_state=None):
 
-        e_intent, e_price, e_pmask = batch.encoder_intent, batch.encoder_price, batch.encoder_pmask
-        # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
+        # e_intent, e_price, e_pmask = batch.encoder_intent, batch.encoder_price, batch.encoder_pmask
+        # # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
+        #
+        # if self.use_utterance:
+        #     policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, utterance=batch.encoder_tokens)
+        # else:
+        #     policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, )
 
-        if self.use_utterance:
-            policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, utterance=batch.encoder_tokens)
-        else:
-            policy, price, pvar = self.model(e_intent, e_price, e_pmask, batch.encoder_dianum, )
-        return policy, price, pvar
+        policy, price = self.model(batch.uttr, batch.state)
+        return policy, price
 
     def learn(self, opt, data, report_func):
         """Train model.
@@ -269,7 +273,7 @@ class SLTrainer(BaseTrainer):
                 root=opt.model_path,
                 model=opt.model_filename,
                 epoch=epoch)
-            PolicyCounter.draw_policy([self.policy_data, self.policy_model, self.incorrect_dist], filename=path)
+            # PolicyCounter.draw_policy([self.policy_data, self.policy_model, self.incorrect_dist], filename=path)
 
             # 3. Log to remote server.
             # if opt.exp_host:
@@ -345,8 +349,8 @@ class SLTrainer(BaseTrainer):
         for batch in valid_iter:
             if batch is None:
                 continue
-            policy, price, pvar = self._run_batch(batch, )
-            loss, batch_stats = self._compute_loss(batch, policy, (price, pvar), self.train_loss)
+            policy, price = self._run_batch(batch, )
+            loss, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
             stats.update(batch_stats)
 
         # Set model back to training mode
@@ -421,12 +425,12 @@ class SLTrainer(BaseTrainer):
                 continue
 
             self.model.zero_grad()
-            policy, price, p_logstd = self._run_batch(batch)
+            policy, price = self._run_batch(batch)
             self.policy_model.update_from_batch(batch, policy)
             self.incorrect_dist.update_from_batch(batch, policy)
             # print('output is: ', policy, price)
 
-            loss, batch_stats = self._compute_loss(batch, policy, (price, p_logstd), self.train_loss)
+            loss, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
 
             # tmp = torch.cat([batch.target_price, price.view(-1,1), batch.target_pmask], dim=1)
             # print('target_price ',tmp)

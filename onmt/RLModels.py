@@ -12,7 +12,6 @@ import onmt
 from onmt.Utils import aeq
 
 from .Models import RNNEncoder
-import transformers
 
 
 class MeanEncoder(nn.Module):
@@ -27,64 +26,34 @@ class MeanEncoder(nn.Module):
 
 class RNNEncoder(nn.Module):
 
-    def __init__(self, input_size, hidden_size=64, num_layers=1):
+    def __init__(self, input_size, hidden_size=64, num_layers=1, type='LSTM'):
         super(RNNEncoder, self).__init__()
-        self.rnn = nn.RNN(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-        )
-        self.output_layer = nn.Sequential(nn.Linear(hidden_size, input_size), nn.ReLU(input_size))
+        # assert type in ['RNN', 'LSTM']
+        self.rnn_type = type
+        if type == 'RNN':
+            self.rnn = nn.RNN(
+                input_size=input_size,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                batch_first=True,
+            )
+        elif type == 'LSTM':
+            self.rnn = nn.LSTM(
+                input_size=input_size,
+                hidden_size=hidden_size,
+                num_layers=num_layers,
+                batch_first=True,
+            )
+        else:
+            raise ValueError('Type:{} should be RNN or LSTM'.format(type))
+        # self.output_layer = nn.Sequential(nn.Linear(hidden_size, input_size), nn.ReLU(input_size))
 
-    def forward(self, x, h_state):
+    def forward(self, x, h_state=None):
         r_out, h_state = self.rnn(x, h_state)
         # outs = []
         # for time in range(r_out.size(1)):
         #     outs.append(self.out(r_out[:, time, :]))
-        return h_state
-
-
-class UtteranceBertEncoder(nn.Module):
-
-    def __init__(self, encoder, encoder_output_size, output_size=64, model_path=None, use_gpu=False):
-        super(UtteranceEncoder, self).__init__()
-        model_class, tokenizer_class, pretrained_weights = \
-            transformers.BertModel, transformers.BertTokenizer, 'bert-base-cased'
-
-        if model_path is None:
-            model_path = pretrained_weights
-        self.tokenizer = tokenizer_class.from_pretrained(model_path)
-        self.bert_model = model_class.from_pretrained(model_path)
-        self.encoder = encoder
-        self.use_gpu = use_gpu
-
-        # TODO: use function to get the size?
-        bert_output_size = 768
-
-        self.output_layer = nn.Sequential(nn.Linear(encoder_output_size, output_size), nn.ReLU(output_size))
-
-    # utterance: (batch_size, )
-    def forward(self, utterances):
-        input_ids = []
-        max_length = 0
-        for i in utterances:
-            input_ids.append(self.tokenizer.encode(i, add_special_tokens=True))
-            max_length = max(max_length, len(input_ids[-1]))
-        for i in input_ids:
-            # add <pad>
-            while len(i) < max_length:
-                i.append(0)
-        input_ids = torch.tensor(input_ids)
-        if self.use_gpu:
-            input_ids = input_ids.cuda()
-        with torch.no_grad():
-            last_hidden_states = self.bert_model(input_ids)[0]  # Models outputs are now tuples
-            # print('last_hs:', last_hidden_states.shape, last_hidden_states)
-        hidden_state = self.encoder(last_hidden_states)
-        hidden_state = self.output_layer(hidden_state)
-        return hidden_state
-
+        return h_state[-1]
 
 class UtteranceEncoder(nn.Module):
     def __init__(self, encoder, embedding, fix_emb=False):
@@ -252,6 +221,153 @@ class PolicyDecoder(nn.Module):
         return policy, p_mean, p_var
 
 
+class MultilayerPerceptron(nn.Module):
+
+    def __init__(self, input_size, layer_size, layer_depth):
+        super(MultilayerPerceptron, self).__init__()
+
+        last_size = input_size
+        hidden_layers = []
+        for i in range(layer_depth):
+            hidden_layers += [nn.Linear(last_size, layer_size), nn.ReLU(layer_size)]
+            last_size = layer_size
+        self.hidden_layers = nn.Sequential(*hidden_layers)
+
+    def forward(self, input):
+        return self.hidden_layers(input)
+
+
+class HistoryEncoder(nn.Module):
+
+    def __init__(self, diaact_size, last_lstm_size, extra_size, embeddings, output_size, hidden_size=64, hidden_depth=2):
+        super(HistoryEncoder, self).__init__()
+
+        self.dia_lstm = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
+
+        if embeddings is not None:
+            uttr_emb_size = embeddings.embedding_dim
+            self.uttr_lstm = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+
+            hidden_input = hidden_size + hidden_size + extra_size
+
+        else:
+            hidden_input = hidden_size + extra_size
+
+        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth)
+
+    def forward(self, diaact, uttr, extra, last_hidden):
+        batch_size = diaact.shape[0]
+        next_hidden = self.dia_lstm(diaact, last_hidden)
+        dia_emb = next_hidden[0].reshape(batch_size, -1)
+
+        if uttr is not None:
+            uttr, lengths = uttr
+            uttr = self.uttr_emb(uttr)
+            uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
+            _, output = self.uttr_lstm(uttr)
+
+            # For LSTM case, output=(h_1, c_1)
+            if isinstance(output, tuple):
+                output = output[0]
+
+            uttr_emb = output.reshape(batch_size, -1)
+
+            hidden_input = torch.cat([dia_emb, uttr_emb, extra], dim=-1)
+        else:
+
+            hidden_input = torch.cat([dia_emb, extra], dim=-1)
+
+        emb = self.hidden_layer(hidden_input)
+
+        return emb, next_hidden
+
+
+class CurrentEncoder(nn.Module):
+
+    def __init__(self, input_size, embeddings, output_size, hidden_size=64, hidden_depth=2):
+        super(CurrentEncoder, self).__init__()
+
+        if embeddings is not None:
+
+            uttr_emb_size = embeddings.embedding_dim
+            self.uttr_emb = embeddings
+            self.uttr_lstm = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+
+            hidden_input = input_size + hidden_size
+
+        else:
+            hidden_input = input_size
+
+        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth)
+
+    def forward(self, uttr, extra):
+        batch_size = extra.shape[0]
+
+        if uttr is not None:
+            for i, u in enumerate(uttr):
+                uttr[i] = self.uttr_emb(u).reshape(-1, self.uttr_emb.embedding_dim)
+                # print(uttr[i].shape)
+            uttr = torch.nn.utils.rnn.pack_sequence(uttr, enforce_sorted=False)
+            # uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
+
+            _, output = self.uttr_lstm(uttr)
+
+            # For LSTM case, output=(h_1, c_1)
+            if isinstance(output, tuple):
+                output = output[0]
+
+            uttr_emb = output.reshape(batch_size, -1)
+
+            hidden_input = torch.cat([uttr_emb, extra], dim=-1)
+        else:
+            hidden_input = extra
+
+        emb = self.hidden_layer(hidden_input)
+
+        return emb
+
+
+class SinglePolicy(nn.Module):
+
+    def __init__(self, input_size, output_size, num_layer=1, hidden_size=128, ):
+        super(SinglePolicy, self).__init__()
+
+        self.hidden_layers = MultilayerPerceptron(input_size, hidden_size, num_layer)
+        self.output_layer = nn.Linear(hidden_size, output_size)
+        self.output_size = output_size
+
+    def forward(self, emb):
+        hidden_state = self.hidden_layers(emb)
+        output = self.output_layer(hidden_state)
+        return output
+
+        
+# For RL Agent
+# Intent + Price(action)
+class MixedPolicy(nn.Module):
+
+    def __init__(self, input_size, intent_size, price_size, hidden_size=64, hidden_depth=2, price_extra=0):
+        super(MixedPolicy, self).__init__()
+        self.common_net = MultilayerPerceptron(input_size, hidden_size, hidden_depth)
+        self.intent_net = SinglePolicy(hidden_size, intent_size, num_layer=1, hidden_size=hidden_size)
+        self.price_net = SinglePolicy(hidden_size + price_extra, price_size, num_layer=1, hidden_size=hidden_size//2)
+        self.intent_size = intent_size
+        self.price_size = price_size
+
+    def forward(self, state_emb, price_extra=None):
+        common_state = self.common_net(state_emb)
+
+        intent_output = self.intent_net(common_state)
+
+        price_input = [common_state]
+        if price_extra:
+            price_input.append(price_extra)
+        price_input = torch.cat(price_input, dim=-1)
+        price_output = self.price_net(price_input)
+
+        return intent_output, price_output
+
+
 class ValueDecoder(nn.Module):
 
     def __init__(self, encoder_size, num_layer=2, hidden_size=128):
@@ -272,6 +388,41 @@ class ValueDecoder(nn.Module):
 
         return value
 
+
+class CurrentModel(nn.Module):
+
+    def __init__(self, encoder, decoder, fix_emb=False):
+        super(CurrentModel, self).__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+        self.fix_emb = fix_emb
+
+    def forward(self, *input):
+        if self.fix_emb:
+            with torch.no_grad():
+                emb = self.encoder(*input)
+        else:
+            emb = self.encoder(*input)
+        output = self.decoder(emb)
+        return output
+
+
+class HistoryModel(nn.Module):
+
+    def __init__(self, encoder, decoder, fix_emb=False):
+        super(HistoryModel, self).__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+        self.fix_emb = fix_emb
+
+    def forward(self, *input):
+        if self.fix_emb:
+            with torch.no_grad():
+                emb, next_hidden = self.encoder(*input)
+        else:
+            emb, next_hidden = self.encoder(*input)
+        output = self.decoder(emb)
+        return output, next_hidden
 
 class PolicyModel(nn.Module):
     """

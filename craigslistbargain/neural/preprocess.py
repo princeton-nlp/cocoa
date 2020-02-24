@@ -14,7 +14,7 @@ from cocoa.model.vocab import Vocabulary
 
 from core.price_tracker import PriceTracker, PriceScaler
 from core.tokenizer import tokenize
-from .batcher_rl import DialogueBatcherFactory, Batch
+from .batcher_rl import DialogueBatcherFactory, SLBatch
 from .symbols import markers
 from .vocab_builder import create_mappings
 from neural import make_model_mappings
@@ -89,7 +89,9 @@ class Dialogue(object):
 
     LF = 0
     # DEC = 1
-    TOKEN = 2
+    TOKEN = 1
+    PACT = 2
+
 
     LF_EMPTY = None
 
@@ -112,8 +114,10 @@ class Dialogue(object):
         self.token_turns = []
         self.tokens = []
         # parsed logical forms
-        self.lf_tokens = []
+        self.lf_turns = []
         self.lfs = []
+
+        self.price_actions = []
 
         self.modified = []
         self.last_prices = [[], []]
@@ -137,7 +141,7 @@ class Dialogue(object):
 
     @property
     def num_turns(self):
-        return len(self.turns[0])
+        return len(self.lf_turns)
 
     @property
     def num_lfs(self):
@@ -177,11 +181,11 @@ class Dialogue(object):
         return {'intent': intent, 'price': price}
 
     # Input lf is raw lf here, {'intent': 'offer', 'price': Entity() }
-    def add_utterance(self, agent, utterance, lf=None, msg=None):
+    def add_utterance(self, agent, utterance, lf=None, price_act=None):
         utterance = utterance.copy()
         # Always start from the partner agent
         if len(self.agents) == 0 and agent == self.agent:
-            self._add_utterance(1 - self.agent, [], lf=self.lf_empty(), msg='')
+            self._add_utterance(1 - self.agent, [], lf=self.lf_empty(), price_act={})
         # Try to process lf from utterance
         if lf is None:
             lf = self.process_lf(utterance)
@@ -190,24 +194,19 @@ class Dialogue(object):
             assert True
         lf = self.process_lf(lf)
         # print("lf {}".format(lf))
-        self._add_utterance(agent, utterance, lf=lf, msg=msg)
+        self._add_utterance(agent, utterance, lf=lf, price_act=price_act)
 
-    def add_utterance_with_state(self, agent, utterance, state, lf=None):
-        self.states.append(state)
-        self.add_utterance(agent, utterance, lf)
-
-    def delete_last_utterance(self, delete_state=True):
-        if delete_state:
-            self.states = self.states[:-1]
+    def delete_last_utterance(self):
 
         # Always start in the middle and delete the utterance of another agent
+        self.price_actions.pop()
         self.agents.pop()
         self.roles.pop()
         self.token_turns.pop()
         self.entities.pop()
         self.lfs.pop()
         self.tokens.pop()
-        self.lf_tokens.pop()
+        self.lf_turns.pop()
         self.modified.pop()
 
     @classmethod
@@ -252,7 +251,10 @@ class Dialogue(object):
 
         return utterance
 
-    def _add_utterance(self, agent, utterance, lf=None, msg=None):
+    def _add_utterance(self, agent, utterance, lf=None, price_act=None):
+        if price_act is None:
+            price_act = {}
+
         # Same agent talking
         if len(self.agents) > 0 and agent == self.agents[-1]:
             new_turn = False
@@ -275,6 +277,7 @@ class Dialogue(object):
             print('error-lf: ', lf)
         assert lf
 
+        self.is_int = False
         if new_turn:
             self.agents.append(agent)
             role = self.agent_to_role[agent]
@@ -282,18 +285,18 @@ class Dialogue(object):
 
             self.token_turns.append(utterance)
             self.entities.append(entities)
-            self.lf_tokens.append(lf)
+            self.lf_turns.append(lf)
             self.modified.append(True)
-            self.msgs.append(msg)
+            self.price_actions.append(price_act)
         else:
             self.token_turns[-1].extend(utterance)
             self.entities[-1].extend(entities)
             # self.lfs[-1].extend(lf)
-            self.lf_tokens.append(lf)
+            self.lf_turns.append(lf)
             print('Not new turn!')
-            print(agent, utterance, lf, msg)
+            print(agent, utterance, lf, price_act)
 
-            print(self.lf_tokens)
+            print(self.lf_turns)
             print(self.token_turns)
             print(self.agents)
             assert False
@@ -306,6 +309,9 @@ class Dialogue(object):
     def lf_to_int(self):
         '''
         Used by Dialogue.convert_to_int() and NeuralSession.conver_to_int()
+        lf_turns -> lfs
+        token_turns -> tokens
+           -> last_prices
         :return:
         '''
         last_price = [0]*2
@@ -315,7 +321,7 @@ class Dialogue(object):
 
         self.need_output = False
 
-        for i, lf in enumerate(self.lf_tokens):
+        for i, lf in enumerate(self.lf_turns):
             if not self.modified[i]:
                 continue
 
@@ -336,13 +342,13 @@ class Dialogue(object):
                     last_price[self.agents[i]] = tmp_lf.get('price')
 
                 # Update intent price for agree-noprice
-                if self.update_agree and tmp_lf['intent'] == self.mappings['lf_vocab'].word_to_ind['agree-noprice']:
-                    agt = self.agents[i]
-                    last_price[agt] = last_price[agt ^ 1]
+                # if self.update_agree and tmp_lf['intent'] == self.mappings['lf_vocab'].word_to_ind['agree-noprice']:
+                #     agt = self.agents[i]
+                #     last_price[agt] = last_price[agt ^ 1]
 
                 if i >= len(self.agents):
                     print('error i{} >= len(agents){}'.format(i, len(self.agents)))
-                    print(self.lf_tokens)
+                    print(self.lf_turns)
                     print(self.token_turns)
                     print(self.agents)
                 tmp_lf['price'] = last_price[self.agents[i]]
@@ -379,19 +385,20 @@ class Dialogue(object):
         self.kb_context_to_int()
         self.lf_to_int()
 
-        if self.model in ['lf2lf', 'seq2seq']:
-            for turn in self.token_turns:
-                # turn is a list of tokens that an agent spoke on their turn
-                # self.turns starts out as [[], [], []], so
-                #   each portion is a list holding the tokens of either the
-                #   encoding portion, decoding portion, or the target portion
-                for portion, stage in zip(self.turns, ('encoding', 'decoding', 'target')):
-                    portion.append(self.textint_map.text_to_int(turn, stage))
-
-        elif self.model in ['tom']:
-            for token, lf, in zip(self.tokens, self.lfs):
-                self.turns[0].append(lf)
-                self.turns[1].append(token)
+        # if self.model in ['lf2lf', 'seq2seq']:
+        #     for turn in self.token_turns:
+        #         # turn is a list of tokens that an agent spoke on their turn
+        #         # self.turns starts out as [[], [], []], so
+        #         #   each portion is a list holding the tokens of either the
+        #         #   encoding portion, decoding portion, or the target portion
+        #         for portion, stage in zip(self.turns, ('encoding', 'decoding', 'target')):
+        #             portion.append(self.textint_map.text_to_int(turn, stage))
+        #
+        # elif self.model in ['tom']:
+        for token, lf, pact in zip(self.tokens, self.lfs, self.price_actions):
+            self.turns[0].append(lf)
+            self.turns[1].append(token)
+            self.turns[2].append(pact)
 
         self.is_int = True
 
@@ -712,10 +719,11 @@ class DataGenerator(object):
 
     def dialogue_sort_score(self, d):
         # Sort dialogues by number o turns
-        return len(d.lf_tokens)
+        return -len(d.lf_turns)
 
     def create_dialogue_batches(self, dialogues, batch_size):
         dialogue_batches = []
+        # make sure the length of dialogue decreasing
         dialogues.sort(key=lambda d: self.dialogue_sort_score(d))
         N = len(dialogues)
         start = 0
@@ -740,6 +748,8 @@ class DataGenerator(object):
         if not os.path.isdir(self.cache):
             os.makedirs(self.cache)
         cache_file = os.path.join(self.cache, '%s_batches.pkl' % name)
+
+        # Generate Batch
         if (not os.path.exists(cache_file)) or self.ignore_cache:
             for dialogue in dialogues:
                 dialogue.convert_to_int()
@@ -764,11 +774,12 @@ class DataGenerator(object):
             random.shuffle(inds)
         for ind in inds:
             for batch in dialogue_batches[ind]:
-                yield Batch(batch['encoder_args'],
+                yield SLBatch(batch['encoder_args'],
                             batch['decoder_args'],
                             batch['context_data'],
-                            self.mappings['utterance_vocab'],
-                            num_context=self.num_context, cuda=cuda,
+                            self.mappings['lf_vocab'],
+                            # num_context=self.num_context,
+                            cuda=cuda,
                             # msgs=batch['msgs'],
                             )
             # End of dialogue

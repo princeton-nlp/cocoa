@@ -25,13 +25,13 @@ class IRNLG(object):
         #     else:
         #         self.gen_dic[tmp["category"]][tmp["intent"]][tmp["role"]] = [tmp["template"]]
 
-    def gen(self, tokens, role, category):
-        template = random.choice(self.gen_dic[category][tokens[0]][role])
+    def gen(self, lf, role, category):
+        template = random.choice(self.gen_dic[category][lf.get('intent')][role])
         words = word_tokenize(template)
         new_words = []
         for i, wd in enumerate(words):
-            if wd == "PPRRIICCEE" and len(tokens) > 1:
-                new_words.append(str(tokens[1]))
+            if wd == "PPRRIICCEE" and lf.get('price'):
+                new_words.append(str(lf.get('price')))
             else:
                 new_words.append(wd)
 

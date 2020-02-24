@@ -49,6 +49,7 @@ class PolicyCounter(object):
         return policy
 
     def update_from_batch(self, batch, policy):
+        return
         n = batch.size
         state = batch.encoder_intent.cpu().numpy()
         policy = policy.data.cpu().numpy()

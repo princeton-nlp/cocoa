@@ -11,7 +11,10 @@ import onmt.Models
 import onmt.modules
 from onmt.RLModels import StateEncoder, UtteranceEncoder, StateUtteranceEncoder, \
     MeanEncoder, RNNEncoder, \
-    PolicyDecoder, PolicyModel, ValueModel, ValueDecoder
+    PolicyDecoder, PolicyModel, ValueModel, ValueDecoder, \
+    HistoryEncoder, CurrentEncoder, \
+    HistoryModel, CurrentModel, \
+    MixedPolicy, SinglePolicy
 from onmt.Utils import use_gpu
 
 from cocoa.io.utils import read_pickle
@@ -22,32 +25,30 @@ def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
     return nn.Embedding(len(word_dict), emb_length)
 
 
-def make_encoder(opt, embeddings, intent_size, output_size, fix_emb=False,):
+def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, fix_emb=False, ):
     """
     Various encoder dispatcher function.
     Args:
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
+    # encoder = StateEncoder(intent_size=intent_size, output_size=output_size,
+    #                     state_length=opt.state_length, extra_size=3 if opt.dia_num>0 else 0 )
 
-    encoder = StateEncoder(intent_size=intent_size, output_size=output_size,
-                        state_length=opt.state_length, extra_size=3 if opt.dia_num>0 else 0 )
-    if opt.use_utterance:
-
-        # TODO: use function to get the size?
-        bert_output_size = 768
-
-        if opt.bert_encoder == 'mean':
-            utters_encoder = MeanEncoder(output_size)
-        else:
-            utters_encoder = RNNEncoder(output_size)
-        uencoder = UtteranceEncoder(utters_encoder, embeddings, fix_emb=fix_emb)
-        encoder = StateUtteranceEncoder(encoder, uencoder, input_size=output_size+embeddings.embedding_dim, output_size=output_size)
+    diaact_size = (intent_size+1)
+    extra_size = 3 + 2
+    hidden_size = 64
+    if not opt.use_utterance:
+        embeddings = None
+    if use_history:
+        encoder = HistoryEncoder(diaact_size*2, hidden_size, extra_size, embeddings, output_size)
+    else:
+        encoder = CurrentEncoder(diaact_size*opt.state_length+extra_size, embeddings, output_size)
 
     return encoder
 
 
-def make_decoder(opt, encoder_size, intent_size, output_value=False):
+def make_decoder(opt, encoder_size, intent_size, price_action=False, output_value=False):
     """
     Various decoder dispatcher function.
     Args:
@@ -55,8 +56,11 @@ def make_decoder(opt, encoder_size, intent_size, output_value=False):
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     if output_value:
-        return ValueDecoder(encoder_size=encoder_size)
-    return PolicyDecoder(encoder_size=encoder_size, intent_size=intent_size)
+        return SinglePolicy(encoder_size, 1, num_layer=2)
+    if price_action:
+        return MixedPolicy(encoder_size, intent_size, 4)
+    return MixedPolicy(encoder_size, intent_size, 1)
+    # return PolicyDecoder(encoder_size=encoder_size, intent_size=intent_size)
 
 
 def load_test_model(model_path, opt, dummy_opt):
@@ -84,8 +88,47 @@ def load_test_model(model_path, opt, dummy_opt):
     return mappings, model, model_opt, critic
 
 
-def make_base_model(model_opt, mappings, gpu, checkpoint=None):
-    """
+def init_model(model, checkpoint, model_opt):
+    # Load the model states from checkpoint or initialize them.
+    if checkpoint is not None:
+        print('Loading model parameters.')
+        model.load_state_dict(checkpoint['model'])
+    else:
+        if model_opt.param_init != 0.0:
+            print('Intializing model parameters.')
+            for p in model.parameters():
+                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+
+
+def make_sl_model(model_opt, mappings, gpu, checkpoint=None):
+    intent_size = mappings['lf_vocab'].size
+
+    # Make encoder.
+    src_dict = mappings['utterance_vocab']
+    src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
+    encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size)
+    # print('encoder', encoder)
+
+    # Make decoder.
+    tgt_dict = mappings['tgt_vocab']
+
+    decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size)
+    # print('decoder', decoder)
+
+    model = CurrentModel(encoder, decoder)
+
+    init_model(model, checkpoint, model_opt)
+
+    if gpu:
+        model.cuda()
+    else:
+        model.cpu()
+
+    return model
+
+
+def make_base_model(model_opt, mappings, gpu, checkpoint=None, type='sl'):
+    """s
     Args:
         model_opt: the option loaded from checkpoint.
         fields: `Field` objects for the model.
@@ -110,8 +153,12 @@ def make_base_model(model_opt, mappings, gpu, checkpoint=None):
     decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size)
     # print('decoder', decoder)
 
+    model = CurrentModel(encoder, decoder)
 
+
+    # Policy Model : Current Encoder + Intent | Price(action)
     model = PolicyModel(encoder, decoder)
+
     model.model_type = 'text'
 
     # Make Critic.

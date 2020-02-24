@@ -45,7 +45,7 @@ def add_model_arguments(parser):
     group.add_argument('--dec-layers', type=int, default=1,
                        help='Number of layers in the decoder')
     group.add_argument('--rnn-type', type=str, default='LSTM',
-                       choices=['LSTM', 'GRU', 'SRU'], action=CheckSRU,
+                       choices=['LSTM', 'GRU', 'SRU', 'RNN'], action=CheckSRU,
                        help="""The gate type to use in the RNNs""")
 
     # Hidden sizes and dimensions

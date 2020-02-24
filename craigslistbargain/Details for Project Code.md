@@ -10,9 +10,42 @@ This part discribe what the structures of neural network in the project.
 
 ### Types of NN
 
-1. Actor-Critic Network, Including Actor & Critic network
+1. Supervise Learning Agent
 2. Theory of Mind Model
-3. 
+3. Policy Network
+4. Value Network
+
+#### Encoder
+
+Input:
+
+* Dialogue Act
+* Dialogue Utterance
+* Last Hidden State  
+  * t-1
+  * from t-1, for history state
+* Other Information
+
+Output:
+
+* State Embedding
+* Current Hidden State
+
+#### Decoder
+
+Input:
+
+* State Embedding
+* Price Information
+* Other Information
+
+Output:
+
+* Intent (+ Price Value)
+
+  or
+
+* Intent  + Price Action
 
 ### Actor (Policy)
 
@@ -187,7 +220,7 @@ $$
 $$
 
 $$
-G(a|s) = \Sigma_{a'\in A} P(a'|s,a) V(a'|s,a)
+G(a|s) = \Sigma_{a'\in A} P(a'|s,a) V(s,a,a')
 $$
 
 
@@ -240,6 +273,8 @@ For one scentence:
 
 
 
+## 
+
 ## Reinforcement Learning Related Agent Settings
 
 ### Reinforce
@@ -250,7 +285,29 @@ For one scentence:
 
 ### Mixed action policy
 
-### Training based on ToM inference
+### ToM inference
+
+### Details for ToM Inference
+
+#### Case 1: `a = 'accept' or 'reject'`
+
+This case is available  when `s[-1]` is `'offer'`. 
+
+In this case, `a'` will not exist and only 2 calculations.
+
+$\sum P(a'|s)V(s,a,a') = R(s,a)$, where `R(s,a)` is given by rule. 
+
+#### Case 2: `a = 'offer'`
+
+In this case, `a'` could only be `'accept'` or `'reject'`, also only 2 calculations.
+
+$\sum P(a'|s)V(s,a,a') = \sum P(a'|s,a)R(s,a,a')$, where `R(s,a,a')` is given by rule and `P(a'|s,a)` is obtained from ToM. 
+
+####  Case 3: `a = others`
+
+In this case, `a'` could be any possible actions.
+
+Using batch calculation.
 
 
 

@@ -1,14 +1,16 @@
 """
-Convert Rules:
-  * disagree with no price: counter-noprice
-  * agree with no price: agree-noprice
-  * propose with no price: inform
+
 """
 
 import json
 import math
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
+import seaborn as sns
+import collections
+from .Dialogue import Dialogue
+
 
 def print_event(e):
     print('print'+'-'*10)
@@ -69,6 +71,13 @@ def check_price(e):
     return False
 
 
+def draw_bar(lengths):
+    cc = collections.Counter(lengths)
+    y = [cc[i] for i in lengths]
+    plt.bar(lengths, y)
+    plt.show()
+
+
 def convert_data(input, output):
     a_p = {}
     a = {}
@@ -78,6 +87,9 @@ def convert_data(input, output):
     if run_type == 'test':
         data = data[:200]
     newData = []
+
+    lengths = []
+
     for i, d in enumerate(data):
         last_agent = None
         events = []
@@ -135,7 +147,10 @@ def convert_data(input, output):
         d['events'] = events
         if not ill:
             newData.append(d)
+            lengths.append(len(events))
 
+
+    draw_bar(lengths)
     data = newData
 
     if output is not None:
@@ -145,104 +160,6 @@ def convert_data(input, output):
     else:
         print("file name: {}\nprice_act: {}\nact:{}".format(input, a_p, a))
 
-class Dialogue:
-    def __init__(self,data):
-        self.events = data['events']
-        self.length = len(self.events)
-
-        if self.events[-1]['action'] == 'accept':
-            self.outcome = 0
-        elif self.events[-1]['action'] == 'reject':
-            self.outcome = 1
-        else:
-            if self.length >= 19 or self.events[-1]['action'] == 'quit':
-                self.outcome = 2
-            else:
-                self.outcome = 3
-
-        self.agents = [{}, {}]
-        self.roles = [i['personal']['Role'] for i in data['scenario']['kbs']]
-        self.seller = 0 if self.roles[0]=='seller' else 1
-        self.buyer = 0 if self.roles[0]=='buyer' else 1
-
-        self.real_price = data['scenario']['kbs'][0]['item']['Price']
-        self.targets = [i['personal']['Target'] for i in data['scenario']['kbs']]
-        self.bottom = [0,0]
-        self.bottom[self.seller] = self.real_price*0.7
-        self.bottom[self.buyer] = self.real_price
-
-        self.price_lines = sorted(self.targets)
-
-        self.category = data['scenario']['kbs'][0]['item']['Category']
-
-        self._get_history_price()
-
-    def _get_history_price(self):
-        self.history_price = []
-        lastprice = [math.inf, math.inf]
-        for e in self.events:
-            m = e['metadata']
-            if m.get('price') is not None:
-                p = e['metadata']['price']
-                p_s = self.scale_price(p, role=e['agent'])
-            elif m.get('intent') == 'accept-noprice':
-                p_s = lastprice[m['agent']^1]
-                p_s = self.unscale_price(p_s, m['agent']^1)
-                p_s = self.scale_price(p_s, m['agent'])
-            else:
-                self.history_price.append(lastprice.copy())
-                continue
-            lastprice[e['agent']] = p_s
-            self.history_price.append(lastprice.copy())
-
-
-    def _get_lines(self, role=None):
-        if isinstance(role, int):
-            role = self.roles[role]
-        if role is None:
-            b, t = self.price_lines
-        elif role == 'seller':
-            t = self.targets[self.seller]
-            b = self.bottom[self.seller]
-        elif role == 'buyer':
-            t = self.targets[self.buyer]
-            b = self.bottom[self.buyer]
-        return b, t
-
-    def scale_price(self, p, role=None):
-        b, t = self._get_lines(role)
-        return (p-b)/(t-b)
-
-    def unscale_price(self, p, role=None):
-        b, t = self._get_lines(role)
-        return p*(t-b)+b
-
-    def _kb_to_str(self):
-        strs = []
-        strs.append('real_price:{}\tcategory:{}'.format(self.real_price, self.category))
-        for i in range(2):
-            strs.append('[{}]\t{}\t target: {}\t bottom{:.2f}\t'.format(self.roles[i], i, self.targets[i], self.bottom[i]))
-
-        return  strs
-    def to_str(self):
-        strs = []
-        # kb
-        strs += self._kb_to_str()
-
-        #events
-        for i, e in enumerate(self.events):
-            s = "{}\t[{}]\thp:{}\t".format(i, e['agent'], self.history_price[i], )
-            if e['action'] == 'message':
-                s += "{}\n".format(str(e['metadata']))
-            else:
-                s += "{}\n".format(e['action'])
-            if isinstance(e['data'], str):
-                s += "\t" + e['data']
-            else:
-                s += "\t" + str(e['metadata'])
-            strs.append(s)
-
-        return strs
 
 def _check_price_one_dialogue(d):
     d = Dialogue(d)

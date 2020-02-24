@@ -27,7 +27,7 @@ import options
 def build_model(model_opt, opt, mappings, checkpoint, model_path = None):
     print('Building model...')
     if model_path is None:
-        model, _ = model_builder.make_base_model(model_opt, mappings,
+        model = model_builder.make_sl_model(model_opt, mappings,
                                         use_gpu(opt), checkpoint=checkpoint)
     else:
         # print('opt', opt, '\n!!:', model_opt)
@@ -111,8 +111,8 @@ if __name__ == '__main__':
 
     # Use simple model instead of bert
 
-    parser.add_argument('--bert-model-path', default=None, type=str, help='Directory of bert pretrained model path')
-    parser.add_argument('--bert-encoder', default='mean', choices=['mean','rnn'], help='bert encoder type')
+    # parser.add_argument('--bert-model-path', default=None, type=str, help='Directory of bert pretrained model path')
+    parser.add_argument('--utter-encoder', default='lstm', choices=['mean','rnn'], help='utterance encoder type')
 
     options.add_data_generator_arguments(parser)
     options.add_model_arguments(parser)
@@ -153,12 +153,12 @@ if __name__ == '__main__':
     config_path = os.path.join(args.model_path, 'config.json')
     write_json(vars(args), config_path)
 
-    builder = UtteranceBuilder(mappings['tgt_vocab'], 1, has_tgt=True)
+    builder = UtteranceBuilder(mappings['utterance_vocab'], 1, has_tgt=True)
 
     # Build optimizer and trainer
     optim = build_optim(args, model, ckpt)
     # vocab is used to make_loss, so use target vocab
-    trainer = build_trainer(args, model, mappings['tgt_vocab'], optim)
+    trainer = build_trainer(args, model, mappings['utterance_vocab'], optim)
     trainer.builder = builder
     # Perform actual training
     trainer.learn(args, data_generator, report_func)

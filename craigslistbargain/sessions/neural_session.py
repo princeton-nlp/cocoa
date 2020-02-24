@@ -11,9 +11,10 @@ from cocoa.core.entity import is_entity, Entity, CanonicalEntity
 from core.event import Event
 from .session import Session
 from neural.preprocess import markers, Dialogue
-from neural.batcher_rl import Batch
+from neural.batcher_rl import RLBatch, ToMBatch
 import copy
 import time
+import json
 
 class NeuralSession(Session):
     def __init__(self, agent, kb, env):
@@ -37,8 +38,9 @@ class NeuralSession(Session):
         # min/expect
         # price strategy: high/low/decay
         self.tom_type = env.tom_type
+        self.price_strategy_distribution = {'low': 0.4, 'high': 0.4, 'decay': 0.2}
         self.price_strategy = env.price_strategy
-        self.acpt_range = [0.3, 0.7]
+        self.acpt_range = [0.4, 1]
 
         # Tom
         self.tom = False
@@ -47,6 +49,10 @@ class NeuralSession(Session):
             self.tom = True
             self.critic = env.critic
             self.model = env.model
+
+    def sample_price_strategy(self):
+        ps, p = list(zip(*self.price_strategy_distribution))
+        self.price_strategy = np.random.choice(ps, p=p)
 
     def set_controller(self, controller):
         self.controller = controller
@@ -70,6 +76,7 @@ class NeuralSession(Session):
             return
         # print(event.data)
         # Parse utterance
+        lf = event.metadata
         utterance = self.env.preprocessor.process_event(event, self.kb)
 
         # e.g. sentences are here!!
@@ -92,9 +99,9 @@ class NeuralSession(Session):
         state = None
         # print(event.agent, self.dialogue.agent)
         if another_dia is None:
-            self.dialogue.add_utterance_with_state(event.agent, utterance, state)
+            self.dialogue.add_utterance(event.agent, utterance, lf=lf)
         else:
-            another_dia.add_utterance_with_state(self.dialogue.agent ^ 1, utterance, state)
+            another_dia.add_utterance(self.dialogue.agent ^ 1, utterance, lf=lf)
 
 
     def _has_entity(self, tokens):
@@ -109,6 +116,24 @@ class NeuralSession(Session):
         s = re.sub(r" 's ", r"'s ", s)
         s = re.sub(r" n't ", r"n't ", s)
         return s
+
+    def _intent_ind2word(self, ind):
+        return self.env.vocab.to_word(ind)
+
+    def _to_event(self, utterance, lf, output_data):
+        intent = lf.get('intent')
+        intent = self.env.vocab.to_word(intent)
+        metadata = {**lf, 'output_data': output_data}
+        metadata_nolf = {'output_data': output_data}
+        if intent == markers.OFFER:
+            return self.offer(lf, metadata_nolf)
+        elif intent == markers.ACCEPT:
+            return self.accept(metadata=metadata_nolf)
+        elif intent == markers.REJECT:
+            return self.reject(metadata=metadata_nolf)
+        elif intent == markers.QUIT:
+            return self.quit(metadata=metadata_nolf)
+        return self.message(utterance, metadata=metadata)
 
     def _tokens_to_event(self, tokens, output_data, semi_event=False):
         # if self.agent == 0 :
@@ -262,6 +287,153 @@ class NeuralSession(Session):
         # print('inference: ', time.time() - last_time)
         return values
 
+    def _to_real_price(self, price):
+        return self.builder.get_price_number(price, self.kb)
+
+    def _raw_token_to_lf(self, tokens):
+        if len(tokens) > 1:
+            price = self._to_real_price(tokens[1])
+            return {'intent': tokens[0], 'price': price}
+        return {'intent': tokens[0]}
+
+    def _lf_to_utterance(self, lf):
+        role = self.kb.facts['personal']['Role']
+        category = self.kb.facts['item']['Category']
+        utterance = self.uttr_gen(lf, role, category)
+        return utterance
+
+    def tom_inference(self, tokens, output_data):
+        # For the step of choosing U2
+        # get parameters of normal distribution for price
+        p_mean = output_data['price_mean']
+        p_logstd = output_data['price_logstd']
+
+        # get all actions
+        all_actions = self.generator._get_all_actions(p_mean, p_logstd)
+        best_action = (None, None)
+        print_list = []
+
+        tom_policy = []
+        tom_actions = []
+
+        avg_time = []
+
+        all_value = [-np.inf for i in range(len(all_actions))]
+
+        for act in all_actions:
+            if output_data['policy'][0, act[0]].item() < 1e-7:
+                continue
+            # use fake step to get opponent policy
+            tmp_tokens = list(act)
+            tmp_lf = self._raw_token_to_lf(act)
+            tmp_u = self._lf_to_utterance(tmp_lf)
+
+            self.dialogue.add_utterance(self.agent, tmp_u, lf=tmp_lf)
+
+            # From [0,1] to real price
+            e = self._tokens_to_event(tmp_tokens, output_data)
+            tmp_time = time.time()
+            info = self.controller.fake_step(self.agent, e)
+            avg_time.append(time.time() - tmp_time)
+            self.dialogue.delete_last_utterance(delete_state=False)
+            self.controller.step_back(self.agent)
+
+            tmp = info.exp() * output_data['policy'][0, act[0]]
+            # choice the best action
+            # if best_action[1] is None or tmp.item() > best_action[1]:
+            #     best_action = (tmp_tokens, tmp.item())
+            # record all the actions
+            tom_policy.append(tmp.item())
+            tom_actions.append(tmp_tokens)
+
+            print_list.append((self.env.textint_map.int_to_text([act[0]]), act, tmp.item(), info.item(),
+                               output_data['policy'][0, act[0]].item()))
+
+        # print('fake_step costs {} time.'.format(np.mean(avg_time)))
+
+        # Sample action from new policy
+        final_action = torch.multinomial(torch.from_numpy(np.array(tom_policy), ), 1).item()
+        tokens = list(tom_actions[final_action])
+
+        # print('-'*5+'tom debug info: ', len(self.dialogue.lf_tokens))
+        # for s in print_list:
+        #     print('\t'+ str(s))
+        # self.dialogue.lf_to_int()
+        # for s in self.dialogue.lfs:
+        #     print(s)
+
+        return tokens
+
+    def try_all_aa(self, tokens, output_data):
+        # For the step of choosing U3
+        p_mean = output_data['price_mean']
+        p_logstd = output_data['price_logstd']
+        # get all
+        num_price = 5
+        all_actions = self.generator._get_all_actions(p_mean, p_logstd, num_price, no_sample=True)
+        all_events = []
+        new_all_actions = []
+
+        for act in all_actions:
+            # TODO: remove continue for min/max tom
+            if output_data['policy'][0, act[0]].item() < 1e-7:
+                continue
+            # Use semi-event here
+            #   *For semi-events we only need to transform the price (keep intent as integer)
+            # From [0,1] to real price
+            e = self._tokens_to_event(act[:2], output_data, semi_event=True)
+            # e = self._tokens_to_event(act[:2], output_data)
+            all_events.append(e)
+            new_all_actions.append(act)
+        all_actions = new_all_actions
+
+        print_list = []
+
+        # Get value functions from other one.
+        values = self.controller.get_value(self.agent, all_events)
+
+        probs = torch.ones_like(values, device=values.device)
+        for i, act in enumerate(all_actions):
+            # print('act: ',i ,output_data['policy'], act, probs.shape)
+            if act[1] is not None:
+                probs[i, 0] = output_data['policy'][0, act[0]].item() * act[2]
+            else:
+                probs[i, 0] = output_data['policy'][0, act[0]].item()
+
+            print_list.append(
+                (self.env.textint_map.int_to_text([act[0]]), act, probs[i, 0].item(), values[i, 0].item()))
+
+        # if len(self.dialogue.lf_tokens) >= 2 and self.dialogue.lf_tokens[-2]['intent'] == 'offer':
+        #     print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
+        #     for i, s in enumerate(self.dialogue.lf_tokens):
+        #         print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
+        #     for s in print_list:
+        #         print('\t' + str(s))
+        # print('is fake: ',time.time()-tmp_time)
+
+        info = {'values': values, 'probs': probs}
+        # print('sum of probs', probs.sum())
+        # info['values'] = values
+
+        # For the min one
+        minone = torch.zeros_like(probs, device=probs.device)
+        minone[values.argmin().item(), 0] = 1
+        maxone = torch.zeros_like(probs, device=probs.device)
+        maxone[values.argmax().item(), 0] = 1
+
+        if self.tom_type == 'expectation':
+            # If use expectation here
+            return (values.mul(probs)).sum()
+        elif self.tom_type == 'competitive':
+            # If use max here
+            return (values.mul(minone)).sum()
+        elif self.tom_type == 'cooperative':
+            # If use max here
+            return (values.mul(maxone)).sum()
+        else:
+            print('Unknown tom type: ', self.tom_type)
+            assert NotImplementedError()
+        return tokens
 
     def send(self, temperature=1, is_fake=False):
 
@@ -276,137 +448,25 @@ class NeuralSession(Session):
         #     print('generate costs {} time.'.format(time.time() - last_time))
         if is_fake:
             tmp_time = time.time()
-            # For the step of choosing U3
-            p_mean = output_data['price_mean']
-            p_logstd = output_data['price_logstd']
-            # get all
-            num_price = 5
-            all_actions = self.generator._get_all_actions(p_mean, p_logstd, num_price, no_sample=True)
-            all_events = []
-            new_all_actions = []
-
-            for act in all_actions:
-                # TODO: remove continue for min/max tom
-                if output_data['policy'][0, act[0]].item() < 1e-7:
-                    continue
-                # Use semi-event here
-                #   *For semi-events we only need to transform the price (keep intent as integer)
-                # From [0,1] to real price
-                e = self._tokens_to_event(act[:2], output_data, semi_event=True)
-                # e = self._tokens_to_event(act[:2], output_data)
-                all_events.append(e)
-                new_all_actions.append(act)
-            all_actions = new_all_actions
-
-            print_list = []
-
-            # Get value functions from other one.
-            values = self.controller.get_value(self.agent, all_events)
-
-            probs = torch.ones_like(values, device=values.device)
-            for i, act in enumerate(all_actions):
-                # print('act: ',i ,output_data['policy'], act, probs.shape)
-                if act[1] is not None:
-                    probs[i, 0] = output_data['policy'][0, act[0]].item() * act[2]
-                else:
-                    probs[i, 0] = output_data['policy'][0, act[0]].item()
-
-                print_list.append((self.env.textint_map.int_to_text([act[0]]), act, probs[i, 0].item(), values[i, 0].item()))
-
-            # if len(self.dialogue.lf_tokens) >= 2 and self.dialogue.lf_tokens[-2]['intent'] == 'offer':
-            #     print('-' * 5 + 'u3 debug info: ', len(self.dialogue.lf_tokens))
-            #     for i, s in enumerate(self.dialogue.lf_tokens):
-            #         print('\t[{}] {} {}\t'.format(self.dialogue.agents[i], s, self.dialogue.lfs[i]))
-            #     for s in print_list:
-            #         print('\t' + str(s))
-            # print('is fake: ',time.time()-tmp_time)
-
-            info = {'values': values, 'probs': probs}
-            # print('sum of probs', probs.sum())
-            # info['values'] = values
-
-            # For the min one
-            minone = torch.zeros_like(probs, device=probs.device)
-            minone[values.argmin().item(), 0] = 1
-            maxone = torch.zeros_like(probs, device=probs.device)
-            maxone[values.argmax().item(), 0] = 1
-
-            if self.tom_type == 'expectation':
-                # If use expectation here
-                return (values.mul(probs)).sum()
-            elif self.tom_type == 'competitive':
-                # If use max here
-                return (values.mul(minone)).sum()
-            elif self.tom_type == 'cooperative':
-                # If use max here
-                return (values.mul(maxone)).sum()
-            else:
-                print('Unknown tom type: ', self.tom_type)
-                assert NotImplementedError()
+            tokens = self.try_all_aa(tokens, output_data)
 
         last_time=time.time()
         if self.tom:
-            # For the step of choosing U2
-            # get parameters of normal distribution for price
-            p_mean = output_data['price_mean']
-            p_logstd = output_data['price_logstd']
-
-            # get all actions
-            all_actions = self.generator._get_all_actions(p_mean, p_logstd)
-            best_action = (None, None)
-            print_list = []
-
-            tom_policy = []
-            tom_actions = []
-
-            avg_time = []
-
-            for act in all_actions:
-                if output_data['policy'][0, act[0]].item() < 1e-7:
-                    continue
-                # use fake step to get opponent policy
-                tmp_tokens = self._output_to_tokens({'intent': act[0], 'price': act[1]})
-                self.dialogue.add_utterance(self.agent, tmp_tokens)
-                # From [0,1] to real price
-                e = self._tokens_to_event(tmp_tokens, output_data)
-                tmp_time = time.time()
-                info = self.controller.fake_step(self.agent, e)
-                avg_time.append(time.time() - tmp_time)
-                self.dialogue.delete_last_utterance(delete_state=False)
-                self.controller.step_back(self.agent)
-
-                tmp = info.exp() * output_data['policy'][0, act[0]]
-                # choice the best action
-                # if best_action[1] is None or tmp.item() > best_action[1]:
-                #     best_action = (tmp_tokens, tmp.item())
-                # record all the actions
-                tom_policy.append(tmp.item())
-                tom_actions.append(tmp_tokens)
-
-                print_list.append((self.env.textint_map.int_to_text([act[0]]), act, tmp.item(), info.item(), output_data['policy'][0, act[0]].item()))
-
-            # print('fake_step costs {} time.'.format(np.mean(avg_time)))
-
-            # Sample action from new policy
-            final_action = torch.multinomial(torch.from_numpy(np.array(tom_policy),), 1).item()
-            tokens = list(tom_actions[final_action])
-
-            # print('-'*5+'tom debug info: ', len(self.dialogue.lf_tokens))
-            # for s in print_list:
-            #     print('\t'+ str(s))
-            # self.dialogue.lf_to_int()
-            # for s in self.dialogue.lfs:
-            #     print(s)
+            tokens = self.tom_inference(tokens, output_data)
         # if self.tom:
         #     print('the whole tom staff costs {} times.'.format(time.time() - last_time))
 
         if tokens is None:
             return None
-        self.dialogue.add_utterance(self.agent, list(tokens))
+
+        lf = self._raw_token_to_lf(tokens)
+        utterance = self._lf_to_utterance(lf)
+
+        self.dialogue.add_utterance(self.agent, utterance, lf=lf)
         # print('tokens', tokens)
-        # self.dialogue.add_utterance_with_state(self.agent, list(tokens), output_data)
-         
-        return self._tokens_to_event(tokens, output_data)
+
+        return self._to_event(utterance, lf, output_data)
+        # return self._tokens_to_event(tokens, output_data)
 
 
     def step_back(self):
@@ -426,7 +486,7 @@ class NeuralSession(Session):
         yield len(batches)
         for batch in batches:
             # TODO: this should be in batcher
-            batch = Batch(batch['encoder_args'],
+            batch = RLBatch(batch['encoder_args'],
                           batch['decoder_args'],
                           batch['context_data'],
                           self.env.vocab,
@@ -465,6 +525,8 @@ class PytorchNeuralSession(NeuralSession):
         encoder_turns = self.batcher._get_turn_batch_at(dias, Dialogue.ENC, -1, step_back=self.batcher.state_length,
                                                         attached_events=attached_events)
 
+        encoder_tokens = self.batcher._get_turn_batch_at(dias, Dialogue.TOKEN, -1)
+
         encoder_inputs = self.batcher.get_encoder_inputs(encoder_turns)
         # print('intent in sess: ', encoder_inputs[0])
         # encoder_context = self.batcher.get_encoder_context(encoder_turns, num_context)
@@ -472,6 +534,7 @@ class PytorchNeuralSession(NeuralSession):
                         'intent': encoder_inputs[0],
                         'price': encoder_inputs[1],
                         'price_mask': encoder_inputs[2],
+                        'tokens': encoder_tokens,
                         # 'context': encoder_context
                     }
 
@@ -495,6 +558,7 @@ class PytorchNeuralSession(NeuralSession):
                     }
 
         context_data = {
+                'encoder_tokens': encoder_tokens,
                 'agents': [self.agent],
                 'kbs': [self.kb],
                 }
@@ -517,19 +581,24 @@ class PytorchNeuralSession(NeuralSession):
             oldp = output_data['price'].item()
             prange = [0,1]
             prange = acpt_range
+
+            # Decay till 1/2 max_length
+            factor = batch.encoder_dianum[0, -1].item()
+            factor = max(1, factor*2)
+
             if self.price_strategy == 'high':
-                p = prange[1]
+                prange = [0.7, 0.7+0.3]
+                p = prange[0]*(factor) + prange[1]*(1-factor)
             elif self.price_strategy == 'low':
-                p = prange[0]
+                prange = [0.2, 0.2+0.3]
+                p = prange[0]*(factor) + prange[1]*(1-factor)
             elif self.price_strategy == 'decay':
-                factor = batch.encoder_dianum[0,-1].item()
-                # print(batch.encoder_dianum)
-                # print(factor, prange)
+                prange = [0.4, 0.4+0.3]
                 p = prange[0]*(factor) + prange[1]*(1-factor)
             else:
                 print('Unknown price strategy: ', self.price_strategy)
                 assert NotImplementedError()
-            output_data['price'] = output_data['price'] / oldp * p
+            output_data['price'] = output_data['price'] * (p / oldp)
             # print('after:', p, output_data['price'])
 
         entity_tokens = self._output_to_tokens(output_data)
