@@ -1,14 +1,16 @@
 # Supervise (main.py)
-mkdir checkpoint/sl; mkdir mappings/sl;PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-examples-paths data/train-luis-post-new.json --test-examples-paths data/dev-luis-post-new.json \
+mkdir checkpoint/language; mkdir mappings/language;
+PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-examples-paths data/train-luis-post-new.json --test-examples-paths data/dev-luis-post-new.json \
 --price-tracker data/price_tracker.pkl \
---model lf2lf --gpuid 0 \
---model-path checkpoint/sl --mappings mappings/sl \
+--model lf2lf \
+--model-path checkpoint/language --mappings mappings/language \
 --word-vec-size 300 --pretrained-wordvec '' '' \
 --rnn-size 300 --rnn-type LSTM --global-attention multibank_general \
 --num-context 2 --stateful \
 --batch-size 128  --optim adagrad --learning-rate 0.01 \
 --epochs 15 --report-every 500 \
---cache cache/sl --ignore-cache --state-length 4 --dia-num 20
+--cache cache/language --ignore-cache \
+--verbose  --state-length 4 --dia-num 20 --use-utterance --hidden-size 128
 
 # With utterance as input:
 * --use-utterance
@@ -20,14 +22,58 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
---model-path checkpoint/rl --mappings mappings/sl \
+--model-path checkpoint/a2c_decay4 --mappings mappings/sl \
 --optim adagrad --learning-rate 0.01 \
 --agents pt-neural pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 10000 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
---model lf2lf --model-type a2c --name a2c_neural --gpuid 1 --num-cpus 5 \
+--model lf2lf --model-type a2c --name a2c_decay4 --gpuid 0 --num-cpus 5 --price-strategy decay \
 --warmup-epochs 25
+
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/a2c_decay2/model_reward0.39_e55.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/test --mappings mappings/sl \
+--optim adagrad --learning-rate 0.01 \
+--agents pt-neural pt-neural-r \
+--report-every 50 --max-turns 20 --num-dialogues 10000 \
+--sample --temperature 0.5 --max-length 20 --reward margin \
+--dia-num 20 --state-length 4 \
+--model lf2lf --model-type a2c --name test --gpuid 0 --num-cpus 5 --price-strategy decay \
+--warmup-epochs 25 --only-run
+
+# reinforce
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/reinforce --mappings mappings/sl \
+--optim adagrad --learning-rate 0.01 \
+--agents pt-neural pt-neural-r \
+--report-every 50 --max-turns 20 --num-dialogues 10000 \
+--sample --temperature 0.5 --max-length 20 --reward margin \
+--dia-num 20 --state-length 4 \
+--model lf2lf --model-type reinforce --name reinforce --gpuid 0 --num-cpus 5 --price-strategy decay \
+--warmup-epochs 25
+
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
+--model-path checkpoint/a2c --mappings mappings/sl \
+--optim adagrad --learning-rate 0.01 \
+--agents pt-neural pt-neural \
+--report-every 50 --max-turns 20 --num-dialogues 10000 \
+--sample --temperature 0.5 --max-length 20 --reward margin \
+--dia-num 20 --state-length 4 \
+--model lf2lf --model-type a2c --name a2c --gpuid 0 --num-cpus 5 \
+--warmup-epochs 25
+
 
 # Theory of Mind
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
@@ -35,14 +81,14 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
---model-path checkpoint/tom --mappings mappings/sl \
+--model-path checkpoint/tom_decay6 --mappings mappings/sl \
 --optim adagrad --learning-rate 0.01 \
 --agents tom pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 10000 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
---model lf2lf --model-type tom --name tom --price-strategy decay --tom-type expectation --gpuid 0 \
---warmup-epochs 25 --num-cpus 11
+--model lf2lf --model-type tom --name tom_decay6 --price-strategy decay --tom-type expectation --gpuid 0 \
+--warmup-epochs 25 --num-cpus 13
 
 # --agents pt-neural/pt-neural-r/tom
 # --model-type reinforce/a2c/tom

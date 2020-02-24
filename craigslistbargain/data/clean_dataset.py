@@ -9,7 +9,7 @@ import argparse
 import matplotlib.pyplot as plt
 import seaborn as sns
 import collections
-from .Dialogue import Dialogue
+from Dialogue import Dialogue
 
 
 def print_event(e):
@@ -75,7 +75,7 @@ def draw_bar(lengths):
     cc = collections.Counter(lengths)
     y = [cc[i] for i in lengths]
     plt.bar(lengths, y)
-    plt.show()
+    # plt.show()
 
 
 def convert_data(input, output):

@@ -37,7 +37,7 @@ def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, f
 
     diaact_size = (intent_size+1)
     extra_size = 3 + 2
-    hidden_size = 64
+    hidden_size = opt.hidden_size
     if not opt.use_utterance:
         embeddings = None
     if use_history:
