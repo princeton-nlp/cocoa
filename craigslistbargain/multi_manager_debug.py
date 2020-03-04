@@ -60,7 +60,7 @@ class MultiRunner:
         else:
             ckpt = args.agent_checkpoints
 
-        systems = [get_system(name, args, schema, False, ckpt[i]) for i, name in enumerate(args.agents)]
+        systems = [get_system(name, args, schema, False, ckpt[i], id=i) for i, name in enumerate(args.agents)]
 
         rl_agent = 0
         system = systems[rl_agent]
@@ -335,7 +335,7 @@ class MultiManager():
             #                            discount=args.discount_factor, fix_policy=True)
 
             info = worker.send(
-                ['train', pickle.dumps((i, _batch_iters, _rewards[0], self.args.train_mode))])
+                ['train', pickle.dumps((i, _batch_iters[0], _rewards[0], self.args.train_mode))])
             loss = pickle.loads(info[1])
 
             # Draw outputs on the tensorboard

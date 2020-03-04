@@ -2,7 +2,7 @@
 
 import json
 import difflib
-from termcolor import colored
+# from termcolor import colored
 import string
 from nltk.tokenize import word_tokenize
 from multiprocessing import Pool
@@ -26,6 +26,8 @@ class IRNLG(object):
         #         self.gen_dic[tmp["category"]][tmp["intent"]][tmp["role"]] = [tmp["template"]]
 
     def gen(self, lf, role, category):
+        if self.gen_dic[category].get(lf.get('intent')) is None:
+            return ''
         template = random.choice(self.gen_dic[category][lf.get('intent')][role])
         words = word_tokenize(template)
         new_words = []

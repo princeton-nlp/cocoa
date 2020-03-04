@@ -106,8 +106,8 @@ class Controller(object):
 
         # Detect empty dialogues
         for s in self.sessions:
-            if len(s.dialogue.lf_tokens) == 0:
-                print('error lfs: ', [s.dialogue.lf_tokens for ss in self.sessions])
+            if len(s.dialogue.lf_turns) == 0:
+                print('error lfs: ', [s.dialogue.lf_turns for ss in self.sessions])
                 print([str(e.action) + str(e.data) for e in self.events])
                 print(self.outcomes, self.offers, self.quit)
                 quit()

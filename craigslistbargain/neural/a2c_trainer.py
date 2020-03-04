@@ -14,6 +14,8 @@ from .utterance import UtteranceBuilder
 
 from tensorboardX import SummaryWriter
 
+from neural.batcher_rl import RLBatch, RawBatch
+
 from neural.rl_trainer import RLTrainer as BaseTrainer
 from neural.sl_trainer import Statistics, SimpleLoss
 
@@ -99,14 +101,17 @@ class RLTrainer(BaseTrainer):
         super(RLTrainer, self).__init__(agents, scenarios, train_loss, optim,
                                         training_agent, reward_func, cuda, args)
         # print('training_agent', training_agent)
+
+        self.critic = agents[training_agent].env.critic
+        self.tom = agents[training_agent].env.tom_model
         self.model_type = args.model_type
         self.use_utterance = False
 
     def _run_batch_a2c(self, batch):
         value = self._run_batch_critic(batch)
-        policy, price, pvar = self._run_batch(batch)
+        policy, price = self._run_batch(batch)
         # print('max price', torch.max(price))
-        return value, policy, price, pvar
+        return value, policy, price
 
     def _gradient_accumulation(self, batch_iter, reward, model, critic, discount=0.95):
         # Compute losses
@@ -125,29 +130,26 @@ class RLTrainer(BaseTrainer):
         for i, batch in enumerate(batch_iter):
             # print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
             # batch.mask_last_price()
-            value, policy, price, pvar = self._run_batch_a2c(batch)
+            rlbatch = RLBatch.from_raw(batch, None, None)
+            value, policy, price = self._run_batch_a2c(rlbatch)
             # print('train_policy is:', policy)
-            if not batch.for_value:
-                policy_loss, pl_stats = self._compute_loss(batch, policy=policy, price=(price, pvar), loss=self.train_loss)
+            if not for_value:
+                policy_loss, pl_stats = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.train_loss)
                 # print('policy_loss is:', policy_loss)
                 policy_stats.update(pl_stats)
 
-            entropy_loss, _ = self._compute_loss(batch, policy=policy, price=(price, pvar), loss=self.entropy_loss)
+            entropy_loss, _ = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.entropy_loss)
 
             # penalty = ((price-1)**2).mul((price>2).float()) + ((price-0)**2).mul((price<0.5).float())
             # penalty = ((price > 2).float()).mul((price - 1) ** 2) + ((price < 0.5).float()).mul((price - 0) ** 2)
             penalty = ((price > 2).float()).mul(0.1) + ((price < 0.5).float()).mul(0.1)
             penalty = torch.zeros_like(price, device=price.device)
 
-
-
-            if not batch.for_value:
+            if not for_value:
                 penalties.append(penalty.view(-1))
                 p_losses.append(policy_loss.view(-1))
                 e_losses.append(entropy_loss.view(-1))
             values.append(value.view(-1))
-
-            for_value = batch.for_value
 
         # print('allnll ', nll)
         rewards = [0] * len(values)
@@ -379,22 +381,24 @@ class RLTrainer(BaseTrainer):
         verbose_str.append(s)
         return verbose_str
 
-    def sample_data(self, i, batch_size, args, real_batch=None):
+    def sample_data(self, i, sample_size, args, real_batch=None, batch_size=128):
         if real_batch is None:
-            real_batch = batch_size
+            real_batch = sample_size
         rewards = [0]*2
         s_rewards = [0]*2
-        _batch_iters = []
+        _batch_iters = [[], []]
         _rewards = [[], []]
         examples = []
         verbose_strs = []
+
+        dialogue_batch = [[], []]
         for j in range(real_batch):
             # Rollout
             scenario, sid = self._get_scenario()
             controller = self._get_controller(scenario, split='train')
             controller.sessions[0].set_controller(controller)
             controller.sessions[1].set_controller(controller)
-            example = controller.simulate(args.max_turns, verbose=args.verbose, temperature=self.get_temperature(i, batch_size, args))
+            example = controller.simulate(args.max_turns, verbose=args.verbose, temperature=self.get_temperature(i, sample_size, args))
 
             for session_id, session in enumerate(controller.sessions):
                 # if args.only_run != True and session_id != self.training_agent:
@@ -411,13 +415,11 @@ class RLTrainer(BaseTrainer):
                 _rewards[session_id].append(reward)
 
             for session_id, session in enumerate(controller.sessions):
-                # Only train one agent
-                if session_id != self.training_agent:
-                    continue
-
+                # dialogue_batch[session_id].append(session.dialogue)
+                # if len(dialogue_batch[session_id]) == batch_size or j == real_batch-1:
                 batch_iter = session.iter_batches()
                 T = next(batch_iter)
-                _batch_iters.append(list(batch_iter))
+                _batch_iters[session_id].append(list(batch_iter))
 
 
                 # if train_policy or args.model_type == 'tom':

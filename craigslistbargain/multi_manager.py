@@ -69,7 +69,7 @@ class MultiRunner:
         else:
             ckpt = args.agent_checkpoints
 
-        systems = [get_system(name, args, schema, False, ckpt[i]) for i, name in enumerate(args.agents)]
+        systems = [get_system(name, args, schema, False, ckpt[i], id=i) for i, name in enumerate(args.agents)]
 
         rl_agent = 0
         system = systems[rl_agent]
@@ -297,7 +297,7 @@ class MultiManager():
                 if info[0] != 'done':
                     print('Error on {}: {}.'.format(i, info))
                 data = pickle.loads(info[1])
-                batches += data[0]
+                batches += data[0][0]
                 rewards[0] += data[1][0]
                 rewards[1] += data[1][1]
                 train_examples += data[2]

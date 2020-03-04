@@ -21,15 +21,14 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
---agent-checkpoints checkpoint/sl/model_best.pt checkpoint/sl/model_best.pt \
---model-path checkpoint/a2c_decay4 --mappings mappings/sl \
+--agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
+--model-path checkpoint/a2c --mappings mappings/language \
 --optim adagrad --learning-rate 0.01 \
 --agents pt-neural pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 10000 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
---model lf2lf --model-type a2c --name a2c_decay4 --gpuid 0 --num-cpus 5 --price-strategy decay \
---warmup-epochs 25
+--model lf2lf --model-type a2c --name a2c
 
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \

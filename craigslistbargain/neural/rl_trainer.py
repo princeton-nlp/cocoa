@@ -124,8 +124,8 @@ class RLTrainer(BaseTrainer):
 
         self.training_agent = training_agent
         self.model = agents[training_agent].env.model
-        self.critic = agents[training_agent].env.critic
-        self.train_loss = SimpleLoss(inp_with_sfmx=False)
+        self.critic = None
+        self.train_loss = SimpleLoss(inp_with_sfmx=False, use_pact=True)
         self.critic_loss = SimpleCriticLoss()
         self.entropy_loss = EntropyLoss()
         self.optim = optim
@@ -197,24 +197,19 @@ class RLTrainer(BaseTrainer):
 
     def _compute_loss(self, batch, policy=None, price=None, value=None, oracle=None, loss=None):
         if policy is not None:
-            target_intent = batch.target_intent
-            pmean, pvar = price
-            pmean = pmean.unsqueeze(1).mul(batch.target_pmask)
-            pvar = pvar.unsqueeze(1).mul(batch.target_pmask)
+            batch_size = batch.size
+            act_intent = batch.act_intent
             # lsub = policy - policy.max(dim=-1).values
             # print('logits_sub: ', lsub)
             # p = lsub.exp()
             # p = p / p.sum(dim=-1, keepdim=True)
             # print('value', p, target_intent)
-            return loss(policy, (pmean, pvar), target_intent.squeeze(1), batch.target_price, batch.target_pmask)
+            return loss(policy, price, act_intent.reshape(batch_size, -1), batch.act_price, batch.act_price_mask)
         elif value is not None:
             return loss(value, oracle)
 
     def _run_batch_critic(self, batch):
-        e_intent, e_price, e_pmask = batch.encoder_intent, batch.encoder_price, batch.encoder_pmask
-        # print('e_intent {}\ne_price{}\ne_pmask{}'.format(e_intent, e_price, e_pmask))
-
-        value = self.critic(e_intent, e_price, e_pmask, batch.encoder_dianum)
+        value = self.critic(batch.uttr, batch.state)
         return value
 
     def update_critic(self, batch_iter, reward, critic, discount=0.95):
@@ -497,7 +492,7 @@ class RLTrainer(BaseTrainer):
         # No agreement
         if not self._is_agreed(example):
             # print('No agreement')
-            return {'seller': -0.5, 'buyer': -0.5}
+            return {'seller': -1, 'buyer': -1}
 
         rewards = {}
         targets = {}

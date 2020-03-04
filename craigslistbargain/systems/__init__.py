@@ -3,7 +3,7 @@ from cocoa.core.util import read_json, read_pickle
 import options
 
 
-def get_system(name, args, schema=None, timed=False, model_path=None):
+def get_system(name, args, schema=None, timed=False, model_path=None, id=0):
     from core.price_tracker import PriceTracker
     print(args.price_tracker_model)
     lexicon = PriceTracker(args.price_tracker_model)
@@ -27,21 +27,13 @@ def get_system(name, args, schema=None, timed=False, model_path=None):
     elif name == 'cmd':
         from .cmd_system import CmdSystem
         return CmdSystem()
-    elif name == 'pt-neural':
+    elif name in ['pt-neural', 'pt-neural-r']:
         from .neural_system import PytorchNeuralSystem
         # assert model_path
-        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
-    elif name == 'pt-neural-r':
-        from .neural_system import PytorchNeuralSystem
-        # assert model_path
-        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
-    elif name == 'ac':
-        from .ac_system import PytorchNeuralACSystem
-        assert model_path
-        return PytorchNeuralACSystem(args, schema, lexicon, model_path, timed)
+        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name, id=id)
     elif name == 'tom':
         from .neural_system import PytorchNeuralSystem
         assert model_path
-        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name)
+        return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name, id=id)
     else:
         raise ValueError('Unknown system %s' % name)

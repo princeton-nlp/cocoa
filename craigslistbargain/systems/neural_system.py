@@ -23,11 +23,13 @@ class PytorchNeuralSystem(System):
     NeuralSystem loads a neural model from disk and provides a function instantiate a new dialogue agent (NeuralSession
     object) that makes use of this underlying model to send and receive messages in a dialogue.
     """
-    def __init__(self, args, schema, price_tracker, model_path, timed, name=None):
+    def __init__(self, args, schema, price_tracker, model_path, timed, name=None, id=0):
         super(PytorchNeuralSystem, self).__init__()
         self.schema = schema
         self.price_tracker = price_tracker
         self.timed_session = timed
+
+        model_type = 'sl' if name == 'pt-neural-r' else 'rl'
 
         # TODO: do we need the dummy parser?
         dummy_parser = argparse.ArgumentParser(description='duh')
@@ -35,23 +37,41 @@ class PytorchNeuralSystem(System):
         options.add_data_generator_arguments(dummy_parser)
         dummy_args = dummy_parser.parse_known_args([])[0]
 
-        # Load the model.
-        mappings, model, model_args, critic = rl_model_builder.load_test_model(
-                model_path, args, dummy_args.__dict__)
 
-        # Load critic from other model.
-        # if name == 'tom':
-        if hasattr(args, 'load_critic_from') and args.load_critic_from is not None:
-            critic_path = args.load_critic_from
-            _, _, _, critic = rl_model_builder.load_test_model(
-                critic_path, args, dummy_args.__dict__)
+        if model_type == 'sl':
+            mappings, model, model_args = rl_model_builder.load_test_model(
+                model_path, args, dummy_args.__dict__, model_type=model_type)
+            actor = model
+            critic = None
+            tom = None
+        else:
+            # Load the model.
+            mappings, model, model_args = rl_model_builder.load_test_model(
+                model_path, args, dummy_args.__dict__, model_type=model_type)
+
+            actor, critic, tom = model
+            # Load critic from other model.
+            # if name == 'tom':
+            if hasattr(args, 'load_critic_from') and args.load_critic_from is not None:
+                critic_path = args.load_critic_from
+                _, critic, _ = rl_model_builder.load_test_model(
+                    critic_path, args, dummy_args.__dict__)
+                critic = critic[1]
 
         self.model_name = model_args.model
         vocab = mappings['utterance_vocab']
+        lf_vocab = mappings['lf_vocab']
         # print(vocab.word_to_ind)
         self.mappings = mappings
 
-        generator = get_generator(model, vocab, Scorer(args.alpha), args, model_args)
+        from neural.generator import LFSampler
+        generator = LFSampler(actor, lf_vocab, 1, max_length=args.max_length, cuda=use_gpu(args), model_type=model_type)
+        if name != 'sl':
+            tom_generator = LFSampler(tom, lf_vocab, 1, max_length=args.max_length, cuda=use_gpu(args), model_type='tom')
+        else:
+            tom_generator = None
+
+        # Price Tracker
         builder = UtteranceBuilder(vocab, args.n_best, has_tgt=True)
         
         nlg_module = IRNLG(args)
@@ -59,6 +79,7 @@ class PytorchNeuralSystem(System):
         preprocessor = Preprocessor(schema, price_tracker, model_args.entity_encoding_form,
                 model_args.entity_decoding_form, model_args.entity_target_form)
         textint_map = TextIntMap(vocab, preprocessor)
+        lfint_map = TextIntMap(lf_vocab, preprocessor)
         remove_symbols = map(vocab.to_ind, (markers.EOS, markers.PAD))
         use_cuda = use_gpu(args)
 
@@ -72,22 +93,24 @@ class PytorchNeuralSystem(System):
         # TODO: class variable is not a good way to do this
         Dialogue.preprocessor = preprocessor
         Dialogue.textint_map = textint_map
+        Dialogue.lfint_map = lfint_map
         Dialogue.mappings = mappings
         Dialogue.num_context = model_args.num_context
 
 
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',
             'stop_symbol', 'remove_symbols', 'gt_prefix',
-            'max_len', 'dialogue_batcher', 'cuda',
+            'max_len', 'dialogue_batcher', 'cuda', 'lf_vocab',
             'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 
-            'name', 'price_strategy', 'tom_type', 'nlg_module'])
-        self.env = Env(model, vocab, preprocessor, textint_map,
+            'name', 'price_strategy', 'tom_type', 'nlg_module', 'tom_generator', 'tom_model', 'id', 'model_type'])
+        self.env = Env(actor, vocab, preprocessor, textint_map,
             stop_symbol=vocab.to_ind(markers.EOS), remove_symbols=remove_symbols,
             gt_prefix=1,
-            max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda,
+            max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda, lf_vocab=lf_vocab,
             dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
             critic=critic, usetom=(name == 'tom'), name=name,
-            price_strategy=args.price_strategy, tom_type=args.tom_type, nlg_module=nlg_module)
+            price_strategy=args.price_strategy, tom_type=args.tom_type, nlg_module=nlg_module,
+            tom_generator=tom_generator, tom_model=tom, id=id, model_type=model_type)
         # print('usetom?:', (name == 'tom'))
 
     @classmethod

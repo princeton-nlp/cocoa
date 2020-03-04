@@ -90,8 +90,10 @@ class PriceScaler(object):
         p = round(p)
         if isinstance(price, Entity):
             return price._replace(canonical=price.canonical._replace(value=p))
-        else:
+        elif isinstance(price, CanonicalEntity):
             return price._replace(value=p)
+        else:
+            return p
 
     @classmethod
     def _scale_price(cls, kb, p):
@@ -132,7 +134,7 @@ class PriceTracker(object):
         elif isinstance(token, float):
             return token
         else:
-            return None
+            return token
 
     @classmethod
     def process_string(cls, token):

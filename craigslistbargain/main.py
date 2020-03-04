@@ -31,7 +31,7 @@ def build_model(model_opt, opt, mappings, checkpoint, model_path = None):
                                         use_gpu(opt), checkpoint=checkpoint)
     else:
         # print('opt', opt, '\n!!:', model_opt)
-        _mappings, model, model_opt, _critic = model_builder.load_test_model(model_path, opt, model_opt.__dict__)
+        _mappings, model, model_opt = model_builder.load_test_model(model_path, opt, model_opt.__dict__)
 
     if len(opt.gpuid) > 1:
         print('Multi gpu training: ', opt.gpuid)

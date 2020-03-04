@@ -242,6 +242,8 @@ class HistoryEncoder(nn.Module):
     def __init__(self, diaact_size, last_lstm_size, extra_size, embeddings, output_size, hidden_size=64, hidden_depth=2):
         super(HistoryEncoder, self).__init__()
 
+        self.fix_emb = False
+
         self.dia_lstm = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
 
         if embeddings is not None:
@@ -262,7 +264,8 @@ class HistoryEncoder(nn.Module):
 
         if uttr is not None:
             uttr, lengths = uttr
-            uttr = self.uttr_emb(uttr)
+            with torch.set_grad_enabled(not self.fix_emb):
+                uttr = self.uttr_emb(uttr)
             uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
             _, output = self.uttr_lstm(uttr)
 
@@ -287,6 +290,8 @@ class CurrentEncoder(nn.Module):
     def __init__(self, input_size, embeddings, output_size, hidden_size=64, hidden_depth=2):
         super(CurrentEncoder, self).__init__()
 
+        self.fix_emb = False
+
         if embeddings is not None:
 
             uttr_emb_size = embeddings.embedding_dim
@@ -304,8 +309,12 @@ class CurrentEncoder(nn.Module):
         batch_size = extra.shape[0]
 
         if uttr is not None:
-            for i, u in enumerate(uttr):
-                uttr[i] = self.uttr_emb(u).reshape(-1, self.uttr_emb.embedding_dim)
+            uttr = uttr.copy()
+            with torch.set_grad_enabled(not self.fix_emb):
+                for i, u in enumerate(uttr):
+                    if u.dtype != torch.int64:
+                        print('uttr_emb:', uttr)
+                    uttr[i] = self.uttr_emb(u).reshape(-1, self.uttr_emb.embedding_dim)
                 # print(uttr[i].shape)
             uttr = torch.nn.utils.rnn.pack_sequence(uttr, enforce_sorted=False)
             # uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
@@ -391,17 +400,14 @@ class ValueDecoder(nn.Module):
 
 class CurrentModel(nn.Module):
 
-    def __init__(self, encoder, decoder, fix_emb=False):
+    def __init__(self, encoder, decoder, fix_encoder=False):
         super(CurrentModel, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.fix_emb = fix_emb
+        self.fix_encoder = fix_encoder
 
     def forward(self, *input):
-        if self.fix_emb:
-            with torch.no_grad():
-                emb = self.encoder(*input)
-        else:
+        with torch.set_grad_enabled(not self.fix_encoder):
             emb = self.encoder(*input)
         output = self.decoder(emb)
         return output
@@ -409,17 +415,14 @@ class CurrentModel(nn.Module):
 
 class HistoryModel(nn.Module):
 
-    def __init__(self, encoder, decoder, fix_emb=False):
+    def __init__(self, encoder, decoder, fix_encoder=False):
         super(HistoryModel, self).__init__()
         self.encoder = encoder
         self.decoder = decoder
-        self.fix_emb = fix_emb
+        self.fix_encoder = fix_encoder
 
     def forward(self, *input):
-        if self.fix_emb:
-            with torch.no_grad():
-                emb, next_hidden = self.encoder(*input)
-        else:
+        with torch.set_grad_enabled(not self.fix_encoder):
             emb, next_hidden = self.encoder(*input)
         output = self.decoder(emb)
         return output, next_hidden

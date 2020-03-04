@@ -63,7 +63,7 @@ def make_decoder(opt, encoder_size, intent_size, price_action=False, output_valu
     # return PolicyDecoder(encoder_size=encoder_size, intent_size=intent_size)
 
 
-def load_test_model(model_path, opt, dummy_opt):
+def load_test_model(model_path, opt, dummy_opt, model_type='sl'):
     if model_path is not None:
         print('Load model from {}.'.format(model_path))
         checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
@@ -78,27 +78,115 @@ def load_test_model(model_path, opt, dummy_opt):
         model_opt = opt
 
     mappings = read_pickle('{}/vocab.pkl'.format(model_opt.mappings))
-
     # mappings = read_pickle('{0}/{1}/vocab.pkl'.format(model_opt.mappings, model_opt.model))
     mappings = make_model_mappings(model_opt.model, mappings)
 
-    model, critic = make_base_model(model_opt, mappings, use_gpu(opt), checkpoint)
-    model.eval()
-    critic.eval()
-    return mappings, model, model_opt, critic
+    if model_type == 'sl':
+        model = make_sl_model(model_opt, mappings, use_gpu(opt), checkpoint)
+        model.eval()
+
+        return mappings, model, model_opt
+    else:
+        actor, critic, tom = make_rl_model(model_opt, mappings, use_gpu(opt), checkpoint)
+        actor.eval()
+        critic.eval()
+        tom.eval()
+        return mappings, (actor, critic, tom), model_opt
 
 
-def init_model(model, checkpoint, model_opt):
+def select_param_from(params, names):
+    selected = {}
+    for k in params:
+        for name in names:
+            if k.find(name) == 0:
+                selected[k] = params[k]
+                break
+    return selected
+
+
+def transfer_critic_model(model, checkpoint, model_opt, model_name='model'):
+    # Load encoder and init decoder.
+    print('Transfer sl parameters to {}.'.format(model_name))
+    model_dict = model.state_dict()
+    pretrain_dict = select_param_from(checkpoint[model_name], ['encoder'])
+    model_dict.update(pretrain_dict)
+    model.load_state_dict(model_dict)
+    if model_opt.param_init != 0.0:
+        for p in model.decoder.parameters():
+            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+
+
+def transfer_actor_model(model, checkpoint, model_opt, model_name='model'):
+    # Load encoder and init decoder.
+    print('Transfer sl parameters to {}.'.format(model_name))
+    model_dict = model.state_dict()
+    pretrain_dict = select_param_from(checkpoint[model_name], ['encoder', 'decoder.common_net', 'decoder.intent_net'])
+    model_dict.update(pretrain_dict)
+    model.load_state_dict(model_dict)
+
+    if model_opt.param_init != 0.0:
+        for p in model.decoder.price_net.parameters():
+            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+
+def init_model(model, checkpoint, model_opt, model_name='model'):
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:
         print('Loading model parameters.')
-        model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint[model_name])
     else:
         if model_opt.param_init != 0.0:
             print('Intializing model parameters.')
             for p in model.parameters():
                 p.data.uniform_(-model_opt.param_init, model_opt.param_init)
 
+def make_rl_model(model_opt, mappings, gpu, checkpoint=None):
+    intent_size = mappings['lf_vocab'].size
+
+    # Make encoder.
+    # For A&C fix encoder
+    # For ToM using new encoder
+    # Fix embedding
+    src_dict = mappings['utterance_vocab']
+    src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
+    rl_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size)
+    tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size, use_history=True)
+    rl_encoder.fix_emb = True
+    tom_encoder.fix_emb = True
+
+    # Make decoder.
+    tgt_dict = mappings['tgt_vocab']
+    actor_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, price_action=True)
+    critic_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, output_value=True)
+    tom_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size)
+    # print('decoder', decoder)
+
+    actor_model = CurrentModel(rl_encoder, actor_decoder, fix_encoder=True)
+    critic_model = CurrentModel(rl_encoder, critic_decoder, fix_encoder=True)
+
+    tom_model = HistoryModel(tom_encoder, tom_decoder)
+
+    load_from_sl = True
+
+    # First
+    if load_from_sl:
+        transfer_actor_model(actor_model, checkpoint, model_opt, 'model')
+        transfer_critic_model(critic_model, checkpoint, model_opt, 'model')
+        init_model(tom_model, None, model_opt)
+    else:
+        init_model(actor_model, checkpoint, model_opt, 'actor_model')
+        init_model(critic_model, checkpoint, model_opt, 'critic_model')
+        init_model(tom_model, checkpoint, model_opt, 'tom_model')
+
+    if gpu:
+        actor_model.cuda()
+        critic_model.cuda()
+        tom_model.cuda()
+    else:
+        actor_model.cpu()
+        critic_model.cpu()
+        tom_model.cpu()
+
+    return actor_model, critic_model, tom_model
 
 def make_sl_model(model_opt, mappings, gpu, checkpoint=None):
     intent_size = mappings['lf_vocab'].size
@@ -224,28 +312,3 @@ def make_base_model(model_opt, mappings, gpu, checkpoint=None, type='sl'):
         critic.cpu()
 
     return model, critic
-
-
-def make_critic_model(model_opt, mappings, gpu, encoder=None):
-    # Make encoder.
-    if encoder is None:
-        src_dict = mappings['src_vocab']
-        src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
-        encoder = make_encoder(model_opt, src_embeddings, model_opt.hidden_size)
-    # print('encoder', encoder)
-
-    # Make decoder.
-    tgt_dict = mappings['tgt_vocab']
-
-    decoder = make_decoder(model_opt, model_opt.hidden_size, len(tgt_dict), output_value=True)
-    # print('decoder', decoder)
-
-    model = PolicyModel(encoder, decoder)
-
-    # Make the whole model leverage GPU if indicated to do so.
-    if gpu:
-        model.cuda()
-    else:
-        model.cpu()
-
-    return model

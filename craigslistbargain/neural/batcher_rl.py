@@ -123,37 +123,25 @@ class Batch(object):
 
         encoder_extra = encoder_args['extra']
 
-        # if not for_value:
-        target_intent = decoder_args['intent']
-        target_price = decoder_args['price']
-        target_pmask = decoder_args['price_mask']
-        target_pact = decoder_args['price_act']
-        target_prob = decoder_args['prob']
-        # TODO: Get policy mask from the intent
-        policy_mask = np.ones((len(encoder_intent), len(vocab)))
-        offer_idx = vocab.to_ind('offer')
-        acc_idx = vocab.to_ind('accept')
-        rej_idx = vocab.to_ind('reject')
-        none_idx = vocab.to_ind('None')
-        unk_idx = vocab.to_ind('unknown')
-        quit_idx = vocab.to_ind('quit')
-        pad_idx = vocab.to_ind(markers.PAD)
-        start_idx = vocab.to_ind('start')
+        only_run = False
+        if decoder_args is None:
+            only_run = True
 
-        for i in range(len(encoder_intent)):
-            if encoder_intent[i][-1] == offer_idx:
-                policy_mask[i, :] = 0
-                policy_mask[i, [acc_idx, rej_idx]] = 1
-            elif encoder_intent[i][-1] in [acc_idx, rej_idx]:
-                policy_mask[i, :] = 0
-                policy_mask[i, [quit_idx, ]] = 1
-            else:
-                policy_mask[i, [acc_idx, rej_idx, pad_idx, none_idx, unk_idx, quit_idx, start_idx]] = 0
+
+        # if not for_value:
+        if not only_run:
+            target_intent = decoder_args['intent']
+            target_price = decoder_args['price']
+            target_pmask = decoder_args['price_mask']
+            target_pact = decoder_args['price_act']
+            target_prob = decoder_args['prob']
+        else:
+            target_intent, target_price, target_pmask, target_pact, target_prob = None, None, None, None, None
         # else:
         #     self.target_value = decoder_args['value']
 
-        title_inputs = decoder_args['context']['title']
-        desc_inputs = decoder_args['context']['description']
+        # title_inputs = decoder_args['context']['title']
+        # desc_inputs = decoder_args['context']['description']
 
         size = len(encoder_intent)
         context_data = context_data
@@ -180,11 +168,14 @@ class Batch(object):
 
         encoder_extra = cls.to_variable(encoder_extra, 'float', cuda).reshape(-1, 5)
 
+        # if not only_run:
         target_intent = cls.to_variable(target_intent, 'long', cuda)
         # target_intent = cls.int_to_onehot(target_intent, len(vocab))
         target_price = cls.to_variable(target_price, 'float', cuda)
         target_pmask = cls.to_variable(target_pmask, 'float', cuda)
-        policy_mask = cls.to_variable(policy_mask, 'float', cuda)
+        target_pact = cls.to_variable(target_pact, 'long', cuda)
+        target_prob = cls.to_variable(target_prob, 'float', cuda)
+        # policy_mask = cls.to_variable(policy_mask, 'float', cuda)
         # print('ti1, ', self.target_intent)
 
         # Reshape all the tensors except uttr
@@ -367,6 +358,8 @@ class Batch(object):
     def to_tensor(cls, data, dtype, cuda=False):
         if type(data) == np.ndarray:
             data = data.tolist()
+        if data is None or (isinstance(data, list) and data[0] is None):
+            return None
         if dtype == "long":
             tensor = torch.LongTensor(data)
         elif dtype == "float":
@@ -387,6 +380,8 @@ class Batch(object):
 
     @classmethod
     def to_variable(cls, data, dtype, cuda=False):
+        if data is None:
+            return data
         tensor = cls.to_tensor(data, dtype)
         var = Variable(tensor)
         return var.cuda() if cuda else var
@@ -424,12 +419,93 @@ class Batch(object):
         self.encoder_price[:,-1] = 0
 
 
-class RLBatch(Batch):
-    def __init__(self, encoder_args, decoder_args, context_data, vocab, reward, done, cuda=False):
-        # super(RLBatch, self).__init__()
+class RawBatch(Batch):
+
+    def get_pre_info(self, lf_vocab):
+        intent_size = lf_vocab.size
+        sentence, extra = self.state
+        state_length = self.state[0].shape[1] // (intent_size+1)
+        intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
+        prices = extra[:, -2:]
+        intents = list(intents.argmax(dim=1).reshape(-1).numpy())
+        return intents, prices
+
+    def policy_mask(self, vocab):
+        intents, _ = self.get_pre_info(vocab)
+        return self.get_policy_mask(intents, vocab)
+
+    @staticmethod
+    def init_vocab(vocab):
+        if hasattr(RawBatch, 'intent_size'):
+            return
+        RawBatch.offer_idx = vocab.to_ind('offer')
+        RawBatch.acc_idx = vocab.to_ind('accept')
+        RawBatch.rej_idx = vocab.to_ind('reject')
+        RawBatch.none_idx = vocab.to_ind('None')
+        RawBatch.unk_idx = vocab.to_ind('unknown')
+        RawBatch.quit_idx = vocab.to_ind('quit')
+        RawBatch.pad_idx = vocab.to_ind(markers.PAD)
+        RawBatch.start_idx = vocab.to_ind('start')
+        RawBatch.intent_size = len(vocab)
+
+        # print('RB idxes:', RawBatch.offer_idx, RawBatch.acc_idx, RawBatch.rej_idx)
+        # print('RB idxes:', RawBatch.quit_idx, RawBatch.start_idx, RawBatch.none_idx)
+        # exit()
+
+    @staticmethod
+    def get_policy_mask(intents, vocab):
+        # if isinstance(intents, torch.Tensor):
+        RawBatch.init_vocab(vocab)
+        policy_mask = np.ones((len(intents), RawBatch.intent_size))
+
+        for i in range(len(intents)):
+            if intents[i] == RawBatch.offer_idx:
+                policy_mask[i, :] = 0
+                policy_mask[i, [RawBatch.acc_idx, RawBatch.rej_idx]] = 1
+            elif intents[i] in [RawBatch.acc_idx, RawBatch.rej_idx]:
+                policy_mask[i, :] = 0
+                policy_mask[i, [RawBatch.quit_idx, ]] = 1
+            else:
+                policy_mask[i, [RawBatch.acc_idx, RawBatch.rej_idx, RawBatch.pad_idx,
+                                RawBatch.none_idx, RawBatch.unk_idx, RawBatch.quit_idx,
+                                RawBatch.start_idx]] = 0
+        policy_mask = torch.FloatTensor(policy_mask)
+        # print('policy_mask: ', policy_mask)
+        # exit()
+        return policy_mask
+
+    @classmethod
+    def generate(cls, encoder_args, decoder_args, context_data, vocab, cuda=False):
         state, uttr, act, prob \
-            = self.convert_data(encoder_args=encoder_args, decoder_args=decoder_args, context_data=context_data,
+            = cls.convert_data(encoder_args=encoder_args, decoder_args=decoder_args, context_data=context_data,
                      vocab=vocab, cuda=cuda)
+        return cls(state, uttr, act, prob)
+
+    def __init__(self, state, uttr, act, prob):
+        self.state, self.uttr, self.act, self.prob = state, uttr, act, prob
+
+
+class RLBatch(RawBatch):
+
+    def get_pre_info(self, lf_vocab):
+        intent_size = lf_vocab.size
+        sentence, extra = self.state[:, :-5], self.state[:, -5:]
+        state_length = sentence.shape[1] // (intent_size+1)
+        intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
+        prices = extra[:, -2:]
+        intents = list(intents.argmax(dim=1).reshape(-1).numpy())
+        return intents, prices
+
+    @classmethod
+    def from_raw(cls, rawBatch, reward, done):
+        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.state
+        return cls(state, uttr, act, prob, reward, done)
+
+    def __len__(self):
+        return self.state.shape[0]
+
+    def __init__(self, state, uttr, act, prob, reward, done):
+        # super(RLBatch, self).__init__()
         self.state = torch.cat(state, dim=-1)
         self.prob = prob
         self.uttr = uttr
@@ -444,7 +520,42 @@ class RLBatch(Batch):
         self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
 
+class ToMBatch(Batch):
+    @classmethod
+    def from_raw(cls, rawBatch, reward, done):
+        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.state
+        return cls(state, uttr, act, prob, reward, done)
+
+    def get_pre_info(self, lf_vocab):
+        intent_size = lf_vocab.size
+        sentence, extra = self.state, self.extra
+        state_length = sentence.shape[1] // (intent_size+1)
+        intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
+        prices = extra[:, -2:]
+        intents = list(intents.argmax(dim=1).reshape(-1).numpy())
+        return intents, prices
+
+    def __len__(self):
+        return self.state.shape[0]
+
+    def __init__(self, state, uttr, act, prob, reward, done):
+        # super(SLBatch, self).__init__()
+        self.state = state[0]
+        self.extra = state[1]
+        self.uttr = uttr
+        self.act_intent = act[0]
+        self.act_price = act[1]
+        self.act_price_mask = act[3]
+        self.size = state[0].shape[0]
+
+        self.tensor_attributes = ['state', 'extra', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
+
+
 class SLBatch(Batch):
+
+    def __len__(self):
+        return self.state.shape[0]
+
     def __init__(self, encoder_args, decoder_args, context_data, vocab, cuda=False):
         # super(SLBatch, self).__init__()
         state, uttr, act, prob \
@@ -459,22 +570,6 @@ class SLBatch(Batch):
 
         self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
-
-class ToMBatch(Batch):
-    def __init__(self, encoder_args, decoder_args, context_data, vocab, cuda=False):
-        # super(SLBatch, self).__init__()
-        state, uttr, act, prob \
-            = self.convert_data(encoder_args=encoder_args, decoder_args=decoder_args, context_data=context_data,
-                     vocab=vocab, cuda=cuda)
-        self.state = state[0]
-        self.extra = state[1]
-        self.uttr = uttr
-        self.act_intent = act[0]
-        self.act_price = act[1]
-        self.act_price_mask = act[3]
-        self.size = state[0].shape[0]
-
-        self.tensor_attributes = ['state', 'extra', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
 class DialogueBatcher(object):
     def __init__(self, kb_pad=None, mappings=None, model='seq2seq', num_context=2, state_length=2, dia_num=None):
@@ -707,16 +802,16 @@ class DialogueBatcher(object):
         extra = [r + [i/self.dia_num] + encoder_price[j][-2:] for j, r in enumerate(roles)]
         encoder_args['extra'] = extra
             # encoder_args['dia_num'] = [i / self.dia_num] * len(encoder_intent)
-
+        # if price_actions['price_act'] is not None:
+        #     print('priceactions', price_actions)
         decoder_args = {
                 'intent': target_intent,
                 'price': target_price,
                 'price_mask': target_price_mask,
+                'price_act': price_actions['price_act'],
+                'prob': price_actions['prob'],
                 'context': kb_context,
                 }
-
-        decoder_args['price_act'] = price_actions['price_act']
-        decoder_args['prob'] = price_actions['prob']
 
         context_data = {
                 'encoder_tokens': encoder_tokens,

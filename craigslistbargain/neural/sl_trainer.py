@@ -103,13 +103,17 @@ class Weighted_MSELoss(nn.Module):
 class SimpleLoss(nn.Module):
     debug = False
 
-    def __init__(self, inp_with_sfmx=False):
+    def __init__(self, inp_with_sfmx=False, use_pact=False):
         super(SimpleLoss, self).__init__()
         if inp_with_sfmx:
             self.criterion_intent = nn.NLLLoss()
         else:
             self.criterion_intent = nn.CrossEntropyLoss(reduction='none')
-        self.criterion_price = Weighted_MSELoss()
+        self.use_pact = use_pact
+        if use_pact:
+            self.criterion_price = self.criterion_intent
+        else:
+            self.criterion_price = Weighted_MSELoss()
         self.use_nll = inp_with_sfmx
 
     def _get_correct_num(self, enc_policy, tgt_intents):
@@ -126,8 +130,10 @@ class SimpleLoss(nn.Module):
             pmask = torch.ones_like(tgt_price)
         alpha = 1
         tgt_policy = tgt_policy.reshape(-1)
+        tgt_price = tgt_price.reshape(-1)
         # print('intent error:', enc_policy, tgt_policy)
         loss0 = self.criterion_intent(enc_policy, tgt_policy)
+        # print('loss1: ', enc_price.shape, tgt_price.shape)
         loss1 = self.criterion_price(enc_price, tgt_price).mul(pmask)
         # if SimpleLoss.debug and torch.mean(tgt_price).item() != 1:
         #     print('compaire', torch.cat([enc_price, tgt_price],dim=1))
@@ -386,6 +392,9 @@ class SLTrainer(BaseTrainer):
         # Add critic in checkpoint
         if hasattr(self, 'critic'):
             checkpoint['critic'] = self.critic.state_dict()
+
+        if hasattr(self, 'tom'):
+            checkpoint['tom'] = self.tom.state_dict()
 
         path = self.checkpoint_path(epoch, opt, valid_stats)
         create_path(path)

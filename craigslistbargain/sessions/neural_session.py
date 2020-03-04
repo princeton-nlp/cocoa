@@ -11,7 +11,8 @@ from cocoa.core.entity import is_entity, Entity, CanonicalEntity
 from core.event import Event
 from .session import Session
 from neural.preprocess import markers, Dialogue
-from neural.batcher_rl import RLBatch, ToMBatch
+from neural.batcher_rl import RLBatch, ToMBatch, RawBatch
+from .tom_model import ToMModel
 import copy
 import time
 import json
@@ -24,6 +25,7 @@ class NeuralSession(Session):
         self.builder = env.utterance_builder
         self.generator = env.dialogue_generator
         self.cuda = env.cuda
+
 
         # utterance generator
         self.uttr_gen = env.nlg_module.gen
@@ -38,7 +40,7 @@ class NeuralSession(Session):
         # min/expect
         # price strategy: high/low/decay
         self.tom_type = env.tom_type
-        self.price_strategy_distribution = {'low': 0.4, 'high': 0.4, 'decay': 0.2}
+        self.price_strategy_distribution = {'insist': 0.5, 'decay': 0.5}
         self.price_strategy = env.price_strategy
         self.acpt_range = [0.4, 1]
 
@@ -49,9 +51,13 @@ class NeuralSession(Session):
             self.tom = True
             self.critic = env.critic
             self.model = env.model
+            self.tom_model = ToMModel(agent, kb, env)
+        if env.name == 'pt-neural-r':
+            self.sample_price_strategy()
 
     def sample_price_strategy(self):
-        ps, p = list(zip(*self.price_strategy_distribution))
+        ps = list(self.price_strategy_distribution.keys())
+        p = [self.price_strategy_distribution[s] for s in ps]
         self.price_strategy = np.random.choice(ps, p=p)
 
     def set_controller(self, controller):
@@ -86,7 +92,7 @@ class NeuralSession(Session):
         #     print(">>> received sentence", event.metadata["real_uttr"])
 
         # Empty message
-        if utterance is None:
+        if lf is None:
             return
 
         #print 'receive:', utterance
@@ -96,8 +102,9 @@ class NeuralSession(Session):
 
         # utterance_int = self.env.textint_map.text_to_int(utterance)
         # state['action'] = utterance_int[0]
-        state = None
         # print(event.agent, self.dialogue.agent)
+        if lf.get('intent') is None:
+            print('lf i is None: ', lf)
         if another_dia is None:
             self.dialogue.add_utterance(event.agent, utterance, lf=lf)
         else:
@@ -118,21 +125,21 @@ class NeuralSession(Session):
         return s
 
     def _intent_ind2word(self, ind):
-        return self.env.vocab.to_word(ind)
+        return self.env.lf_vocab.to_word(ind)
 
     def _to_event(self, utterance, lf, output_data):
         intent = lf.get('intent')
-        intent = self.env.vocab.to_word(intent)
+        intent = self.env.lf_vocab.to_word(intent)
         metadata = {**lf, 'output_data': output_data}
         metadata_nolf = {'output_data': output_data}
         if intent == markers.OFFER:
-            return self.offer(lf, metadata_nolf)
+            return self.offer('offer', metadata)
         elif intent == markers.ACCEPT:
-            return self.accept(metadata=metadata_nolf)
+            return self.accept(metadata=metadata)
         elif intent == markers.REJECT:
-            return self.reject(metadata=metadata_nolf)
+            return self.reject(metadata=metadata)
         elif intent == markers.QUIT:
-            return self.quit(metadata=metadata_nolf)
+            return self.quit(metadata=metadata)
         return self.message(utterance, metadata=metadata)
 
     def _tokens_to_event(self, tokens, output_data, semi_event=False):
@@ -160,7 +167,7 @@ class NeuralSession(Session):
             return tokens
 
         if isinstance(tokens[0], int):
-            tokens[0] = self.env.vocab.to_word(tokens[0])
+            tokens[0] = self.env.lf_vocab.to_word(tokens[0])
 
 
         if len(tokens) > 1 and tokens[0] == markers.OFFER and is_entity(tokens[1]):
@@ -193,7 +200,7 @@ class NeuralSession(Session):
         real_uttr = self.uttr_gen(tokens, role, category)
         # print(">>> sender's uttr: ", real_uttr)
 
-        return self.message(s, metadata={"output_data": output_data, "real_uttr": real_uttr})
+        return self.message(real_uttr, metadata={"output_data": output_data})
 
     def get_value(self, all_events):
         all_dia = []
@@ -288,18 +295,24 @@ class NeuralSession(Session):
         return values
 
     def _to_real_price(self, price):
+        if price is None: return None
         return self.builder.get_price_number(price, self.kb)
 
     def _raw_token_to_lf(self, tokens):
+        if tokens[-1] is None:
+            tokens = tokens[:-1]
         if len(tokens) > 1:
             price = self._to_real_price(tokens[1])
+            # print('rt price', tokens[1], type(tokens[1]), price)
             return {'intent': tokens[0], 'price': price}
         return {'intent': tokens[0]}
 
     def _lf_to_utterance(self, lf):
         role = self.kb.facts['personal']['Role']
         category = self.kb.facts['item']['Category']
-        utterance = self.uttr_gen(lf, role, category)
+        tmplf = lf.copy()
+        tmplf['intent'] = self.env.lf_vocab.to_word(tmplf['intent'])
+        utterance = self.uttr_gen(tmplf, role, category)
         return utterance
 
     def tom_inference(self, tokens, output_data):
@@ -462,10 +475,16 @@ class NeuralSession(Session):
         lf = self._raw_token_to_lf(tokens)
         utterance = self._lf_to_utterance(lf)
 
-        self.dialogue.add_utterance(self.agent, utterance, lf=lf)
+        event = self._to_event(utterance, lf, output_data)
+        uttr = self.env.preprocessor.process_event(event, self.kb)
+        if uttr is None:
+            print('event', event.action, event.metadata)
+
+        price_act = {'price_act': output_data.get('price_act'), 'prob': output_data.get('prob')}
+        self.dialogue.add_utterance(self.agent, uttr, lf=lf, price_act=price_act)
         # print('tokens', tokens)
 
-        return self._to_event(utterance, lf, output_data)
+        return event
         # return self._tokens_to_event(tokens, output_data)
 
 
@@ -481,17 +500,16 @@ class NeuralSession(Session):
         #     print(self.dialogue.agents[i], t)
         # print('')
         self.convert_to_int()
-        batches = self.batcher.create_batch([self.dialogue], for_value=True)
+        batches = self.batcher.create_batch([self.dialogue])
         # print('number of batches: ', len(batches))
         yield len(batches)
         for batch in batches:
             # TODO: this should be in batcher
-            batch = RLBatch(batch['encoder_args'],
+            batch = RawBatch.generate(batch['encoder_args'],
                           batch['decoder_args'],
                           batch['context_data'],
-                          self.env.vocab,
-                          num_context=Dialogue.num_context, cuda=self.env.cuda,
-                          for_value=batch['for_value'])
+                          self.env.lf_vocab,
+                          cuda=self.env.cuda,)
             yield batch
 
 
@@ -499,9 +517,10 @@ class PytorchNeuralSession(NeuralSession):
     def __init__(self, agent, kb, env):
         super(PytorchNeuralSession, self).__init__(agent, kb, env)
         self.vocab = env.vocab
-        self.quit_idx = self.vocab.to_ind('quit')
-        self.acc_idx = self.vocab.to_ind('accept')
-        self.rej_idx = self.vocab.to_ind('reject')
+        self.lf_vocab = env.lf_vocab
+        self.quit_idx = self.lf_vocab.to_ind('quit')
+        self.acc_idx = self.lf_vocab.to_ind('accept')
+        self.rej_idx = self.lf_vocab.to_ind('reject')
 
         self.new_turn = False
         self.end_turn = False
@@ -522,84 +541,130 @@ class PytorchNeuralSession(NeuralSession):
             dias = [self.dialogue]
         else:
             dias = other_dia
-        encoder_turns = self.batcher._get_turn_batch_at(dias, Dialogue.ENC, -1, step_back=self.batcher.state_length,
-                                                        attached_events=attached_events)
 
-        encoder_tokens = self.batcher._get_turn_batch_at(dias, Dialogue.TOKEN, -1)
+        LF, TOKEN, PACT = Dialogue.LF, Dialogue.TOKEN, Dialogue.PACT
+        ROLE = Dialogue.ROLE
 
-        encoder_inputs = self.batcher.get_encoder_inputs(encoder_turns)
-        # print('intent in sess: ', encoder_inputs[0])
-        # encoder_context = self.batcher.get_encoder_context(encoder_turns, num_context)
+        encoder_turns = self.batcher._get_turn_batch_at(dias, LF, -1, step_back=self.batcher.state_length)
+        # print('encoder_turns', encoder_turns)
+        encoder_tokens = self.batcher._get_turn_batch_at(dias, TOKEN, -1)
+        roles = self.batcher._get_turn_batch_at(dias, ROLE, -1)
+
+        encoder_intent, encoder_price, encoder_price_mask = self.batcher.get_encoder_inputs(encoder_turns)
+
         encoder_args = {
-                        'intent': encoder_inputs[0],
-                        'price': encoder_inputs[1],
-                        'price_mask': encoder_inputs[2],
-                        'tokens': encoder_tokens,
-                        # 'context': encoder_context
-                    }
+            'intent': encoder_intent,
+            'price': encoder_price,
+            'price_mask': encoder_price_mask,
+            'tokens': encoder_tokens,
+        }
+        if attached_events is not None:
+            i = len(dias[0].lf_turns)+1
+        else:
+            i = len(dias[0].lf_turns)
+        extra = [r + [i / self.batcher.dia_num] + encoder_price[j][-2:] for j, r in enumerate(roles)]
+        encoder_args['extra'] = extra
+        # encoder_args['dia_num'] = [i / self.dia_num] * len(encoder_intent)
 
-
-        roles = self.batcher._get_turn_batch_at(dias, Dialogue.ROLE, -1,
-                                                attached_events=attached_events)
-        if self.batcher.dia_num:
-            for a in roles:
-                if attached_events is not None:
-                    a.append(len(dias[0].lfs)+1 / self.batcher.dia_num)
-                else:
-                    a.append(len(dias[0].lfs) / self.batcher.dia_num)
-            encoder_args['dia_num'] = roles
-            # encoder_args['dia_num'] = [len(dias[0].lfs) / self.batcher.dia_num] * len(encoder_inputs[0])
-
-        decoder_args = {
-                        'intent': encoder_inputs[0],
-                        'price': encoder_inputs[1],
-                        'price_mask': encoder_inputs[2],
-                        'context': self.kb_context_batch,
-                    }
+        decoder_args = None
 
         context_data = {
-                'encoder_tokens': encoder_tokens,
-                'agents': [self.agent],
-                'kbs': [self.kb],
-                }
-        # print('[self.vocab]: ', self.vocab)
-        return Batch(encoder_args, decoder_args, context_data,
-                self.vocab, num_context=num_context, cuda=self.cuda)
+            'encoder_tokens': encoder_tokens,
+            'agents': [self.agent],
+            'kbs': [self.kb],
+        }
+        return RawBatch.generate(encoder_args, decoder_args, context_data,
+                self.lf_vocab, cuda=self.cuda)
 
     def generate(self, temperature=1, is_fake=False, acpt_range=None):
         if len(self.dialogue.agents) == 0:
             self.dialogue._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
             # TODO: Need we add an empty state?
         batch = self._create_batch()
+        rlbatch = RLBatch.from_raw(batch, None, None)
 
-        output_data = self.generator.generate_batch(batch, enc_state=None, whole_policy=is_fake,
+        intents, prices = batch.get_pre_info(self.lf_vocab)
+
+        # get acpt_range
+        if self.env.name == 'pt-neural-r':
+            factor = batch.state[1][0, -3].item()
+            if self.price_strategy == 'insist':
+                acpt_range = [1., 0.7]
+            elif self.price_strategy == 'decay':
+                prange = [1., 0.4]
+                p = prange[0]*(factor) + prange[1]*(1-factor)
+                acpt_range = [1., p-0.1]
+            elif self.price_strategy == 'persuaded':
+                acpt_range = [1., prices[0, 0].item()]
+
+        output_data = self.generator.generate_batch(rlbatch, enc_state=None, whole_policy=is_fake,
                                                     temperature=temperature, acpt_range=acpt_range)
+
         # SL Agent with rule-based price action
         if self.env.name == 'pt-neural-r' and self.price_strategy != 'neural' and output_data['price'] is not None:
-            # TODO: what is the range of price?
             # print(output_data['price'])
-            oldp = output_data['price'].item()
-            prange = [0,1]
+            oldp = output_data['price']
+            if isinstance(oldp, int):
+                print('oldp error')
+                exit()
+            prange = [0, 1]
             prange = acpt_range
+            step = 1./5
 
             # Decay till 1/2 max_length
-            factor = batch.encoder_dianum[0, -1].item()
-            factor = max(1, factor*2)
+            factor = batch.state[1][0, -3].item()
+            o_factor = factor
+            factor = max(1., factor*2)
 
-            if self.price_strategy == 'high':
-                prange = [0.7, 0.7+0.3]
-                p = prange[0]*(factor) + prange[1]*(1-factor)
-            elif self.price_strategy == 'low':
-                prange = [0.2, 0.2+0.3]
+            if self.price_strategy == 'insist':
+                prange = [1., 1.]
                 p = prange[0]*(factor) + prange[1]*(1-factor)
             elif self.price_strategy == 'decay':
-                prange = [0.4, 0.4+0.3]
+                prange = [1., 0.4]
                 p = prange[0]*(factor) + prange[1]*(1-factor)
+            elif self.price_strategy == 'persuaded':
+                prange = [1., 0.4]
+                if o_factor < 1:
+                    # decay
+                    p = prices[0, 0].item() - step*(prange[0]-prange[1])
+                else:
+                    p = prices[0, 0].item()
             else:
+                p = oldp
                 print('Unknown price strategy: ', self.price_strategy)
                 assert NotImplementedError()
-            output_data['price'] = output_data['price'] * (p / oldp)
+
+            if isinstance(p, int):
+                print('p is int')
+            p = max(p, prices[0, 1].item())
+            output_data['price'] = p
             # print('after:', p, output_data['price'])
+        if self.env.name != 'pt-neural-r':
+            # Using pact
+            # 0: insist, 3: decay 0.1, 2: half of last price, 1: agree
+            p_act = output_data['original_price']
+            p = 1
+            if p_act == 0:
+                # insist
+                p = prices[0, 0].item()
+            elif p_act == 1:
+                p = prices[0, 1].item()
+            elif p_act == 2:
+                p = (prices[0, 0].item() + prices[0,1].item())/2
+            elif p_act == 3:
+                p = prices[0, 0].item()-0.1
+            else:
+                print('what\'s wrong?', p_act)
+            p = max(p, prices[0, 1].item())
+
+            output_data['original_price'] = p
+            if output_data['price'] is not None:
+                output_data['price'] = p
+            output_data['price_act'] = p_act
+
+
+        if isinstance(output_data['price'], int):
+            print('op is int', prices.dtype, self.env.name, self.price_strategy)
 
         entity_tokens = self._output_to_tokens(output_data)
 
@@ -614,26 +679,21 @@ class PytorchNeuralSession(NeuralSession):
 
     def _output_to_tokens(self, data):
         # print(data['intent'], data['price'])
-        not_pytorch = False
-        if isinstance(data["intent"], int):
-            not_pytorch = True
-
-        if not_pytorch:
+        if isinstance(data['intent'], int):
             predictions = [data["intent"]]
-        else:
+        elif isinstance(data['intent'], torch.Tensor):
             predictions = [data["intent"].item()]
+
         if data.get('price') is not None:
-            if not_pytorch:
-                p = data['price']
-            else:
-                p = data['price'].item()
+            p = data['price']
             p = max(p, 0.0)
             p = min(p, 1.0)
             predictions += [p]
         else:
             predictions += [None]
 
-        tokens = self.builder.build_target_tokens(predictions, self.kb)
+        # tokens = self.builder.build_target_tokens(predictions, self.kb)
+        # print('out_to_tokens', predictions, tokens)
         # print('converting to tokens: {} -> {}'.format(predictions, tokens))
-        return tokens
+        return predictions
 

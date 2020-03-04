@@ -39,7 +39,7 @@ class Controller(BaseController):
 
     def event_callback(self, event):
         if event.action == 'offer':
-            self.offers[event.agent] = event.data
+            self.offers[event.agent] = event.metadata
         elif event.action == 'accept':
             self.outcomes[event.agent] = True
         elif event.action == 'reject':

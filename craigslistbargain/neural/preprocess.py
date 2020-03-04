@@ -173,8 +173,9 @@ class Dialogue(object):
     def process_lf(self, lf_raw):
         intent, price = lf_raw.get('intent'), lf_raw.get('price')
         if intent is not None:
-            if self.lfint_map is not None:
-                intent = self.lfint_map.vocab.to_ind(intent)
+            if isinstance(intent, str):
+                if self.lfint_map is not None:
+                    intent = self.lfint_map.vocab.to_ind(intent)
 
         if price is not None:
             price = PriceScaler.scale_price(self.kb, price)
@@ -187,11 +188,14 @@ class Dialogue(object):
         if len(self.agents) == 0 and agent == self.agent:
             self._add_utterance(1 - self.agent, [], lf=self.lf_empty(), price_act={})
         # Try to process lf from utterance
-        if lf is None:
-            lf = self.process_lf(utterance)
+        # if lf is None:
+        #     lf = self.process_lf(utterance)
         if lf is []:
             print('[] case: ', utterance, lf)
             assert True
+
+        if price_act is None and lf.get('output_data') is not None:
+            price_act = lf['output_data'].get('price_act')
         lf = self.process_lf(lf)
         # print("lf {}".format(lf))
         self._add_utterance(agent, utterance, lf=lf, price_act=price_act)
@@ -592,11 +596,11 @@ class Preprocessor(object):
             else:
                 return None
         elif e.action == 'offer':
-            data = e.data['price']
+            data = e.metadata['price']
             if data is None:
                 return None
-            price = PriceScaler._scale_price(kb, data)
-            entity_tokens = [markers.OFFER, self.price_to_entity(price)]
+            # price = PriceScaler._scale_price(kb, data)
+            entity_tokens = [markers.OFFER]
             return entity_tokens
         elif e.action == 'quit':
             entity_tokens = [markers.QUIT]
