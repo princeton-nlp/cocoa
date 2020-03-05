@@ -447,6 +447,7 @@ class RawBatch(Batch):
         RawBatch.pad_idx = vocab.to_ind(markers.PAD)
         RawBatch.start_idx = vocab.to_ind('start')
         RawBatch.intent_size = len(vocab)
+        RawBatch.extra_size = 5 # Role | num | last_prices
 
         # print('RB idxes:', RawBatch.offer_idx, RawBatch.acc_idx, RawBatch.rej_idx)
         # print('RB idxes:', RawBatch.quit_idx, RawBatch.start_idx, RawBatch.none_idx)
@@ -498,7 +499,7 @@ class RLBatch(RawBatch):
 
     @classmethod
     def from_raw(cls, rawBatch, reward, done):
-        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.state
+        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.prob
         return cls(state, uttr, act, prob, reward, done)
 
     def __len__(self):
@@ -522,9 +523,11 @@ class RLBatch(RawBatch):
 
 class ToMBatch(Batch):
     @classmethod
-    def from_raw(cls, rawBatch, reward, done):
-        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.state
-        return cls(state, uttr, act, prob, reward, done)
+    def from_raw(cls, rawBatch, strategy):
+        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.prob
+        # print('i_s:', -(RawBatch.intent_size+1)*2)
+        state = (state[0][:, -(RawBatch.intent_size+1)*2:], state[1])
+        return cls(state, uttr, act, strategy)
 
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
@@ -538,7 +541,7 @@ class ToMBatch(Batch):
     def __len__(self):
         return self.state.shape[0]
 
-    def __init__(self, state, uttr, act, prob, reward, done):
+    def __init__(self, state, uttr, act, strategy):
         # super(SLBatch, self).__init__()
         self.state = state[0]
         self.extra = state[1]
@@ -546,9 +549,12 @@ class ToMBatch(Batch):
         self.act_intent = act[0]
         self.act_price = act[1]
         self.act_price_mask = act[3]
+        self.strategy = strategy
         self.size = state[0].shape[0]
 
-        self.tensor_attributes = ['state', 'extra', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
+        self.strategy = self.to_tensor(strategy, 'long', cuda=self.state.device.type!='cpu')
+
+        self.tensor_attributes = ['state', 'extra', 'uttr', 'act_intent', 'act_price', 'act_price_mask', 'strategy']
 
 
 class SLBatch(Batch):

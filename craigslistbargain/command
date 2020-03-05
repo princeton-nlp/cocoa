@@ -12,6 +12,20 @@ PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-ex
 --cache cache/language --ignore-cache \
 --verbose  --state-length 4 --dia-num 20 --use-utterance --hidden-size 128
 
+# tom_itentity_test
+PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
+--scenarios-path data/train-scenarios.json \
+--valid-scenarios-path data/dev-scenarios.json \
+--price-tracker data/price_tracker.pkl \
+--agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
+--model-path checkpoint/a2c --mappings mappings/language \
+--optim adagrad --learning-rate 0.01 \
+--agents pt-neural pt-neural-r \
+--report-every 50 --max-turns 20 --num-dialogues 10 \
+--sample --temperature 0.5 --max-length 20 --reward margin \
+--dia-num 20 --state-length 4 --epochs 10 \
+--model lf2lf --model-type a2c --name identity --identity-test
+
 # With utterance as input:
 * --use-utterance
 * --bert-model-path [path] (optional, if pretrain model saved)

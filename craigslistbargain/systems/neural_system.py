@@ -15,6 +15,7 @@ from neural.preprocess import markers, TextIntMap, Preprocessor, Dialogue
 from neural.batcher_rl import DialogueBatcherFactory
 from neural.utterance import UtteranceBuilder
 from neural.nlg import IRNLG
+from neural.batcher_rl import RawBatch
 import options
 
 
@@ -96,6 +97,8 @@ class PytorchNeuralSystem(System):
         Dialogue.lfint_map = lfint_map
         Dialogue.mappings = mappings
         Dialogue.num_context = model_args.num_context
+
+        RawBatch.init_vocab(lf_vocab)
 
 
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',

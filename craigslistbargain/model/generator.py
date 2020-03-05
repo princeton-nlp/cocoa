@@ -30,7 +30,7 @@ class Templates(BaseTemplates):
 
     def add_template(self, utterance, dialogue_state):
         if self.finalized:
-            print 'Cannot add templates.'
+            print('Cannot add templates.')
             return
         if not utterance.template or self.ambiguous_template(utterance.template):
             return
@@ -55,12 +55,12 @@ class Templates(BaseTemplates):
             category, role, context_tag, response_tag = group
             if response_tag == 'offer':
                 continue
-            print '='*40
-            print 'category={}, role={}, context={}, response={}'.format(category, role, context_tag, response_tag)
-            print '='*40
+            print('='*40)
+            print('category={}, role={}, context={}, response={}'.format(category, role, context_tag, response_tag))
+            print('='*40)
             rows = [x[1] for x in df.get_group(group).iterrows()]
             #rows = sorted(rows, key=lambda r: r['count'], reverse=True)
             for i, row in enumerate(rows):
                 if i == n:
                     break
-                print row['template'].encode('utf-8')
+                print(row['template'].encode('utf-8'))

@@ -20,6 +20,7 @@ class ToMModel(object):
 
     def __init__(self, agent, kb, env):
         self.agent = agent
+        self.env = env
         self.kb = kb
         self.generator = env.tom_generator
         self.gt_session = None
@@ -30,7 +31,6 @@ class ToMModel(object):
     def estimate(self, uttr, lf):
         self.update_dialogue(uttr, lf)
         # ...
-
 
         self.recover_dialogue()
 

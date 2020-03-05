@@ -90,6 +90,7 @@ if __name__ == '__main__':
                         help='directory of templates for IR-based NLG')
 
     parser.add_argument('--get-dialogues', default=False, action='store_true')
+    parser.add_argument('--identity-test', default=False, action='store_true')
 
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
@@ -99,8 +100,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dump_args()
-
-    if args.debug:
+    if args.identity_test:
+        # Single thread
+        print('[Info] Running in debug mode for identity test.')
+        manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
+        manager.learn_identity()
+    elif args.debug:
         # Single thread
         print('[Info] Running in debug mode.')
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)

@@ -56,7 +56,7 @@ def make_decoder(opt, encoder_size, intent_size, price_action=False, output_valu
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     if output_value:
-        return SinglePolicy(encoder_size, 1, num_layer=2)
+        return SinglePolicy(encoder_size, intent_size, num_layer=2)
     if price_action:
         return MixedPolicy(encoder_size, intent_size, 4)
     return MixedPolicy(encoder_size, intent_size, 1)
@@ -156,14 +156,17 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None):
     # Make decoder.
     tgt_dict = mappings['tgt_vocab']
     actor_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, price_action=True)
-    critic_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, output_value=True)
-    tom_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size)
+    critic_decoder = make_decoder(model_opt, model_opt.hidden_size, 1, output_value=True)
+    # tom_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size)
+    tom_decoder = make_decoder(model_opt, model_opt.hidden_size, 2, output_value=True)
     # print('decoder', decoder)
 
     actor_model = CurrentModel(rl_encoder, actor_decoder, fix_encoder=True)
     critic_model = CurrentModel(rl_encoder, critic_decoder, fix_encoder=True)
 
     tom_model = HistoryModel(tom_encoder, tom_decoder)
+    #TODO: use for tom_identity test
+    # tom_model = make_encoder(model_opt, src_embeddings, intent_size, 2, use_history=True)
 
     load_from_sl = True
 

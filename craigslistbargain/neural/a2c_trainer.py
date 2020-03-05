@@ -14,7 +14,7 @@ from .utterance import UtteranceBuilder
 
 from tensorboardX import SummaryWriter
 
-from neural.batcher_rl import RLBatch, RawBatch
+from neural.batcher_rl import RLBatch, RawBatch, ToMBatch
 
 from neural.rl_trainer import RLTrainer as BaseTrainer
 from neural.sl_trainer import Statistics, SimpleLoss
@@ -106,12 +106,63 @@ class RLTrainer(BaseTrainer):
         self.tom = agents[training_agent].env.tom_model
         self.model_type = args.model_type
         self.use_utterance = False
+        self.tom_identity_loss = torch.nn.NLLLoss(reduction='none')
 
     def _run_batch_a2c(self, batch):
         value = self._run_batch_critic(batch)
         policy, price = self._run_batch(batch)
         # print('max price', torch.max(price))
         return value, policy, price
+
+    def _run_batch_tom_identity(self, batch, hidden_state):
+        predictions, next_hidden = self.tom(batch.state, None, batch.extra, hidden_state)
+        return predictions, next_hidden
+
+    def _tom_gradient_accumulation(self, batch_iter, strategy, model, ):
+        model.train()
+
+        h = None
+        preds = []
+        for i, batch in enumerate(batch_iter):
+            tom_batch = ToMBatch.from_raw(batch, strategy)
+            pred, h = self._run_batch_tom_identity(tom_batch, hidden_state=h)
+            preds.append(pred.reshape(1, -1))
+
+        preds = torch.cat(preds, dim=0)
+        strategy = torch.LongTensor([strategy]*preds.shape[0], device=preds.device)
+        # print('preds&label: ',preds, strategy)
+        loss = self.tom_identity_loss(preds, strategy)
+        accu = torch.gather(torch.softmax(preds, dim=1), 1, strategy.reshape(-1, 1))
+        # (-1,), (-1, 1) -> (-1,) *2
+        # print('loss & accu:', loss, accu)
+        return loss, accu.reshape(-1)
+
+    def update_tom(self, args, batch_iters, strategy, model, update_model=True):
+        # print('optim', type(self.optim['tom']))
+        model.zero_grad()
+        loss = []
+        step_loss = [[] for i in range(20)]
+        step_accu = [[] for i in range(20)]
+        for i, b in enumerate(batch_iters):
+            l, a = self._tom_gradient_accumulation(b, strategy[i], model)
+            loss.append(l)
+            for j in range(l.shape[0]):
+                step_loss[j].append(l[j].item())
+                step_accu[j].append(a[j].item())
+
+        loss = torch.cat(loss, dim=0).mean()
+
+        step_num = [len(d) for d in step_loss]
+        step_loss = [torch.FloatTensor(d).mean().item() for d in step_loss]
+        step_accu = [torch.FloatTensor(d).mean().item() for d in step_accu]
+
+        # update
+        if update_model:
+            loss.backward()
+            self.optim['tom'].step()
+
+
+        return loss.item(), (step_loss, step_accu, step_num)
 
     def _gradient_accumulation(self, batch_iter, reward, model, critic, discount=0.95):
         # Compute losses
@@ -390,6 +441,7 @@ class RLTrainer(BaseTrainer):
         _rewards = [[], []]
         examples = []
         verbose_strs = []
+        strategies = [[], []]
 
         dialogue_batch = [[], []]
         for j in range(real_batch):
@@ -413,6 +465,7 @@ class RLTrainer(BaseTrainer):
                 rewards[session_id] = reward
                 s_rewards[session_id] = s_reward
                 _rewards[session_id].append(reward)
+                strategies[session_id].append(session.price_strategy_label)
 
             for session_id, session in enumerate(controller.sessions):
                 # dialogue_batch[session_id].append(session.dialogue)
@@ -432,7 +485,7 @@ class RLTrainer(BaseTrainer):
                     print(s)
             verbose_strs.append(verbose_str)
 
-        return _batch_iters, _rewards, examples, verbose_strs
+        return _batch_iters, (_rewards, strategies), examples, verbose_strs
 
     def learn(self, args):
         rewards = [None]*2

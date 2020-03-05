@@ -236,6 +236,28 @@ class MultilayerPerceptron(nn.Module):
     def forward(self, input):
         return self.hidden_layers(input)
 
+class HistoryIdentity(nn.Module):
+
+    def __init__(self, diaact_size, last_lstm_size, extra_size, embeddings, output_size, hidden_size=64, hidden_depth=2):
+        super(HistoryIdentity, self).__init__()
+
+        self.fix_emb = False
+
+        self.dia_lstm = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
+
+        if embeddings is not None:
+            uttr_emb_size = embeddings.embedding_dim
+            self.uttr_lstm = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+
+            hidden_input = hidden_size + hidden_size + extra_size
+
+        else:
+            hidden_input = hidden_size + extra_size
+
+        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth)
+
+    def forward(self, diaact, extra, lasthidden):
+        return
 
 class HistoryEncoder(nn.Module):
 

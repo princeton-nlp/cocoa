@@ -69,6 +69,9 @@ class MultiRunner:
         # optim = build_optim(args, [model, system.env.critic], None)
         optim = {'model': build_optim(args, model, None),
                  'critic': build_optim(args, system.env.critic, None)}
+        if system.env.tom_model is not None:
+            optim['tom'] = build_optim(args, system.env.tom_model, None)
+            optim['tom']._set_rate(0.01)
         optim['critic']._set_rate(0.05)
 
         scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
@@ -138,6 +141,17 @@ class MultiRunner:
         env = self.systems[model_idx].env
         return env.model.state_dict(), env.critic.state_dict()
 
+    def train_tom(self, model_idx, batch_iters, strategy):
+        env = self.systems[model_idx].env
+        train_loss = self.trainer.update_tom(self.args, batch_iters, strategy, env.tom_model)
+        return train_loss
+
+    def valid_tom(self, model_idx, batch_iters, strategy):
+        env = self.systems[model_idx].env
+        valid_loss = self.trainer.update_tom(self.args, batch_iters, strategy, env.tom_model, update_model=False)
+        return valid_loss
+
+
     def send(self, cmd):
         if cmd[0] == 'quit':
             return
@@ -190,6 +204,31 @@ class MultiRunner:
             self.save_model(pickle.loads(cmd[1]))
             return ['done']
             # self.conn.send(['done'])
+
+        else:
+            # Using Universal Formation
+            if len(cmd) < 2:
+                cmd.append([])
+            else:
+                cmd[1] = pickle.loads(cmd[1])
+            if len(cmd) < 3:
+                cmd.append({})
+            else:
+                cmd[2] = pickle.load(cmd[2])
+
+            # try:
+            ret = getattr(self, cmd[0])(*cmd[1], **cmd[2])
+            status = 'done'
+            ret_data = ret
+            # except Exception as e:
+            #     status = 'failed'
+            #     print('[failed] ', e)
+            #     ret_data = str(e)
+
+            ret_data = pickle.dumps(ret_data)
+            return [status, ret_data]
+
+
 
 class MultiManager():
     def __init__(self, num_cpu, args, worker_class):
@@ -252,6 +291,7 @@ class MultiManager():
                 self.writer.add_scalar('agent{}/intent_loss'.format(j), tmp[4], ii)
                 self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[5], ii)
                 self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
+        self.writer.flush()
 
     def _draw_tensorboard_valid(self, ii, all_rewards):
         for j in range(2):
@@ -279,6 +319,57 @@ class MultiManager():
                     f.write(s + '\n')
         with open(path_pkl, 'wb') as f:
             pickle.dump(examples, f)
+
+    def learn_identity(self):
+
+        args = self.args
+        save_every = 100
+
+        batch_size = 100
+        if args.only_run:
+            batch_size = 1
+
+        num_worker = self.update_worker_list()
+        worker = self.worker_conn[0]
+        train_agent = 0
+        print('[Info] Start sampling.')
+        info = worker.send(['simulate', train_agent, args.num_dialogues, args.num_dialogues])
+        _batch_iters, batch_info, example, _ = pickle.loads(info[1])
+        _rewards, strategies = batch_info
+
+        # divide the training set
+        train_size = round(len(_batch_iters) * 0.6)
+        train_batch = _batch_iters[1-train_agent][:train_size]
+        dev_batch = _batch_iters[1-train_agent][train_size:]
+
+        print('[Info] Start training model.')
+        step_range = 10
+        step_writer = [SummaryWriter(logdir='logs/{}/step_{}'.format(args.name, i)) for i in range(step_range)]
+
+        # train model
+        for i in range(args.epochs):
+            info = worker.send(
+                ['train_tom', pickle.dumps((train_agent, train_batch, strategies[1-train_agent]))])
+            train_loss, train_step_info = pickle.loads(info[1])
+
+            info = worker.send(
+                ['valid_tom', pickle.dumps((train_agent, dev_batch, strategies[1-train_agent]))])
+            dev_loss, dev_step_info = pickle.loads(info[1])
+
+            # Draw outputs on the tensorboard
+            def draw_info(loss, step_info, name):
+                self.writer.add_scalar('tom{}/{}_loss'.format(train_agent, name), loss, i)
+                self.writer.flush()
+                for j, w in enumerate(step_writer):
+                    w.add_scalar('tom{}/{}_loss'.format(train_agent, name), step_info[0][j], i)
+                    w.add_scalar('tom{}/{}_accuracy'.format(train_agent, name), step_info[1][j], i)
+                    w.flush()
+            draw_info(train_loss, train_step_info, 'train')
+            draw_info(dev_loss, dev_step_info, 'dev')
+            print('[info] train{}/{} train_loss:{}, valid_loss:{}'.format(i+1, args.epochs), train_loss, dev_loss)
+
+            # Save models
+            # worker.send(['save_model', pickle.dumps((i, valid_stats[0]))])
 
     def learn(self):
         args = self.args
@@ -310,7 +401,8 @@ class MultiManager():
         for i in range(args.num_dialogues // batch_size):
             # _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
             info = worker.send(['simulate', i, batch_size, batch_size])
-            _batch_iters, _rewards, example, _ = pickle.loads(info[1])
+            _batch_iters, batch_info, example, _ = pickle.loads(info[1])
+            _rewards, strategies = batch_info
             # For debug
             print("rewards:", np.mean(_rewards[0]), np.mean(_rewards[1]))
             print("rewards_num:", len(_rewards[0]), len(_rewards[1]))

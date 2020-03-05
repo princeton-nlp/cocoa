@@ -40,7 +40,7 @@ class NeuralSession(Session):
         # min/expect
         # price strategy: high/low/decay
         self.tom_type = env.tom_type
-        self.price_strategy_distribution = {'insist': 0.5, 'decay': 0.5}
+        self.price_strategy_distribution = {'name': ['insist', 'decay'], 'prob': [0.5, 0.5]}
         self.price_strategy = env.price_strategy
         self.acpt_range = [0.4, 1]
 
@@ -56,9 +56,16 @@ class NeuralSession(Session):
             self.sample_price_strategy()
 
     def sample_price_strategy(self):
-        ps = list(self.price_strategy_distribution.keys())
-        p = [self.price_strategy_distribution[s] for s in ps]
+        ps = self.price_strategy_distribution['name']
+        p = [s for s in self.price_strategy_distribution['prob']]
         self.price_strategy = np.random.choice(ps, p=p)
+
+    @property
+    def price_strategy_label(self):
+        for i, s in enumerate(self.price_strategy_distribution['name']):
+            if s == self.price_strategy:
+                return i
+        return -1
 
     def set_controller(self, controller):
         self.controller = controller
