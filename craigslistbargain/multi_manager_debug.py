@@ -366,7 +366,7 @@ class MultiManager():
                     w.flush()
             draw_info(train_loss, train_step_info, 'train')
             draw_info(dev_loss, dev_step_info, 'dev')
-            print('[info] train{}/{} train_loss:{}, valid_loss:{}'.format(i+1, args.epochs), train_loss, dev_loss)
+            print('[info] train{}/{} train_loss:{}, valid_loss:{}'.format(i+1, args.epochs, train_loss, dev_loss))
 
             # Save models
             # worker.send(['save_model', pickle.dumps((i, valid_stats[0]))])

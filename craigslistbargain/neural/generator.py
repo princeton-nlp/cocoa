@@ -131,8 +131,8 @@ class LFSampler(Sampler):
 
         # TODO: Not correct, for multiple data.
         original_price = price
-        if intent not in self.price_actions:
-            price = None
+        # if intent not in self.price_actions:
+        #     price = None
 
         # print('gen output: ',policy, price)
         ret = {"intent": intent,
