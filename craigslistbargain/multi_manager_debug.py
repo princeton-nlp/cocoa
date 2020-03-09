@@ -33,7 +33,8 @@ except ImportError:
 
 import multiprocessing
 import multiprocessing.connection
-import pickle
+import math
+import pickle as pkl
 import numpy as np
 
 from multi_manager import MultiRunner, execute_runner
@@ -71,7 +72,7 @@ class MultiRunner:
                  'critic': build_optim(args, system.env.critic, None)}
         if system.env.tom_model is not None:
             optim['tom'] = build_optim(args, system.env.tom_model, None)
-            optim['tom']._set_rate(0.01)
+            optim['tom']._set_rate(0.001)
         optim['critic']._set_rate(0.05)
 
         scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
@@ -141,14 +142,15 @@ class MultiRunner:
         env = self.systems[model_idx].env
         return env.model.state_dict(), env.critic.state_dict()
 
-    def train_tom(self, model_idx, batch_iters, strategy):
+    def train_tom(self, model_idx, batch_iters, strategy, dump_file=None):
         env = self.systems[model_idx].env
-        train_loss = self.trainer.update_tom(self.args, batch_iters, strategy, env.tom_model)
+        train_loss = self.trainer.update_tom(self.args, batch_iters, strategy, env.tom_model, dump_name=dump_file)
         return train_loss
 
-    def valid_tom(self, model_idx, batch_iters, strategy):
+    def valid_tom(self, model_idx, batch_iters, strategy, dump_file=None):
         env = self.systems[model_idx].env
-        valid_loss = self.trainer.update_tom(self.args, batch_iters, strategy, env.tom_model, update_model=False)
+        valid_loss = self.trainer.update_tom(self.args, batch_iters, strategy,
+                                             env.tom_model, update_model=False, dump_name=dump_file)
         return valid_loss
 
 
@@ -160,27 +162,27 @@ class MultiRunner:
             return ['done']
         elif cmd[0] == 'simulate':
             data = self.simulate(cmd[1:])
-            # self.conn.send(['done', pickle.dumps(data)])
-            return ['done', pickle.dumps(data)]
+            # self.conn.send(['done', pkl.dumps(data)])
+            return ['done', pkl.dumps(data)]
             # try:
             # except Exception, err:
             #     print(e)
             #     self.conn.send(['error'])
         elif cmd[0] == 'train':
-            data = self.train(pickle.loads(cmd[1]))
-            # self.conn.send(['done', pickle.dumps(data)])
-            return ['done', pickle.dumps(data)]
+            data = self.train(pkl.loads(cmd[1]))
+            # self.conn.send(['done', pkl.dumps(data)])
+            return ['done', pkl.dumps(data)]
             # try:
-            #     data = self.train(pickle.loads(cmd[1]))
-            #     self.conn.send(['done', pickle.dumps(data)])
+            #     data = self.train(pkl.loads(cmd[1]))
+            #     self.conn.send(['done', pkl.dumps(data)])
             # except:
             #     self.conn.send(['error'])
         elif cmd[0] == 'update_model':
-            self.update_model((cmd[1],) + pickle.loads(cmd[2]))
+            self.update_model((cmd[1],) + pkl.loads(cmd[2]))
             return ['done']
             # self.conn.send(['done'])
             # try:
-            #     self.update_model(pickle.loads(cmd[1]))
+            #     self.update_model(pkl.loads(cmd[1]))
             #     self.conn.send(['done'])
             # except:
             #     self.conn.send(['error'])
@@ -188,20 +190,20 @@ class MultiRunner:
         elif cmd[0] == 'fetch_model':
 
             data = self.fetch_model(cmd[1:])
-            return ['done', pickle.dumps(data)]
-            # self.conn.send(['done', pickle.dumps(data)])
+            return ['done', pkl.dumps(data)]
+            # self.conn.send(['done', pkl.dumps(data)])
             # try:
             #     data = self.fetch_model(cmd[1:])
-            #     self.conn.send(['done', pickle.dumps(data)])
+            #     self.conn.send(['done', pkl.dumps(data)])
             # except:
             #     self.conn.send(['error'])
         elif cmd[0] == 'valid':
             data = self.valid(cmd[1])
-            return ['done', pickle.dumps(data)]
-            # self.conn.send(['done', pickle.dumps(data)])
+            return ['done', pkl.dumps(data)]
+            # self.conn.send(['done', pkl.dumps(data)])
 
         elif cmd[0] == 'save_model':
-            self.save_model(pickle.loads(cmd[1]))
+            self.save_model(pkl.loads(cmd[1]))
             return ['done']
             # self.conn.send(['done'])
 
@@ -210,11 +212,11 @@ class MultiRunner:
             if len(cmd) < 2:
                 cmd.append([])
             else:
-                cmd[1] = pickle.loads(cmd[1])
+                cmd[1] = pkl.loads(cmd[1])
             if len(cmd) < 3:
                 cmd.append({})
             else:
-                cmd[2] = pickle.load(cmd[2])
+                cmd[2] = pkl.load(cmd[2])
 
             # try:
             ret = getattr(self, cmd[0])(*cmd[1], **cmd[2])
@@ -225,7 +227,7 @@ class MultiRunner:
             #     print('[failed] ', e)
             #     ret_data = str(e)
 
-            ret_data = pickle.dumps(ret_data)
+            ret_data = pkl.dumps(ret_data)
             return [status, ret_data]
 
 
@@ -318,7 +320,7 @@ class MultiManager():
                 for s in ex:
                     f.write(s + '\n')
         with open(path_pkl, 'wb') as f:
-            pickle.dump(examples, f)
+            pkl.dump(examples, f)
 
     def learn_identity(self):
 
@@ -332,15 +334,29 @@ class MultiManager():
         num_worker = self.update_worker_list()
         worker = self.worker_conn[0]
         train_agent = 0
-        print('[Info] Start sampling.')
-        info = worker.send(['simulate', train_agent, args.num_dialogues, args.num_dialogues])
-        _batch_iters, batch_info, example, _ = pickle.loads(info[1])
+        load_data = args.load_sample
+        data_pkl = 'logs/{}/data.pkl'.format(args.name)
+        if not load_data:
+            print('[Info] Start sampling.')
+            info = worker.send(['simulate', train_agent, args.num_dialogues, args.num_dialogues])
+            with open(data_pkl, 'wb') as f:
+                pkl.dump(pkl.loads(info[1]), f)
+            _batch_iters, batch_info, example, v_str = pkl.loads(info[1])
+        else:
+            info = ['done', None]
+            with open(data_pkl, 'rb') as f:
+                info[1] = pkl.load(f)
+            _batch_iters, batch_info, example, v_str = info[1]
+
         _rewards, strategies = batch_info
+        self.dump_examples(example, v_str, 0)
 
         # divide the training set
-        train_size = round(len(_batch_iters) * 0.6)
+        train_size = round(len(_batch_iters[1-train_agent]) * 0.6)
         train_batch = _batch_iters[1-train_agent][:train_size]
+        train_strategy = strategies[1-train_agent][:train_size]
         dev_batch = _batch_iters[1-train_agent][train_size:]
+        dev_strategy = strategies[1-train_agent][train_size:]
 
         print('[Info] Start training model.')
         step_range = 10
@@ -349,27 +365,34 @@ class MultiManager():
         # train model
         for i in range(args.epochs):
             info = worker.send(
-                ['train_tom', pickle.dumps((train_agent, train_batch, strategies[1-train_agent]))])
-            train_loss, train_step_info = pickle.loads(info[1])
+                ['train_tom', pkl.dumps((train_agent, train_batch,
+                                         train_strategy, 'logs/{}/train_pred_{}.pkl'.format(args.name, i)))])
+            train_loss, train_step_info = pkl.loads(info[1])
 
             info = worker.send(
-                ['valid_tom', pickle.dumps((train_agent, dev_batch, strategies[1-train_agent]))])
-            dev_loss, dev_step_info = pickle.loads(info[1])
+                ['valid_tom', pkl.dumps((train_agent, dev_batch,
+                                         dev_strategy, 'logs/{}/dev_pred_{}.pkl'.format(args.name, i)))])
+            dev_loss, dev_step_info = pkl.loads(info[1])
 
             # Draw outputs on the tensorboard
             def draw_info(loss, step_info, name):
                 self.writer.add_scalar('tom{}/{}_loss'.format(train_agent, name), loss, i)
                 self.writer.flush()
                 for j, w in enumerate(step_writer):
+                    if math.isnan(step_info[0][j]):
+                        continue
                     w.add_scalar('tom{}/{}_loss'.format(train_agent, name), step_info[0][j], i)
                     w.add_scalar('tom{}/{}_accuracy'.format(train_agent, name), step_info[1][j], i)
                     w.flush()
             draw_info(train_loss, train_step_info, 'train')
             draw_info(dev_loss, dev_step_info, 'dev')
+            if i == 0:
+                print('train_step_info:', train_step_info[2])
+                print('dev_step_info:', dev_step_info[2])
             print('[info] train{}/{} train_loss:{}, valid_loss:{}'.format(i+1, args.epochs, train_loss, dev_loss))
 
             # Save models
-            # worker.send(['save_model', pickle.dumps((i, valid_stats[0]))])
+            # worker.send(['save_model', pkl.dumps((i, valid_stats[0]))])
 
     def learn(self):
         args = self.args
@@ -401,7 +424,7 @@ class MultiManager():
         for i in range(args.num_dialogues // batch_size):
             # _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
             info = worker.send(['simulate', i, batch_size, batch_size])
-            _batch_iters, batch_info, example, _ = pickle.loads(info[1])
+            _batch_iters, batch_info, example, _ = pkl.loads(info[1])
             _rewards, strategies = batch_info
             # For debug
             print("rewards:", np.mean(_rewards[0]), np.mean(_rewards[1]))
@@ -412,7 +435,7 @@ class MultiManager():
             #     loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
             #                            discount=args.discount_factor, fix_policy=True)
             #     loss = worker.send(
-            #         ['train', pickle.dumps((i, _batch_iters, _rewards[self.training_agent], self.args.train_mode))])
+            #         ['train', pkl.dumps((i, _batch_iters, _rewards[self.training_agent], self.args.train_mode))])
             #     if (k + 1) % 5 == 0:
             #         _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
             #     if loss[0, 3].item() < 0.2:
@@ -427,8 +450,8 @@ class MultiManager():
             #                            discount=args.discount_factor, fix_policy=True)
 
             info = worker.send(
-                ['train', pickle.dumps((i, _batch_iters[0], _rewards[0], self.args.train_mode))])
-            loss = pickle.loads(info[1])
+                ['train', pkl.dumps((i, _batch_iters[0], _rewards[0], self.args.train_mode))])
+            loss = pkl.loads(info[1])
 
             # Draw outputs on the tensorboard
             self._draw_tensorboard((i + 1) * batch_size, [[loss], []],
@@ -452,9 +475,9 @@ class MultiManager():
             #             self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
 
             valid_info = worker.send(['valid', (0, 200)])
-            valid_stats, _, _ = pickle.loads(valid_info[1])
+            valid_stats, _, _ = pkl.loads(valid_info[1])
 
-            worker.send(['save_model', pickle.dumps((i, valid_stats[0]))])
+            worker.send(['save_model', pkl.dumps((i, valid_stats[0]))])
             # # Save model
             # if (i + 1) % save_every == 0:
             #     # TODO: valid in dev set
@@ -505,7 +528,7 @@ class MultiManager():
                 info = w.send(['simulate', epoch, batch_size, task_lists[i]])
                 if info[0] != 'done':
                     print('Error on {}: {}.'.format(i, info))
-                data = pickle.loads(info[1])
+                data = pkl.loads(info[1])
                 batches += data[0]
                 rewards[0] += data[1][0]
                 rewards[1] += data[1][1]
@@ -519,12 +542,12 @@ class MultiManager():
             print("rewards_num:", len(rewards[0]), len(rewards[1]))
 
             # Train the model
-            train_info = self.worker_conn[0].send(['train', pickle.dumps((epoch, batches, rewards[0], self.args.train_mode))])
+            train_info = self.worker_conn[0].send(['train', pkl.dumps((epoch, batches, rewards[0], self.args.train_mode))])
             if train_info[0] != 'done':
                 print('Error on {}: {}.'.format(i, train_info))
 
             # Draw outputs on the tensorboard
-            self._draw_tensorboard((epoch + 1) * batch_size, [[pickle.loads(train_info[1])], []],
+            self._draw_tensorboard((epoch + 1) * batch_size, [[pkl.loads(train_info[1])], []],
                                    rewards)
 
             # Get new model from trainer
@@ -555,7 +578,7 @@ class MultiManager():
             for i, w in enumerate(self.worker_conn):
                 valid_info = w.send(['valid', (now, task_lists[i])])
                 now += task_lists[i]
-                valid_info[1] = pickle.loads(valid_info[1])
+                valid_info[1] = pkl.loads(valid_info[1])
                 for j in range(2):
                     valid_stats[j].update(valid_info[1][0][j])
                 valid_examples += valid_info[1][1]
@@ -563,7 +586,7 @@ class MultiManager():
 
             self.dump_examples(valid_examples, valid_ex_str, epoch, 'dev')
             # Save the model
-            self.worker_conn[0].send(['save_model', pickle.dumps((epoch, valid_stats[0]))])
+            self.worker_conn[0].send(['save_model', pkl.dumps((epoch, valid_stats[0]))])
             # self.worker_conn[0].recv()
 
             # Draw dev rewards on tensorboard

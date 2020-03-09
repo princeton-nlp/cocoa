@@ -13,6 +13,7 @@ from core.controller import Controller
 from .utterance import UtteranceBuilder
 
 from tensorboardX import SummaryWriter
+import pickle as pkl
 
 from neural.batcher_rl import RLBatch, RawBatch, ToMBatch
 
@@ -106,7 +107,7 @@ class RLTrainer(BaseTrainer):
         self.tom = agents[training_agent].env.tom_model
         self.model_type = args.model_type
         self.use_utterance = False
-        self.tom_identity_loss = torch.nn.NLLLoss(reduction='none')
+        self.tom_identity_loss = torch.nn.CrossEntropyLoss(reduction='none')
 
     def _run_batch_a2c(self, batch):
         value = self._run_batch_critic(batch)
@@ -135,16 +136,18 @@ class RLTrainer(BaseTrainer):
         accu = torch.gather(torch.softmax(preds, dim=1), 1, strategy.reshape(-1, 1))
         # (-1,), (-1, 1) -> (-1,) *2
         # print('loss & accu:', loss, accu)
-        return loss, accu.reshape(-1)
+        return loss, accu.reshape(-1), (preds.detach(), strategy.detach())
 
-    def update_tom(self, args, batch_iters, strategy, model, update_model=True):
+    def update_tom(self, args, batch_iters, strategy, model, update_model=True, dump_name=None):
         # print('optim', type(self.optim['tom']))
         model.zero_grad()
         loss = []
         step_loss = [[] for i in range(20)]
         step_accu = [[] for i in range(20)]
+        output_data = []
         for i, b in enumerate(batch_iters):
-            l, a = self._tom_gradient_accumulation(b, strategy[i], model)
+            l, a, tmp = self._tom_gradient_accumulation(b, strategy[i], model)
+            output_data.append(tmp)
             loss.append(l)
             for j in range(l.shape[0]):
                 step_loss[j].append(l[j].item())
@@ -155,6 +158,11 @@ class RLTrainer(BaseTrainer):
         step_num = [len(d) for d in step_loss]
         step_loss = [torch.FloatTensor(d).mean().item() for d in step_loss]
         step_accu = [torch.FloatTensor(d).mean().item() for d in step_accu]
+
+        # dump output data
+        if dump_name is not None:
+            with open(dump_name, 'wb') as f:
+                pkl.dump(output_data, f)
 
         # update
         if update_model:
@@ -411,6 +419,7 @@ class RLTrainer(BaseTrainer):
                 ret.append("[{}: {}]\t{}\t{}\t\"{}\"".format(e.time, e.agent, e.action, e.data, e.metadata["real_uttr"]))
             else:
                 ret.append("[{}: {}]\t{}\t{}".format(e.time, e.agent, e.action, e.data))
+                ret.append("        \t{}\t{}".format(e.metadata.get('intent'), e.metadata.get('price')))
         return ret 
         
 

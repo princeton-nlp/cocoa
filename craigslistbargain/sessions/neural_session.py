@@ -599,7 +599,7 @@ class PytorchNeuralSession(NeuralSession):
                 acpt_range = [1., 0.7]
             elif self.price_strategy == 'decay':
                 prange = [1., 0.4]
-                p = prange[0]*(factor) + prange[1]*(1-factor)
+                p = prange[0]*(1-factor) + prange[1]*(factor)
                 acpt_range = [1., p-0.1]
             elif self.price_strategy == 'persuaded':
                 acpt_range = [1., prices[0, 0].item()]
@@ -621,14 +621,15 @@ class PytorchNeuralSession(NeuralSession):
             # Decay till 1/2 max_length
             factor = batch.state[1][0, -3].item()
             o_factor = factor
-            factor = max(1., factor*2)
+            factor = min(1., factor*2)
 
             if self.price_strategy == 'insist':
                 prange = [1., 1.]
-                p = prange[0]*(factor) + prange[1]*(1-factor)
+                p = prange[0]*(1-factor) + prange[1]*(factor)
             elif self.price_strategy == 'decay':
                 prange = [1., 0.4]
-                p = prange[0]*(factor) + prange[1]*(1-factor)
+                p = prange[0]*(1-factor) + prange[1]*(factor)
+                # print('pfactor', p, factor)
             elif self.price_strategy == 'persuaded':
                 prange = [1., 0.4]
                 if o_factor < 1:
@@ -643,6 +644,7 @@ class PytorchNeuralSession(NeuralSession):
 
             if isinstance(p, int):
                 print('p is int')
+            # print('prices', prices)
             p = max(p, prices[0, 1].item())
             output_data['price'] = p
             # print('after:', p, output_data['price'])

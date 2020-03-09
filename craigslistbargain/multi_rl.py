@@ -91,6 +91,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--get-dialogues', default=False, action='store_true')
     parser.add_argument('--identity-test', default=False, action='store_true')
+    parser.add_argument('--load-sample', default=False, action='store_true')
 
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
