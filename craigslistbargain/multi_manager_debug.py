@@ -36,8 +36,23 @@ import multiprocessing.connection
 import math
 import pickle as pkl
 import numpy as np
+import shutil
 
 from multi_manager import MultiRunner, execute_runner
+
+def init_dir(path, clean_all=False):
+    if not os.path.exists(path):
+        print('[Info] make dir {}'.format(path))
+        os.mkdir(path)
+    else:
+        print('[Warning] path {} exists!'.format(path))
+        if clean_all:
+            print('[Warning] clean files in {}!'.format(path))
+            shutil.rmtree(path, True)
+            # Deal with delay on NAS
+            while not os.path.exists(path):
+                os.mkdir(path)
+            print('[Info] remake dir {}'.format(path))
 
 class MultiRunner:
     def __init__(self, args, addr):
@@ -72,7 +87,7 @@ class MultiRunner:
                  'critic': build_optim(args, system.env.critic, None)}
         if system.env.tom_model is not None:
             optim['tom'] = build_optim(args, system.env.tom_model, None)
-            optim['tom']._set_rate(0.001)
+            # optim['tom']._set_rate(0.1)
         optim['critic']._set_rate(0.05)
 
         scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
@@ -153,6 +168,9 @@ class MultiRunner:
                                              env.tom_model, update_model=False, dump_name=dump_file)
         return valid_loss
 
+    def split_batch(self, batch_iters, batch_size):
+        ret = self.trainer._sort_merge_batch(batch_iters, batch_size)
+        return ret
 
     def send(self, cmd):
         if cmd[0] == 'quit':
@@ -216,7 +234,7 @@ class MultiRunner:
             if len(cmd) < 3:
                 cmd.append({})
             else:
-                cmd[2] = pkl.load(cmd[2])
+                cmd[2] = pkl.loads(cmd[2])
 
             # try:
             ret = getattr(self, cmd[0])(*cmd[1], **cmd[2])
@@ -230,6 +248,22 @@ class MultiRunner:
             ret_data = pkl.dumps(ret_data)
             return [status, ret_data]
 
+    def local_send(self, cmd):
+        if len(cmd) < 2:
+            cmd.append([])
+        if len(cmd) < 3:
+            cmd.append({})
+
+        # try:
+        ret = getattr(self, cmd[0])(*cmd[1], **cmd[2])
+        status = 'done'
+        ret_data = ret
+        # except Exception as e:
+        #     status = 'failed'
+        #     print('[failed] ', e)
+        #     ret_data = str(e)
+        # ret_data = pkl.dumps(ret_data)
+        return [status, ret_data]
 
 
 class MultiManager():
@@ -253,6 +287,11 @@ class MultiManager():
             # self.worker_listener.append(multiprocessing.connection.Listener(addr))
             self.worker_listener.append(addr)
         self.worker_conn = []
+
+        cache_path = 'cache/{}'.format(args.name)
+        log_path = 'logs/' + args.name
+        init_dir(cache_path)
+        init_dir(log_path, clean_all=True)
 
         self.writer = SummaryWriter(logdir='logs/{}'.format(args.name))
 
@@ -335,16 +374,18 @@ class MultiManager():
         worker = self.worker_conn[0]
         train_agent = 0
         load_data = args.load_sample
-        data_pkl = 'logs/{}/data.pkl'.format(args.name)
-        if not load_data:
+
+        data_pkl = 'cache/{}/data.pkl'.format(args.name)
+        if load_data is None:
             print('[Info] Start sampling.')
             info = worker.send(['simulate', train_agent, args.num_dialogues, args.num_dialogues])
             with open(data_pkl, 'wb') as f:
                 pkl.dump(pkl.loads(info[1]), f)
             _batch_iters, batch_info, example, v_str = pkl.loads(info[1])
         else:
+            print('[Info] Load sample from {}'.format(load_data))
             info = ['done', None]
-            with open(data_pkl, 'rb') as f:
+            with open(load_data, 'rb') as f:
                 info[1] = pkl.load(f)
             _batch_iters, batch_info, example, v_str = info[1]
 
@@ -362,17 +403,34 @@ class MultiManager():
         step_range = 10
         step_writer = [SummaryWriter(logdir='logs/{}/step_{}'.format(args.name, i)) for i in range(step_range)]
 
-        # train model
-        for i in range(args.epochs):
-            info = worker.send(
-                ['train_tom', pkl.dumps((train_agent, train_batch,
-                                         train_strategy, 'logs/{}/train_pred_{}.pkl'.format(args.name, i)))])
-            train_loss, train_step_info = pkl.loads(info[1])
+        # split training batch
+        _, train_batch_splited = worker.local_send(
+            ['split_batch', (train_batch, 1024)])
+        _, dev_batch_splited = worker.local_send(
+            ['split_batch', (dev_batch, 1024)]
+        )
 
-            info = worker.send(
-                ['valid_tom', pkl.dumps((train_agent, dev_batch,
-                                         dev_strategy, 'logs/{}/dev_pred_{}.pkl'.format(args.name, i)))])
-            dev_loss, dev_step_info = pkl.loads(info[1])
+        # train model
+        cur_t = time.time()
+        for i in range(args.epochs):
+            # print('train.send:')
+            info = worker.local_send(
+                ['train_tom', (train_agent, train_batch_splited,
+                               train_strategy, 'cache/{}/train_pred_{}.pkl'.format(args.name, i))])
+            train_loss, train_step_info = info[1]
+            # info = worker.send(
+            #     ['train_tom', pkl.dumps((train_agent, train_batch,
+            #                              train_strategy, 'cache/{}/train_pred_{}.pkl'.format(args.name, i)))])
+            # train_loss, train_step_info = pkl.loads(info[1])
+
+            # info = worker.send(
+            #     ['valid_tom', pkl.dumps((train_agent, dev_batch,
+            #                              dev_strategy, 'cache/{}/dev_pred_{}.pkl'.format(args.name, i)))])
+            # dev_loss, dev_step_info = pkl.loads(info[1])
+            info = worker.local_send(
+                ['valid_tom', (train_agent, dev_batch_splited,
+                               dev_strategy, 'cache/{}/dev_pred_{}.pkl'.format(args.name, i))])
+            dev_loss, dev_step_info = info[1]
 
             # Draw outputs on the tensorboard
             def draw_info(loss, step_info, name):
@@ -389,7 +447,9 @@ class MultiManager():
             if i == 0:
                 print('train_step_info:', train_step_info[2])
                 print('dev_step_info:', dev_step_info[2])
-            print('[info] train{}/{} train_loss:{}, valid_loss:{}'.format(i+1, args.epochs, train_loss, dev_loss))
+            print('[info] train{}/{} train_loss:{:.5f}, valid_loss:{:.5f}, time:{:.2f}s.'
+                  .format(i+1, args.epochs, train_loss, dev_loss, time.time()-cur_t))
+            cur_t = time.time()
 
             # Save models
             # worker.send(['save_model', pkl.dumps((i, valid_stats[0]))])

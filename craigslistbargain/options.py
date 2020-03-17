@@ -25,6 +25,10 @@ def add_data_generator_arguments(parser):
 def add_model_arguments(parser):
     from onmt.modules.SRU import CheckSRU
     group = parser.add_argument_group('Model')
+
+    parser.add_argument('--tom-hidden-size', type=int, default=64, help='start from specific epoch.')
+    parser.add_argument('--hidden-depth', type=int, default=1, help='start from specific epoch.')
+
     group.add_argument('--dia-num', type=int, default=0, help='')
     group.add_argument('--state-length', type=int, default=2, help='')
 
@@ -58,7 +62,7 @@ def add_model_arguments(parser):
     group.add_argument('--rnn-size', type=int, default=500,
                        help='Size of rnn hidden states')
     group.add_argument('--rnn-type', type=str, default='LSTM',
-                       choices=['LSTM', 'GRU', 'SRU'], action=CheckSRU,
+                       choices=['LSTM', 'GRU', 'SRU', 'RNN'], action=CheckSRU,
                        help="""The gate type to use in the RNNs""")
     group.add_argument('--input-feed', action='store_true',
                        help="""Feed the context vector at each time step as

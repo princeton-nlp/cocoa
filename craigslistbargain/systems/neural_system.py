@@ -16,7 +16,18 @@ from neural.batcher_rl import DialogueBatcherFactory
 from neural.utterance import UtteranceBuilder
 from neural.nlg import IRNLG
 from neural.batcher_rl import RawBatch
+import sys
+import re
 import options
+
+
+def get_new_args(args):
+    new_args = {}
+    news = []
+    for s in sys.argv:
+        if len(s) > 2 and s[:2] == '--':
+            news.append(s[2:].replace('-', '_'))
+    return news
 
 
 class PytorchNeuralSystem(System):
@@ -36,19 +47,21 @@ class PytorchNeuralSystem(System):
         dummy_parser = argparse.ArgumentParser(description='duh')
         options.add_model_arguments(dummy_parser)
         options.add_data_generator_arguments(dummy_parser)
-        dummy_args = dummy_parser.parse_known_args([])[0]
-
+        dummy_args = dummy_parser.parse_known_args()[0]
+        dummy_args_dict = dummy_args.__dict__
+        new_args = get_new_args(dummy_args_dict)
 
         if model_type == 'sl':
             mappings, model, model_args = rl_model_builder.load_test_model(
-                model_path, args, dummy_args.__dict__, model_type=model_type)
+                model_path, args, dummy_args_dict, new_args, model_type=model_type)
             actor = model
             critic = None
             tom = None
+            print('sl model:', actor)
         else:
             # Load the model.
             mappings, model, model_args = rl_model_builder.load_test_model(
-                model_path, args, dummy_args.__dict__, model_type=model_type)
+                model_path, args, dummy_args_dict, new_args, model_type=model_type)
 
             actor, critic, tom = model
             # Load critic from other model.
@@ -56,8 +69,11 @@ class PytorchNeuralSystem(System):
             if hasattr(args, 'load_critic_from') and args.load_critic_from is not None:
                 critic_path = args.load_critic_from
                 _, critic, _ = rl_model_builder.load_test_model(
-                    critic_path, args, dummy_args.__dict__)
+                    critic_path, args, dummy_args_dict, new_args)
                 critic = critic[1]
+            print('rl models', actor)
+            print(critic)
+            print(tom)
 
         self.model_name = model_args.model
         vocab = mappings['utterance_vocab']

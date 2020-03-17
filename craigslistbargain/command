@@ -5,12 +5,12 @@ PYTHONPATH=. python main.py --schema-path data/craigslist-schema.json --train-ex
 --model lf2lf \
 --model-path checkpoint/language --mappings mappings/language \
 --word-vec-size 300 --pretrained-wordvec '' '' \
---rnn-size 300 --rnn-type LSTM --global-attention multibank_general \
+--rnn-size 300 --rnn-type RNN --global-attention multibank_general \
 --num-context 2 --stateful \
 --batch-size 128  --optim adagrad --learning-rate 0.01 \
 --epochs 15 --report-every 500 \
 --cache cache/language --ignore-cache \
---verbose  --state-length 4 --dia-num 20 --use-utterance --hidden-size 128
+--verbose  --state-length 4 --dia-num 20 --use-utterance --hidden-size 64
 
 # tom_itentity_test
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
@@ -19,12 +19,13 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
 --model-path checkpoint/a2c --mappings mappings/language \
---optim adagrad --learning-rate 0.01 \
+--optim adam --rnn-type RNN --rnn-size 300 --max-grad-norm -1 \
 --agents pt-neural pt-neural-r \
---report-every 50 --max-turns 20 --num-dialogues 10 \
+--report-every 50 --max-turns 20 --num-dialogues 2560 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
---dia-num 20 --state-length 4 --epochs 10 \
---model lf2lf --model-type a2c --name identity --identity-test
+--dia-num 20 --state-length 4 --epochs 2000 --use-utterance \
+--model lf2lf --model-type a2c --identity-test --load-sample cache/identity/data.pkl \
+--learning-rate 0.001 --name identity_lr0.001_size128_adam2k --tom-hidden-size 128 --hidden-depth 1 --gpu 0
 
 # With utterance as input:
 * --use-utterance

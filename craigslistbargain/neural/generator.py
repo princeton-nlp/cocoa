@@ -47,6 +47,8 @@ class LFSampler(Sampler):
         # self.all_actions = self._get_all_actions()
     @staticmethod
     def softmax_with_mask(policy, mask=1):
+        if isinstance(mask, torch.Tensor):
+            mask = mask.to(device=policy.device)
 
         policy.sub_(policy.max(1, keepdim=True)[0].expand(-1, policy.size(1)))
         # mask = batch.policy_mask
@@ -131,8 +133,8 @@ class LFSampler(Sampler):
 
         # TODO: Not correct, for multiple data.
         original_price = price
-        # if intent not in self.price_actions:
-        #     price = None
+        if intent not in self.price_actions:
+            price = None
 
         # print('gen output: ',policy, price)
         ret = {"intent": intent,

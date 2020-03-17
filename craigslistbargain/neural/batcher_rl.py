@@ -361,9 +361,9 @@ class Batch(object):
         if data is None or (isinstance(data, list) and data[0] is None):
             return None
         if dtype == "long":
-            tensor = torch.LongTensor(data)
+            tensor = torch.tensor(data, dtype=torch.int64)
         elif dtype == "float":
-            tensor = torch.FloatTensor(data)
+            tensor = torch.tensor(data, dtype=torch.float32)
         else:
             raise ValueError
         tensor = cls.reshape_tensor(tensor)
@@ -421,13 +421,64 @@ class Batch(object):
 
 class RawBatch(Batch):
 
+    def to(self, device):
+        if device is None:
+            return
+        for k in self.__dict__:
+            v = getattr(self, k)
+            if v is None:
+                continue
+            if isinstance(v, torch.Tensor):
+                setattr(self, k, v.to(device=device))
+            elif isinstance(v, tuple) and k == 'state':
+                setattr(self, k, (v[0].to(device=device), v[1].to(device=device)))
+
+
+    @staticmethod
+    def merge(batches):
+        names = ['state', 'uttr', 'act', 'prob']
+        val = []
+        for k in names:
+            tmp = []
+            for b in batches:
+                v = getattr(b, k)
+                if v is None:
+                    tmp = None
+                elif isinstance(v, tuple):
+                    if len(tmp) < len(v):
+                        tmp = [[] for _ in range(len(v))]
+                    for i in range(len(v)):
+                        tmp[i].append(v[i])
+                elif isinstance(v, list):
+                    tmp = tmp + v
+                elif isinstance(v, torch.Tensor):
+                    tmp.append(v)
+                else:
+                    print('unexpected v:', k, v)
+
+            if tmp is None:
+                tmp = None
+            elif isinstance(tmp, list):
+                if k != 'uttr':
+                    # state[2]
+                    if isinstance(tmp[0], list):
+                        for i in range(len(tmp)):
+                            tmp[i] = torch.cat(tmp[i], dim=0)
+                        tmp = tuple(tmp)
+                    elif isinstance(tmp[0], torch.Tensor):
+                        tmp = torch.cat(tmp, dim=0)
+
+            val.append(tmp)
+
+        return RawBatch(*val)
+
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
         sentence, extra = self.state
         state_length = self.state[0].shape[1] // (intent_size+1)
         intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
         prices = extra[:, -2:]
-        intents = list(intents.argmax(dim=1).reshape(-1).numpy())
+        intents = list(intents.argmax(dim=1).reshape(-1).cpu().numpy())
         return intents, prices
 
     def policy_mask(self, vocab):
@@ -482,6 +533,15 @@ class RawBatch(Batch):
                      vocab=vocab, cuda=cuda)
         return cls(state, uttr, act, prob)
 
+    @property
+    def size(self):
+        if self.state is None:
+            return 0
+        if isinstance(self.state, tuple):
+            return self.state[0].shape[0]
+        else:
+            return self.state.shape[0]
+
     def __init__(self, state, uttr, act, prob):
         self.state, self.uttr, self.act, self.prob = state, uttr, act, prob
 
@@ -494,7 +554,7 @@ class RLBatch(RawBatch):
         state_length = sentence.shape[1] // (intent_size+1)
         intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
         prices = extra[:, -2:]
-        intents = list(intents.argmax(dim=1).reshape(-1).numpy())
+        intents = list(intents.argmax(dim=1).reshape(-1).cpu().numpy())
         return intents, prices
 
     @classmethod
@@ -516,7 +576,6 @@ class RLBatch(RawBatch):
         # self.value = []
         self.reward = reward
         self.done = done
-        self.size = state[0].shape[0]
 
         self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
@@ -535,7 +594,7 @@ class ToMBatch(Batch):
         state_length = sentence.shape[1] // (intent_size+1)
         intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
         prices = extra[:, -2:]
-        intents = list(intents.argmax(dim=1).reshape(-1).numpy())
+        intents = list(intents.argmax(dim=1).reshape(-1).cpu().numpy())
         return intents, prices
 
     def __len__(self):
@@ -550,7 +609,6 @@ class ToMBatch(Batch):
         self.act_price = act[1]
         self.act_price_mask = act[3]
         self.strategy = strategy
-        self.size = state[0].shape[0]
 
         self.strategy = self.to_tensor(strategy, 'long', cuda=self.state.device.type!='cpu')
 
@@ -572,7 +630,7 @@ class SLBatch(Batch):
         self.act_intent = act[0]
         self.act_price = act[1]
         self.act_price_mask = act[3]
-        self.size = state[0].shape[0]
+        # self.size = state[0].shape[0]
 
         self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 

@@ -124,40 +124,113 @@ class RLTrainer(BaseTrainer):
 
         h = None
         preds = []
+        losses = []
+        accus = []
+        strategies = []
         for i, batch in enumerate(batch_iter):
             tom_batch = ToMBatch.from_raw(batch, strategy)
+            if h is not None:
+                if isinstance(h, tuple):
+                    h = (h[0][:batch.size, :], h[1][:batch.size, :])
+                elif isinstance(h, torch.Tensor):
+                    h = h[:batch.size, :]
             pred, h = self._run_batch_tom_identity(tom_batch, hidden_state=h)
-            preds.append(pred.reshape(1, -1))
+            s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=pred.device)
+            loss = self.tom_identity_loss(pred, s)
+            accu = torch.gather(torch.softmax(pred, dim=1), 1, s.reshape(-1, 1))
+            losses.append(loss.reshape(-1))
+            accus.append(accu.reshape(-1))
+            strategies.append(s.detach())
+            preds.append(pred.reshape(1, -1).detach())
 
-        preds = torch.cat(preds, dim=0)
-        strategy = torch.LongTensor([strategy]*preds.shape[0], device=preds.device)
-        # print('preds&label: ',preds, strategy)
-        loss = self.tom_identity_loss(preds, strategy)
-        accu = torch.gather(torch.softmax(preds, dim=1), 1, strategy.reshape(-1, 1))
+        # preds = torch.cat(preds, dim=0)
+        # strategy = torch.tensor([strategy]*preds.shape[0], dtype=torch.int64, device=preds.device)
         # (-1,), (-1, 1) -> (-1,) *2
         # print('loss & accu:', loss, accu)
-        return loss, accu.reshape(-1), (preds.detach(), strategy.detach())
+        return losses, accus, (preds, strategies)
+
+    def _sort_merge_batch(self, batch_iters, batch_size, device=None):
+        sorted_id = [i for i in range(len(batch_iters))]
+        sorted_id.sort(key=lambda i: len(batch_iters[i]), reverse=True)
+        batch_iters = sorted(batch_iters, reverse=True, key=lambda l: len(l))
+        batch_length = [len(b) for b in batch_iters]
+
+        if device is None:
+            if self.cuda:
+                device = torch.device('cuda:0')
+            else:
+                device = torch.device('cpu')
+
+        def merge_batch(one_batch):
+            batches = [[] for i in range(len(one_batch[0]))]
+            for bi in one_batch:
+                for i, b in enumerate(bi):
+                    batches[i].append(b)
+            for i, b in enumerate(batches):
+                # print('merge batch:', i, len(b))
+                batches[i] = RawBatch.merge(b)
+                batches[i].to(device)
+            return batches
+
+        # Split by size
+        right = 0
+        bs, ids, bl = [], [], []
+        while True:
+            left = right
+            right = min(right+batch_size, len(batch_iters))
+            # print('merge: ', left, right)
+            bs.append(merge_batch(batch_iters[left: right]))
+            ids.append(sorted_id[left: right])
+            bl.append(batch_length[left: right])
+            if right >= len(batch_iters):
+                break
+
+        return bs, ids, bl
 
     def update_tom(self, args, batch_iters, strategy, model, update_model=True, dump_name=None):
         # print('optim', type(self.optim['tom']))
+        # cur_t = time.time()
+        # batch_iters, sorted_id, batch_length = self._sort_merge_batch(batch_iters, 1024)
+        batch_iters, sorted_id, batch_length = batch_iters
+        # print('merge batch: {}s.'.format(time.time() - cur_t))
+        # cur_t = time.time()
+
         model.zero_grad()
         loss = []
         step_loss = [[] for i in range(20)]
         step_accu = [[] for i in range(20)]
         output_data = []
         for i, b in enumerate(batch_iters):
-            l, a, tmp = self._tom_gradient_accumulation(b, strategy[i], model)
+            stra = [strategy[j] for j in sorted_id[i]]
+            l, a, tmp = self._tom_gradient_accumulation(b, stra, model)
             output_data.append(tmp)
-            loss.append(l)
-            for j in range(l.shape[0]):
-                step_loss[j].append(l[j].item())
-                step_accu[j].append(a[j].item())
+            # weight = torch.ones_like(l, device=l.device)
+            # for j in range(5):
+            #     if j < l.shape[0]:
+            #         weight[j] = 5-j
+            # l = l.mul(weight)
+            # for j, ll in enumerate(l):
+            #     if j == len(l)-1:
+            #         loss.append(ll)
+            #     else:
+            #         if l[j+1].shape[0] > ll.shape[0]:
+            #             loss.append(ll[l[j+1].shape[0]:])
+            loss.append(torch.cat(l, dim=0))
+            for j in range(len(l)):
+                step_loss[j].append(l[j])
+                step_accu[j].append(a[j])
+
+        # print('calculate loss: {}s.'.format(time.time() - cur_t))
+        # cur_t = time.time()
 
         loss = torch.cat(loss, dim=0).mean()
 
-        step_num = [len(d) for d in step_loss]
-        step_loss = [torch.FloatTensor(d).mean().item() for d in step_loss]
-        step_accu = [torch.FloatTensor(d).mean().item() for d in step_accu]
+        step_num = [np.sum([dd.shape[0] for dd in d]) for d in step_loss]
+        step_loss = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_loss]
+        step_accu = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_accu]
+
+        # print('returen infos: {}s.'.format(time.time() - cur_t))
+        # cur_t = time.time()
 
         # dump output data
         if dump_name is not None:
@@ -168,6 +241,8 @@ class RLTrainer(BaseTrainer):
         if update_model:
             loss.backward()
             self.optim['tom'].step()
+        # print('udpate model: {}s.'.format(time.time() - cur_t))
+        # cur_t = time.time()
 
 
         return loss.item(), (step_loss, step_accu, step_num)

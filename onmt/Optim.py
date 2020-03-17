@@ -98,7 +98,7 @@ class Optim(object):
                  min(self._step ** (-0.5),
                      self._step * self.warmup_steps**(-1.5))))
 
-        if self.max_grad_norm:
+        if self.max_grad_norm > 0:
             clip_grad_norm(self.params, self.max_grad_norm)
         self.optimizer.step()
 
