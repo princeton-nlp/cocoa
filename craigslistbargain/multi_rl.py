@@ -91,6 +91,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--get-dialogues', default=False, action='store_true')
     parser.add_argument('--identity-test', default=False, action='store_true')
+    parser.add_argument('--tom-test', default=False, action='store_true')
+    parser.add_argument('--ban-identity', default=False, action='store_true')
+    parser.add_argument('--load-identity-from', default=None, type=str, help='load critic model from another checkpoint')
     parser.add_argument('--load-sample', default=None, type=str)
 
     cocoa.options.add_scenario_arguments(parser)
@@ -101,7 +104,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     dump_args()
-    if args.identity_test:
+    if args.identity_test or args.tom_test:
         # Single thread
         print('[Info] Running in debug mode for identity test.')
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)

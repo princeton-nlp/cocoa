@@ -149,7 +149,7 @@ class SimpleLoss(nn.Module):
         # if torch.isnan(loss.mean()):
         # print('loss0', loss0)
         # print('loss1', loss1)
-        return loss, stats
+        return loss0, loss1, stats
 
     def _stats(self, loss0, loss1, word_num, price_num, correct_num):
         """
@@ -356,7 +356,7 @@ class SLTrainer(BaseTrainer):
             if batch is None:
                 continue
             policy, price = self._run_batch(batch, )
-            loss, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
+            loss0, loss1, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
             stats.update(batch_stats)
 
         # Set model back to training mode
@@ -367,7 +367,7 @@ class SLTrainer(BaseTrainer):
     def epoch_step(self, ppl, epoch):
         return self.optim.update_learning_rate(ppl, epoch)
 
-    def drop_checkpoint(self, opt, epoch, valid_stats, model_opt=None):
+    def drop_checkpoint(self, opt, epoch, valid_stats, model_opt=None, score_type='loss', best_only=False):
         """ Save a resumable checkpoint.
 
         Args:
@@ -376,6 +376,8 @@ class SLTrainer(BaseTrainer):
             fields (dict): fields and vocabulary
             valid_stats : statistics of last validation run
         """
+        if not isinstance(valid_stats, float):
+            valid_stats = valid_stats.mean_loss()
         real_model = (self.model.module
                       if isinstance(self.model, nn.DataParallel)
                       else self.model)
@@ -396,19 +398,19 @@ class SLTrainer(BaseTrainer):
         if hasattr(self, 'tom'):
             checkpoint['tom'] = self.tom.state_dict()
 
-        path = self.checkpoint_path(epoch, opt, valid_stats)
+        path = self.checkpoint_path(epoch, opt, valid_stats, score_type)
         create_path(path)
-        if not opt.best_only:
+        if not best_only:
             print('Save checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
-        self.save_best_checkpoint(checkpoint, opt, valid_stats)
+        self.save_best_checkpoint(checkpoint, opt, valid_stats, score_type)
 
         return path
 
-    def save_best_checkpoint(self, checkpoint, opt, valid_stats):
-        if self.best_valid_loss is None or valid_stats.mean_loss() < self.best_valid_loss:
-            self.best_valid_loss = valid_stats.mean_loss()
+    def save_best_checkpoint(self, checkpoint, opt, valid_stats, score_type='loss'):
+        if self.best_valid_loss is None or valid_stats < self.best_valid_loss:
+            self.best_valid_loss = valid_stats
             path = '{root}/{model}_best.pt'.format(
                 root=opt.model_path,
                 model=opt.model_filename)
@@ -416,12 +418,14 @@ class SLTrainer(BaseTrainer):
             print('Save best checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
-    def checkpoint_path(self, epoch, opt, stats):
-        path = '{root}/{model}_loss{loss:.4f}_e{epoch:d}.pt'.format(
-            root=opt.model_path,
-            model=opt.model_filename,
-            loss=stats.mean_loss(),
-            epoch=epoch)
+    def checkpoint_path(self, epoch, opt, stats, score_type='loss'):
+        path = '{root}/{model}_{score_type}{score:.4f}_e{epoch:d}.pt'.format(
+                    root=opt.model_path,
+                    model=opt.model_filename,
+                    score_type=score_type,
+                    score=stats,
+                    epoch=epoch)
+        assert path is not None
         return path
 
     def _gradient_accumulation(self, true_batchs, total_stats, report_stats):
@@ -439,7 +443,8 @@ class SLTrainer(BaseTrainer):
             self.incorrect_dist.update_from_batch(batch, policy)
             # print('output is: ', policy, price)
 
-            loss, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
+            loss0, loss1, batch_stats = self._compute_loss(batch, policy, price, self.train_loss)
+            loss = loss0 + loss1
 
             # tmp = torch.cat([batch.target_price, price.view(-1,1), batch.target_pmask], dim=1)
             # print('target_price ',tmp)

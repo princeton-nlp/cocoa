@@ -242,87 +242,6 @@ class MultilayerPerceptron(nn.Module):
     def forward(self, input):
         return self.hidden_layers(input)
 
-class HistoryIdentity(nn.Module):
-
-    def __init__(self, diaact_size, last_lstm_size, extra_size, embeddings, output_size, hidden_size=64, hidden_depth=2):
-        super(HistoryIdentity, self).__init__()
-
-        self.fix_emb = False
-
-        self.dia_lstm = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
-
-        if embeddings is not None:
-            uttr_emb_size = embeddings.embedding_dim
-            self.uttr_lstm = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
-
-            hidden_input = hidden_size + hidden_size + extra_size
-
-        else:
-            hidden_input = hidden_size + extra_size
-
-        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth)
-
-    def forward(self, diaact, extra, lasthidden):
-        return
-
-class HistoryEncoder(nn.Module):
-
-    def __init__(self, diaact_size, last_lstm_size, extra_size, embeddings, output_size,
-                 hidden_size=64, hidden_depth=2, final_output=None, rnn_type='rnn'):
-        super(HistoryEncoder, self).__init__()
-
-        self.fix_emb = False
-
-        if rnn_type == 'lstm':
-            self.dia_rnn = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
-        else:
-            self.dia_rnn = torch.nn.RNNCell(input_size=diaact_size, hidden_size=last_lstm_size)
-
-        if embeddings is not None:
-            uttr_emb_size = embeddings.embedding_dim
-            if rnn_type == 'lstm':
-                self.uttr_rnn = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
-            else:
-                self.uttr_rnn = torch.nn.RNN(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
-
-            hidden_input = last_lstm_size + hidden_size + extra_size
-        else:
-            hidden_input = last_lstm_size + extra_size
-
-        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth, final_output=final_output)
-
-    def forward(self, diaact, uttr, extra, last_hidden):
-        batch_size = diaact.shape[0]
-        next_hidden = self.dia_rnn(diaact, last_hidden)
-        if isinstance(next_hidden, tuple):
-            # For LSTM
-            dia_emb = next_hidden[0].reshape(batch_size, -1)
-        else:
-            # For RNN
-            dia_emb = next_hidden.reshape(batch_size, -1)
-
-        if uttr is not None:
-            uttr, lengths = uttr
-            with torch.set_grad_enabled(not self.fix_emb):
-                uttr = self.uttr_emb(uttr)
-            uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
-            _, output = self.uttr_rnn(uttr)
-
-            # For LSTM case, output=(h_1, c_1)
-            if isinstance(output, tuple):
-                output = output[0]
-
-            uttr_emb = output.reshape(batch_size, -1)
-
-            hidden_input = torch.cat([dia_emb, uttr_emb, extra], dim=-1)
-        else:
-
-            hidden_input = torch.cat([dia_emb, extra], dim=-1)
-
-        emb = self.hidden_layer(hidden_input)
-
-        return emb, next_hidden
-
 
 class CurrentEncoder(nn.Module):
 
@@ -372,6 +291,108 @@ class CurrentEncoder(nn.Module):
         emb = self.hidden_layer(hidden_input)
 
         return emb
+
+
+class HistoryIdentity(nn.Module):
+
+    def __init__(self, diaact_size, last_lstm_size, extra_size, identity_dim,
+                 hidden_size=64, hidden_depth=2, rnn_type='rnn'):
+        super(HistoryIdentity, self).__init__()
+
+        self.fix_emb = False
+        self.identity_dim = identity_dim
+
+        if rnn_type == 'lstm':
+            self.dia_rnn = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
+        else:
+            self.dia_rnn = torch.nn.RNNCell(input_size=diaact_size, hidden_size=last_lstm_size)
+
+        hidden_input = last_lstm_size + extra_size
+
+        self.hidden_layer = MultilayerPerceptron(hidden_input, hidden_size, hidden_depth, final_output=identity_dim)
+
+    def forward(self, diaact, extra, last_hidden):
+        batch_size = diaact.shape[0]
+        next_hidden = self.dia_rnn(diaact, last_hidden)
+        if isinstance(next_hidden, tuple):
+            # For LSTM
+            dia_emb = next_hidden[0].reshape(batch_size, -1)
+        else:
+            # For RNN
+            dia_emb = next_hidden.reshape(batch_size, -1)
+
+        hidden_input = torch.cat([dia_emb, extra], dim=-1)
+
+        emb = self.hidden_layer(hidden_input)
+
+        return emb, next_hidden
+
+
+class HistoryEncoder(nn.Module):
+
+    def __init__(self, identity, extra_size, embeddings, output_size,
+                 hidden_size=64, hidden_depth=2, rnn_type='rnn', fix_identity=True):
+        super(HistoryEncoder, self).__init__()
+
+        self.fix_emb = False
+        self.fix_identity = fix_identity
+        self.ban_identity = False
+
+        self.identity = identity
+        self.uttr_emb = embeddings
+        identity_size = identity.identity_dim
+
+        if embeddings is not None:
+            uttr_emb_size = embeddings.embedding_dim
+            if rnn_type == 'lstm':
+                self.uttr_rnn = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+            else:
+                self.uttr_rnn = torch.nn.RNN(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+
+            hidden_input = hidden_size + extra_size + identity_size
+        else:
+            hidden_input = extra_size + identity_size
+
+        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth)
+
+    def forward(self, uttr, state, identity_state):
+        identity, next_hidden = self.identity(*identity_state)
+        batch_size = state.shape[0]
+        if self.fix_identity:
+            _identity = identity.detach()
+        else:
+            _identity = identity
+        if self.ban_identity:
+            _identity.fill_(0)
+        _identity = torch.softmax(_identity, dim=1)
+        if uttr is not None:
+            uttr = uttr.copy()
+            with torch.set_grad_enabled(not self.fix_emb):
+                for i, u in enumerate(uttr):
+                    if u.dtype != torch.int64:
+                        print('uttr_emb:', uttr)
+                    # print('uttr_emb', next(self.uttr_emb.parameters()).device, u.device)
+                    uttr[i] = self.uttr_emb(u).reshape(-1, self.uttr_emb.embedding_dim)
+                # print(uttr[i].shape)
+            uttr = torch.nn.utils.rnn.pack_sequence(uttr, enforce_sorted=False)
+            # uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
+
+            _, output = self.uttr_rnn(uttr)
+
+            # For LSTM case, output=(h_1, c_1)
+            if isinstance(output, tuple):
+                output = output[0]
+
+            uttr_emb = output.reshape(batch_size, -1)
+
+            hidden_input = torch.cat([uttr_emb, state, _identity], dim=-1)
+        else:
+
+            hidden_input = torch.cat([state, _identity], dim=-1)
+
+        emb = self.hidden_layer(hidden_input)
+
+        return emb, next_hidden, identity
 
 
 class SinglePolicy(nn.Module):
@@ -461,9 +482,9 @@ class HistoryModel(nn.Module):
 
     def forward(self, *input):
         with torch.set_grad_enabled(not self.fix_encoder):
-            emb, next_hidden = self.encoder(*input)
+            emb, next_hidden, identity = self.encoder(*input)
         output = self.decoder(emb)
-        return output, next_hidden
+        return output, next_hidden, identity
 
 class PolicyModel(nn.Module):
     """

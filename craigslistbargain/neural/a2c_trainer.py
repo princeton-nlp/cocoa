@@ -115,18 +115,30 @@ class RLTrainer(BaseTrainer):
         # print('max price', torch.max(price))
         return value, policy, price
 
-    def _run_batch_tom_identity(self, batch, hidden_state):
-        predictions, next_hidden = self.tom(batch.state, None, batch.extra, hidden_state)
-        return predictions, next_hidden
+    def _run_batch_tom_identity(self, batch, hidden_state, only_identity=False):
+        if only_identity:
+            identity, next_hidden = self.tom.encoder.identity(batch.identity_state, batch.extra, hidden_state)
+            predictions = None
+        else:
+            predictions, next_hidden, identity = self.tom(batch.uttr, batch.state,
+                                                          (batch.identity_state, batch.extra, hidden_state))
+        return predictions, next_hidden, identity
 
-    def _tom_gradient_accumulation(self, batch_iter, strategy, model, ):
+    def _tom_gradient_accumulation(self, batch_iter, strategy, model, only_identity=False):
         model.train()
 
         h = None
-        preds = []
-        losses = []
-        accus = []
+        identity_loss = []
+        tom_intent_loss = []
+        tom_price_loss = []
+        identity_accu = []
+        tom_intent_accu = []
         strategies = []
+
+        pred_intent = []
+        pred_price = []
+        pred_identity = []
+
         for i, batch in enumerate(batch_iter):
             tom_batch = ToMBatch.from_raw(batch, strategy)
             if h is not None:
@@ -134,20 +146,40 @@ class RLTrainer(BaseTrainer):
                     h = (h[0][:batch.size, :], h[1][:batch.size, :])
                 elif isinstance(h, torch.Tensor):
                     h = h[:batch.size, :]
-            pred, h = self._run_batch_tom_identity(tom_batch, hidden_state=h)
-            s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=pred.device)
-            loss = self.tom_identity_loss(pred, s)
-            accu = torch.gather(torch.softmax(pred, dim=1), 1, s.reshape(-1, 1))
-            losses.append(loss.reshape(-1))
-            accus.append(accu.reshape(-1))
-            strategies.append(s.detach())
-            preds.append(pred.reshape(1, -1).detach())
+            pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h, only_identity=only_identity)
+
+            # Identity Loss
+            s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=identity.device)
+            loss = self.tom_identity_loss(identity, s)
+            accu = torch.gather(torch.softmax(identity, dim=1), 1, s.reshape(-1, 1))
+            identity_loss.append(loss.reshape(-1))
+            identity_accu.append(accu.reshape(-1))
+            pred_identity.append(identity.reshape(1, -1).detach())
+
+            # ToM Loss
+            if not only_identity:
+                intent, price = pred
+                loss0, loss1, batch_stats = self._compute_loss(tom_batch, policy=intent, price=price, loss=self.tom_loss)
+                intent_accu = torch.gather(torch.softmax(intent, dim=1), 1, tom_batch.act_intent.reshape(-1, 1))
+                tom_intent_accu.append(intent_accu)
+                tom_intent_loss.append(loss0.reshape(-1))
+                tom_price_loss.append(loss1.reshape(-1))
+                pred_intent.append(intent.reshape(1, -1).detach())
+                pred_price.append(price.reshape(1, -1).detach())
+
+            # losses.append(loss.reshape(-1))
+            # accus.append(accu.reshape(-1))
+            # strategies.append(s.detach())
+
+            # preds.append(pred.reshape(1, -1).detach())
+
 
         # preds = torch.cat(preds, dim=0)
         # strategy = torch.tensor([strategy]*preds.shape[0], dtype=torch.int64, device=preds.device)
         # (-1,), (-1, 1) -> (-1,) *2
         # print('loss & accu:', loss, accu)
-        return losses, accus, (preds, strategies)
+        return (identity_loss, tom_intent_loss, tom_price_loss), (identity_accu, tom_intent_accu), \
+               (pred_identity, pred_intent, pred_price, strategies)
 
     def _sort_merge_batch(self, batch_iters, batch_size, device=None):
         sorted_id = [i for i in range(len(batch_iters))]
@@ -187,23 +219,57 @@ class RLTrainer(BaseTrainer):
 
         return bs, ids, bl
 
-    def update_tom(self, args, batch_iters, strategy, model, update_model=True, dump_name=None):
+    @staticmethod
+    def split_by_strategy(t, s):
+        if s is None:
+            return t
+        s = torch.Tensor(s, dtype=torch.uint8, device=t.device).reshape(-1, 1)
+        ret = [0,1]
+        ret[0]=torch.masked_select(t, s)
+        ret[1]=torch.masked_select(t, 1-s)
+        return ret
+
+    def update_tom(self, args, batch_iters, strategy, model,
+                   update_tom=True, update_identity=True, only_identity=True, dump_name=None):
         # print('optim', type(self.optim['tom']))
-        # cur_t = time.time()
+        cur_t = time.time()
         # batch_iters, sorted_id, batch_length = self._sort_merge_batch(batch_iters, 1024)
         batch_iters, sorted_id, batch_length = batch_iters
         # print('merge batch: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
+        if not (update_identity or update_tom or only_identity):
+            valid_tom = True
+        else:
+            valid_tom = False
+        valid_tom = False
 
         model.zero_grad()
-        loss = []
-        step_loss = [[] for i in range(20)]
-        step_accu = [[] for i in range(20)]
+        loss = [[], [], []]
+        accu = [[], []]
+        step_loss = [[], [], []]
+        step_accu = [[], []]
+        # step_loss = [[] for i in range(20)]
+        # step_accu = [[] for i in range(20)]
         output_data = []
+
+        def add_list(step, one, s=None):
+            for j, o in enumerate(one):
+                if isinstance(o, list):
+                    for k in range(len(o)):
+                        if k >= len(step[j]):
+                            step[j].append([])
+                        step[j][k].append(self.split_by_strategy(o[k], s))
+                else:
+                    step[j].append(o)
+
         for i, b in enumerate(batch_iters):
             stra = [strategy[j] for j in sorted_id[i]]
-            l, a, tmp = self._tom_gradient_accumulation(b, stra, model)
-            output_data.append(tmp)
+            l, a, logs = self._tom_gradient_accumulation(b, stra, model, only_identity=only_identity)
+
+            # print('[DEBUG] {} time {}s.'.format('grad_accu', time.time() - cur_t))
+            # cur_t = time.time()
+
+            output_data.append(logs)
             # weight = torch.ones_like(l, device=l.device)
             # for j in range(5):
             #     if j < l.shape[0]:
@@ -215,19 +281,50 @@ class RLTrainer(BaseTrainer):
             #     else:
             #         if l[j+1].shape[0] > ll.shape[0]:
             #             loss.append(ll[l[j+1].shape[0]:])
-            loss.append(torch.cat(l, dim=0))
-            for j in range(len(l)):
-                step_loss[j].append(l[j])
-                step_accu[j].append(a[j])
+            if not valid_tom:
+                stra = None
+
+            for j, ll in enumerate(l):
+                if j > 0 and only_identity:
+                    break
+                tmp = torch.cat(ll, dim=0)
+                loss[j].append(self.split_by_strategy(tmp, stra))
+            for j, aa in enumerate(a):
+                if j > 0 and only_identity:
+                    break
+                tmp = torch.cat(aa, dim=0)
+                accu[j].append(self.split_by_strategy(tmp, stra))
+            # step loss
+            # step accuracy
+            add_list(step_loss, l, stra)
+            add_list(step_accu, a, stra)
+
+            # print('[DEBUG] {} time {}s.'.format('append', time.time() - cur_t))
+            # cur_t = time.time()
 
         # print('calculate loss: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
+        if valid_tom:
+            step_num = [[np.sum([dd[i].shape[0] for dd in d]) for d in step_loss[0]]
+                        for i in range(2)]
+        else:
+            step_num = [np.sum([dd.shape[0] for dd in d]) for d in step_loss[0]]
 
-        loss = torch.cat(loss, dim=0).mean()
+        for i, l in enumerate(loss):
+            if i > 0 and only_identity:
+                break
+            loss[i] = torch.cat(l, dim=0).mean()
+            if valid_tom:
+                step_loss[i] = [[torch.cat([dd[j] for dd in d], dim=0).mean().item() if len(d) > 0 else None for d in step_loss[i]]
+                                for j in range(2)]
+            else:
+                step_loss[i] = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_loss[i]]
 
-        step_num = [np.sum([dd.shape[0] for dd in d]) for d in step_loss]
-        step_loss = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_loss]
-        step_accu = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_accu]
+        for i, a in enumerate(step_accu):
+            if i > 0 and only_identity:
+                break
+            accu[i] = torch.cat(accu[i], dim=0).mean().item()
+            step_accu[i] = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_accu[i]]
 
         # print('returen infos: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
@@ -237,15 +334,33 @@ class RLTrainer(BaseTrainer):
             with open(dump_name, 'wb') as f:
                 pkl.dump(output_data, f)
 
+        # print('[DEBUG] {} time {}s.'.format('mean & dump', time.time() - cur_t))
+        # cur_t = time.time()
+
         # update
-        if update_model:
-            loss.backward()
+        if update_identity:
+            loss[0].backward()
+            self.optim['tom_identity'].step()
+
+        if update_tom:
+            l = loss[1] + loss[2]*100
+            l.backward()
             self.optim['tom'].step()
+
+        # print('[DEBUG] {} time {}s.'.format('backward', time.time() - cur_t))
+        # cur_t = time.time()
+
+        for i, l in enumerate(loss):
+            if isinstance(loss[i], torch.Tensor):
+                loss[i] = loss[i].item()
+            else:
+                loss[i] = None
+
         # print('udpate model: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
 
-
-        return loss.item(), (step_loss, step_accu, step_num)
+        return loss, \
+               accu, (step_loss, step_accu, step_num)
 
     def _gradient_accumulation(self, batch_iter, reward, model, critic, discount=0.95):
         # Compute losses
@@ -425,40 +540,33 @@ class RLTrainer(BaseTrainer):
         self.critic.train()
         return [total_stats, oppo_total_stats], examples, verbose_str
 
-    def save_best_checkpoint(self, checkpoint, opt, valid_stats):
+    def save_best_checkpoint(self, checkpoint, opt, valid_stats, score_type='accu'):
 
-        path = None
-        if opt.model_type == 'reinforce' or opt.model_type == 'a2c':
-            if self.best_valid_reward is None or valid_stats.mean_reward() > self.best_valid_reward:
-                self.best_valid_reward = valid_stats.mean_reward()
-                path = '{root}/{model}_best.pt'.format(
-                            root=opt.model_path,
-                            model=opt.model_filename)
-        elif opt.model_type == 'critic':
-            if self.best_valid_loss is None or valid_stats.mean_loss() < self.best_valid_loss:
-                self.best_valid_loss = valid_stats.mean_loss()
-                path = '{root}/{model}_best.pt'.format(
-                            root=opt.model_path,
-                            model=opt.model_filename)
+        if self.best_valid_reward is None:
+            better = True
+        else:
+            if score_type == 'accu' or score_type == 'reward':
+                better = valid_stats > self.best_valid_reward
+            else:
+                better = valid_stats < self.best_valid_reward
 
-        if path is not None:
-            print('Save best checkpoint {path}'.format(path=path))
+        if better:
+            path = '{root}/{model}_best.pt'.format(
+                        root=opt.model_path,
+                        model=opt.model_filename)
+            print('[Info] Update new best model({}:{:.4f}) at {}.'.format(score_type, valid_stats, path))
+            self.best_valid_reward = valid_stats
+        # if path is not None:
+        #     print('[Info] Save best checkpoint {path}'.format(path=path))
             torch.save(checkpoint, path)
 
-    def checkpoint_path(self, episode, opt, stats):
-        path=None
-        if opt.model_type == 'reinforce' or opt.model_type == 'a2c' or opt.model_type == 'tom':
-            path = '{root}/{model}_reward{reward:.2f}_e{episode:d}.pt'.format(
-                        root=opt.model_path,
-                        model=opt.model_filename,
-                        reward=stats.mean_reward(),
-                        episode=episode)
-        elif opt.model_type == 'critic':
-            path = '{root}/{model}_loss{reward:.4f}_e{episode:d}.pt'.format(
-                        root=opt.model_path,
-                        model=opt.model_filename,
-                        reward=stats.mean_loss(),
-                        episode=episode)
+    def checkpoint_path(self, episode, opt, stats, score_type='loss'):
+        path = '{root}/{model}_{score_type}{score:.4f}_e{episode:d}.pt'.format(
+                    root=opt.model_path,
+                    model=opt.model_filename,
+                    score_type=score_type,
+                    score=stats,
+                    episode=episode)
         assert path is not None
         return path
 

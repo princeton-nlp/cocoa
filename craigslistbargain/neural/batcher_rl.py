@@ -430,8 +430,10 @@ class RawBatch(Batch):
                 continue
             if isinstance(v, torch.Tensor):
                 setattr(self, k, v.to(device=device))
-            elif isinstance(v, tuple) and k == 'state':
-                setattr(self, k, (v[0].to(device=device), v[1].to(device=device)))
+            elif isinstance(v, tuple) and (k == 'state' or k == 'act'):
+                setattr(self, k, tuple([vv.to(device) for vv in v]))
+            elif isinstance(v, list) and k == 'uttr':
+                setattr(self, k, [vv.to(device) for vv in v])
 
 
     @staticmethod
@@ -580,12 +582,12 @@ class RLBatch(RawBatch):
         self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
 
-class ToMBatch(Batch):
+class ToMBatch(RawBatch):
     @classmethod
     def from_raw(cls, rawBatch, strategy):
         state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.prob
         # print('i_s:', -(RawBatch.intent_size+1)*2)
-        state = (state[0][:, -(RawBatch.intent_size+1)*2:], state[1])
+        # state = (state[0][:, -(RawBatch.intent_size+1)*2:], state[1])
         return cls(state, uttr, act, strategy)
 
     def get_pre_info(self, lf_vocab):
@@ -602,7 +604,8 @@ class ToMBatch(Batch):
 
     def __init__(self, state, uttr, act, strategy):
         # super(SLBatch, self).__init__()
-        self.state = state[0]
+        self.state = torch.cat(state, dim=-1)
+        self.identity_state = state[0][:, -(RawBatch.intent_size+1)*2:]
         self.extra = state[1]
         self.uttr = uttr
         self.act_intent = act[0]
@@ -612,7 +615,8 @@ class ToMBatch(Batch):
 
         self.strategy = self.to_tensor(strategy, 'long', cuda=self.state.device.type!='cpu')
 
-        self.tensor_attributes = ['state', 'extra', 'uttr', 'act_intent', 'act_price', 'act_price_mask', 'strategy']
+        self.tensor_attributes = ['state', 'identity_state', 'extra', 'uttr',
+                                  'act_intent', 'act_price', 'act_price_mask', 'strategy']
 
 
 class SLBatch(Batch):

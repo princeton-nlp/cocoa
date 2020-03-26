@@ -127,6 +127,7 @@ class RLTrainer(BaseTrainer):
         self.critic = None
         self.train_loss = SimpleLoss(inp_with_sfmx=False, use_pact=True)
         self.critic_loss = SimpleCriticLoss()
+        self.tom_loss = SimpleLoss(inp_with_sfmx=False, use_pact=False)
         self.entropy_loss = EntropyLoss()
         self.optim = optim
         self.cuda = cuda

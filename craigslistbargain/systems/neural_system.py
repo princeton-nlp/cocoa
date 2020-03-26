@@ -61,16 +61,28 @@ class PytorchNeuralSystem(System):
         else:
             # Load the model.
             mappings, model, model_args = rl_model_builder.load_test_model(
-                model_path, args, dummy_args_dict, new_args, model_type=model_type)
+                model_path, args, dummy_args_dict, new_args, model_type=model_type, load_type='from_sl')
 
             actor, critic, tom = model
             # Load critic from other model.
             # if name == 'tom':
             if hasattr(args, 'load_critic_from') and args.load_critic_from is not None:
                 critic_path = args.load_critic_from
-                _, critic, _ = rl_model_builder.load_test_model(
-                    critic_path, args, dummy_args_dict, new_args)
-                critic = critic[1]
+                _, t_model, _ = rl_model_builder.load_test_model(
+                    critic_path, args, dummy_args_dict, [], model_type=model_type)
+                critic = model[1]
+
+            if hasattr(args, 'load_identity_from') and args.load_identity_from is not None:
+                print('[Info] load identity from {}.'.format(args.load_identity_from))
+                identity_path = args.load_identity_from
+                _, t_model, _ = rl_model_builder.load_test_model(
+                    identity_path, args, dummy_args_dict, [], model_type=model_type)
+                tom.encoder.identity.load_state_dict(t_model[2].encoder.identity.state_dict())
+
+            if hasattr(args, 'ban_identity') and args.ban_identity:
+                print('[Info] Identity banned.')
+                tom.encoder.ban_identity = True
+
             print('rl models', actor)
             print(critic)
             print(tom)

@@ -12,7 +12,7 @@ import onmt.modules
 from onmt.RLModels import StateEncoder, UtteranceEncoder, StateUtteranceEncoder, \
     MeanEncoder, RNNEncoder, \
     PolicyDecoder, PolicyModel, ValueModel, ValueDecoder, \
-    HistoryEncoder, CurrentEncoder, \
+    HistoryEncoder, CurrentEncoder, HistoryIdentity, \
     HistoryModel, CurrentModel, \
     MixedPolicy, SinglePolicy
 from onmt.Utils import use_gpu
@@ -25,7 +25,16 @@ def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
     return nn.Embedding(len(word_dict), emb_length)
 
 
-def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, hidden_depth=1, final_output=None,
+def make_identity(opt, intent_size, hidden_size, hidden_depth, identity_dim=2):
+    diaact_size = (intent_size+1)
+    extra_size = 3 + 2
+    if hidden_size is None:
+        hidden_size = opt.hidden_size
+    identity = HistoryIdentity(diaact_size * 2, hidden_size, extra_size, identity_dim=identity_dim, hidden_depth=hidden_depth)
+
+    return identity
+
+def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, hidden_depth=1, identity=None,
                  hidden_size=None):
     """
     Various encoder dispatcher function.
@@ -43,8 +52,8 @@ def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, h
     if not opt.use_utterance:
         embeddings = None
     if use_history:
-        encoder = HistoryEncoder(diaact_size*2, hidden_size, extra_size, embeddings, output_size,
-                                 hidden_depth=hidden_depth, final_output=final_output)
+        encoder = HistoryEncoder(identity, diaact_size*opt.state_length+extra_size, embeddings, output_size,
+                                 hidden_depth=hidden_depth)
     else:
         encoder = CurrentEncoder(diaact_size*opt.state_length+extra_size, embeddings, output_size,
                                  hidden_depth=hidden_depth)
@@ -67,7 +76,7 @@ def make_decoder(opt, encoder_size, intent_size, hidden_size, price_action=False
     # return PolicyDecoder(encoder_size=encoder_size, intent_size=intent_size)
 
 
-def load_test_model(model_path, opt, dummy_opt, new_opt, model_type='sl'):
+def load_test_model(model_path, opt, dummy_opt, new_opt, model_type='sl', load_type=None):
     if model_path is not None:
         print('Load model from {}.'.format(model_path))
         checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
@@ -93,7 +102,7 @@ def load_test_model(model_path, opt, dummy_opt, new_opt, model_type='sl'):
 
         return mappings, model, model_opt
     else:
-        actor, critic, tom = make_rl_model(model_opt, mappings, use_gpu(opt), checkpoint)
+        actor, critic, tom = make_rl_model(model_opt, mappings, use_gpu(opt), checkpoint, load_type)
         actor.eval()
         critic.eval()
         tom.eval()
@@ -145,7 +154,7 @@ def init_model(model, checkpoint, model_opt, model_name='model'):
             for p in model.parameters():
                 p.data.uniform_(-model_opt.param_init, model_opt.param_init)
 
-def make_rl_model(model_opt, mappings, gpu, checkpoint=None):
+def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'):
     # print('rnn-type', model_opt.rnn_type)
     # print('h-size', model_opt.hidden_depth)
     # print('th-d', model_opt.tom_hidden_size)
@@ -159,13 +168,19 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None):
     src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
     rl_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size)
     # tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size, use_history=True)
+    tom_identity = make_identity(model_opt, intent_size, model_opt.tom_hidden_size,
+                                 hidden_depth=model_opt.hidden_depth, identity_dim=2)
+    tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size,
+                               use_history=True, hidden_depth=model_opt.hidden_depth, identity=tom_identity,
+                               hidden_size=model_opt.tom_hidden_size)
     rl_encoder.fix_emb = True
-    # tom_encoder.fix_emb = True
+    tom_encoder.fix_emb = True
 
     # Make decoder.
     tgt_dict = mappings['tgt_vocab']
     actor_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, model_opt.hidden_size, price_action=True)
     critic_decoder = make_decoder(model_opt, model_opt.hidden_size, 1, model_opt.hidden_size, output_value=True)
+    tom_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, model_opt.hidden_size)
 
     # tom_decoder = make_decoder(model_opt, model_opt.hidden_size, 2, model_opt.hidden_size, output_value=True)
     # print('decoder', decoder)
@@ -173,24 +188,26 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None):
     actor_model = CurrentModel(rl_encoder, actor_decoder, fix_encoder=True)
     critic_model = CurrentModel(rl_encoder, critic_decoder, fix_encoder=True)
 
-    # tom_model = HistoryModel(tom_encoder, tom_decoder)
-    tom_model = make_encoder(model_opt, None, intent_size, model_opt.tom_hidden_size,
-                             use_history=True, hidden_depth=model_opt.hidden_depth, final_output=2,
-                             hidden_size=model_opt.tom_hidden_size)
+    tom_model = HistoryModel(tom_encoder, tom_decoder)
+
     #TODO: use for tom_identity test
     # tom_model = make_encoder(model_opt, src_embeddings, intent_size, 2, use_history=True)
 
-    load_from_sl = True
+    print('load type:', load_type)
 
     # First
-    if load_from_sl:
+    if load_type == 'from_sl':
         transfer_actor_model(actor_model, checkpoint, model_opt, 'model')
         transfer_critic_model(critic_model, checkpoint, model_opt, 'model')
-        init_model(tom_model, None, model_opt)
+        init_model(tom_model, None, model_opt, 'tom')
+    # elif load_type == 'only_tom':
+    #     init_model(actor_model, checkpoint, model_opt, 'model')
+    #     init_model(critic_model, checkpoint, model_opt, 'critic')
+    #     init_model(tom_model, checkpoint, model_opt, 'tom')
     else:
-        init_model(actor_model, checkpoint, model_opt, 'actor_model')
-        init_model(critic_model, checkpoint, model_opt, 'critic_model')
-        init_model(tom_model, checkpoint, model_opt, 'tom_model')
+        init_model(actor_model, checkpoint, model_opt, 'model')
+        init_model(critic_model, checkpoint, model_opt, 'critic')
+        init_model(tom_model, checkpoint, model_opt, 'tom')
 
     if gpu:
         actor_model.cuda()
