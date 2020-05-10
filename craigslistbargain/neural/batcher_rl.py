@@ -200,9 +200,10 @@ class Batch(object):
 
         state_sentence = torch.cat([encoder_intent, encoder_price], dim=-1)
         state_extra = encoder_extra
+        state_obs = torch.cat([encoder_intent, encoder_price.mul(encoder_pmask), encoder_pmask], dim=-1)
         uttr = encoder_tokens
 
-        return (state_sentence, state_extra), uttr, \
+        return (state_sentence, state_extra, state_obs), uttr, \
                (target_intent, target_price, target_pact, target_pmask), target_prob
 
     # def __init__(self, attrs_name, attrs_value, for_value=False):
@@ -476,7 +477,7 @@ class RawBatch(Batch):
 
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
-        sentence, extra = self.state
+        sentence, extra, _ = self.state
         state_length = self.state[0].shape[1] // (intent_size+1)
         intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
         prices = extra[:, -2:]
@@ -569,7 +570,7 @@ class RLBatch(RawBatch):
 
     def __init__(self, state, uttr, act, prob, reward, done):
         # super(RLBatch, self).__init__()
-        self.state = torch.cat(state, dim=-1)
+        self.state = torch.cat(state[:2], dim=-1)
         self.prob = prob
         self.uttr = uttr
         self.act_intent = act[0]
@@ -592,10 +593,10 @@ class ToMBatch(RawBatch):
 
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
-        sentence, extra = self.state, self.extra
+        sentence = self.state
         state_length = sentence.shape[1] // (intent_size+1)
         intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
-        prices = extra[:, -2:]
+        prices = self.last_price
         intents = list(intents.argmax(dim=1).reshape(-1).cpu().numpy())
         return intents, prices
 
@@ -604,9 +605,16 @@ class ToMBatch(RawBatch):
 
     def __init__(self, state, uttr, act, strategy):
         # super(SLBatch, self).__init__()
-        self.state = torch.cat(state, dim=-1)
-        self.identity_state = state[0][:, -(RawBatch.intent_size+1)*2:]
-        self.extra = state[1]
+        # self.state = torch.cat([state[2], state[1][:, :3]], dim=-1)
+        length = state[2].shape[1] // (RawBatch.intent_size+2)
+        intent = state[2][:, :length*RawBatch.intent_size][:, -RawBatch.intent_size*2:]
+        price = state[2][:, length*RawBatch.intent_size:length*(RawBatch.intent_size+1)][:, -2:]
+        pmask = state[2][:, length*(RawBatch.intent_size+1):length*(RawBatch.intent_size+2)][:, -2:]
+        self.identity_state = torch.cat([intent, price, pmask], dim=-1)
+        # self.identity_state = state[2][:, -(RawBatch.intent_size+2)*2:]
+        self.extra = state[1][:, :3]
+        self.state = torch.cat([self.identity_state, self.extra], dim=-1)
+        self.last_price = state[1][:, -2:]
         self.uttr = uttr
         self.act_intent = act[0]
         self.act_price = act[1]
@@ -615,7 +623,7 @@ class ToMBatch(RawBatch):
 
         self.strategy = self.to_tensor(strategy, 'long', cuda=self.state.device.type!='cpu')
 
-        self.tensor_attributes = ['state', 'identity_state', 'extra', 'uttr',
+        self.tensor_attributes = ['state', 'identity_state', 'extra', 'uttr', 'last_price',
                                   'act_intent', 'act_price', 'act_price_mask', 'strategy']
 
 
@@ -629,7 +637,7 @@ class SLBatch(Batch):
         state, uttr, act, prob \
             = self.convert_data(encoder_args=encoder_args, decoder_args=decoder_args, context_data=context_data,
                      vocab=vocab, cuda=cuda)
-        self.state = torch.cat(state, dim=-1)
+        self.state = torch.cat(state[:2], dim=-1)
         self.uttr = uttr
         self.act_intent = act[0]
         self.act_price = act[1]
@@ -715,23 +723,24 @@ class DialogueBatcher(object):
                 # STAGE == ENC: encoder batch
                 intents = []
                 prices = []
+                oprices = []
 
                 def get_turns():
                     intent = [self.pad]*(max(0, step_back-i-1))
                     price = [None]*(max(0, step_back-i-1))
+                    oprice = [None] * (max(0, step_back - i - 1))
                     for j in range(max(0, i + 1 - step_back), i + 1):
                         tmp = lfs[j]
                         intent.append(tmp['intent'])
-                        if STAGE == 0:
-                            price.append(tmp.get('price'))
-                        else:
-                            # price.append(tmp.get('price'))
-                            price.append(tmp.get('original_price'))
+                        price.append(tmp.get('price'))
+                        # price.append(tmp.get('price'))
+                        oprice.append(tmp.get('original_price'))
                     # tmp = d.lfs[i]
                     # intent = np.array(intent)
                     # price = np.array(price)
                     intents.append(intent)
                     prices.append(price)
+                    oprices.append(oprice)
 
                 for d in dialogues:
                     if attached_events is not None:
@@ -751,7 +760,7 @@ class DialogueBatcher(object):
 
                 # if step_back == 2:
                 #     print(step_back-i-1, i+1-step_back, i+1, intents)
-                turns = {'intent': intents, 'price': prices}
+                turns = {'intent': intents, 'price': prices, 'original_price': oprices}
                 return turns
             else:
                 # STAGE==ROLE: role batch
@@ -825,7 +834,7 @@ class DialogueBatcher(object):
         # print(intent)
         for i in range(size):
             price.append([p if p is not None else (j+1) % 2 for j, p in enumerate(encoder_turns['price'][i])])
-            price_mask.append([1 if p is not None else 0 for p in encoder_turns['price'][i]])
+            price_mask.append([1 if p is not None else 0 for p in encoder_turns['original_price'][i]])
         # intent = np.array(intent, dtype=np.int32)
         # price = np.array(price, dtype=np.float)
         # price_mask = np.array(price_mask, dtype=np.int32)
@@ -844,7 +853,7 @@ class DialogueBatcher(object):
     def make_decoder_inputs_and_targets(self, decoder_turns, target_turns=None):
         intent = decoder_turns['intent']
         price = [p if p[0] is not None else [0] for p in decoder_turns['price']]
-        price_mask = [[1] if p[0] is not None else [0] for p in decoder_turns['price']]
+        price_mask = [[1] if p[0] is not None else [0] for p in decoder_turns['original_price']]
         # intent = np.array(intent, dtype=np.int32)
         # price = np.array(price, dtype=np.float)
         # price_mask = np.array(price_mask, dtype=np.int32)

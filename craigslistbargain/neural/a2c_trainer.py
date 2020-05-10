@@ -1,3 +1,6 @@
+# Data: _batch_iters, (_rewards, strategies), examples, verbose_strs
+# Out: (pred_identity, pred_intent, pred_price, strategies)
+
 import argparse
 import random
 import json

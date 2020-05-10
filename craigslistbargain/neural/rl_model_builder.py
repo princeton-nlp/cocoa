@@ -9,10 +9,8 @@ import onmt
 import onmt.io
 import onmt.Models
 import onmt.modules
-from onmt.RLModels import StateEncoder, UtteranceEncoder, StateUtteranceEncoder, \
-    MeanEncoder, RNNEncoder, \
-    PolicyDecoder, PolicyModel, ValueModel, ValueDecoder, \
-    HistoryEncoder, CurrentEncoder, HistoryIdentity, \
+from onmt.RLModels import PolicyDecoder, PolicyModel, ValueModel, ValueDecoder, \
+    HistoryIDEncoder, CurrentEncoder, HistoryIdentity, \
     HistoryModel, CurrentModel, \
     MixedPolicy, SinglePolicy
 from onmt.Utils import use_gpu
@@ -26,8 +24,8 @@ def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
 
 
 def make_identity(opt, intent_size, hidden_size, hidden_depth, identity_dim=2):
-    diaact_size = (intent_size+1)
-    extra_size = 3 + 2
+    diaact_size = (intent_size+1+1)
+    extra_size = 3
     if hidden_size is None:
         hidden_size = opt.hidden_size
     identity = HistoryIdentity(diaact_size * 2, hidden_size, extra_size, identity_dim=identity_dim, hidden_depth=hidden_depth)
@@ -52,7 +50,9 @@ def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, h
     if not opt.use_utterance:
         embeddings = None
     if use_history:
-        encoder = HistoryEncoder(identity, diaact_size*opt.state_length+extra_size, embeddings, output_size,
+        extra_size = 3
+        diaact_size += 1
+        encoder = HistoryIDEncoder(identity, diaact_size*2+extra_size, embeddings, output_size,
                                  hidden_depth=hidden_depth)
     else:
         encoder = CurrentEncoder(diaact_size*opt.state_length+extra_size, embeddings, output_size,

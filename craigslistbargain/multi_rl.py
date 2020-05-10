@@ -2,6 +2,7 @@ import argparse
 import random
 import json
 import numpy as np
+import torch
 import sys
 
 from onmt.Utils import use_gpu
@@ -96,12 +97,19 @@ if __name__ == '__main__':
     parser.add_argument('--load-identity-from', default=None, type=str, help='load critic model from another checkpoint')
     parser.add_argument('--load-sample', default=None, type=str)
 
+    parser.add_argument('--seed', type=int, default=0)
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)
     options.add_rl_arguments(parser)
     options.add_model_arguments(parser)
     args = parser.parse_args()
+
+    # Set seeds
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
 
     dump_args()
     if args.identity_test or args.tom_test:

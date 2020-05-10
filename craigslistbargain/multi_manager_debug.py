@@ -54,6 +54,7 @@ def init_dir(path, clean_all=False):
                 os.mkdir(path)
             print('[Info] remake dir {}'.format(path))
 
+
 class MultiRunner:
     def __init__(self, args, addr):
         self.init_trainer(args)
@@ -102,7 +103,6 @@ class MultiRunner:
 
     def get_real_addr(self, addr):
         return addr
-
 
     def simulate(self, cmd):
         i, batch_size, real_batch = cmd
@@ -403,6 +403,7 @@ class MultiManager():
         train_agent = 0
         load_data = args.load_sample
 
+        # Generate data samples or load from files
         data_pkl = 'cache/{}/data.pkl'.format(args.name)
         if load_data is None:
             print('[Info] Start sampling.')
@@ -420,7 +421,7 @@ class MultiManager():
         _rewards, strategies = batch_info
         self.dump_examples(example, v_str, 0)
 
-        # divide the training set
+        # Divide the training set
         train_size = round(len(_batch_iters[1-train_agent]) * 0.6)
         train_batch = _batch_iters[1-train_agent][:train_size]
         train_strategy = strategies[1-train_agent][:train_size]
@@ -458,12 +459,12 @@ class MultiManager():
                 ['split_batch', (dev_batch, 1024)]
             )
 
-        def draw_dev_info(loss, accu, step_info, name, s, i):
-            dev_writer[s].add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), loss[1], i)
-            dev_writer[s].add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), accu[1], i)
-            dev_writer[s].add_scalar('tom{}/{}_price_loss'.format(train_agent, name), loss[2], i)
-            dev_writer[s].add_scalar('tom{}/{}_total_loss'.format(train_agent, name), loss[1] + loss[2], i)
-            dev_writer[s].flush()
+        def draw_dev_info(loss, accu, step_info, name, w, i):
+            w.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), loss[1], i)
+            w.add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), accu[1], i)
+            w.add_scalar('tom{}/{}_price_loss'.format(train_agent, name), loss[2], i)
+            w.add_scalar('tom{}/{}_total_loss'.format(train_agent, name), loss[1] + loss[2], i)
+            w.flush()
 
         # Draw outputs on the tensorboard
         def draw_info(loss, accu, step_info, name, i):
@@ -526,9 +527,10 @@ class MultiManager():
                                        dev_strategy[j], learn_type,
                                        'cache/{}/dev{}_pred_{}.pkl'.format(args.name, j, i))])
                     tmp_loss, tmp_accu, dev_step_info = info[1]
-                    dev_loss[2] = ratio * tmp_loss[2]
-                    dev_accu[1] = ratio * tmp_accu[1]
-                    draw_dev_info(tmp_loss, tmp_accu, dev_step_info, 'dev', j, i)
+                    dev_loss[2] += ratio * tmp_loss[2]
+                    dev_accu[1] += ratio * tmp_accu[1]
+                    draw_dev_info(tmp_loss, tmp_accu, dev_step_info, 'dev', dev_writer[j], i)
+                draw_dev_info(dev_loss, dev_accu, None, 'dev', self.writer, i)
             else:
                 info = worker.local_send(
                     ['valid_tom', (train_agent, dev_batch_splited,

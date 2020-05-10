@@ -207,7 +207,7 @@ class SLTrainer(BaseTrainer):
     def _compute_loss(self, batch, policy=None, price=None, loss=None):
         # Get one-hot vectors of target
         # class_num = len(batch.vocab)
-        batch_size = batch.size
+        batch_size = len(batch)
         # print('class_num {}\tbatch_size{}'.format(class_num, batch_size))
         # target_intent = torch.zeros(batch_size, class_num)
         # if batch.target_intent.device.type == 'cuda':
