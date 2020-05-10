@@ -755,7 +755,7 @@ class DialogueBatcher(object):
                     else:
                         lfs = d.lfs
                         if len(lfs) == 0:
-                            print('tt', len(d.lfs), len(d.lf_tokens), len(d.token_turns), len(d.tokens))
+                            print('tt', len(d.lfs), len(d.lf_turns), len(d.token_turns), len(d.tokens))
                         get_turns()
 
                 # if step_back == 2:
@@ -801,7 +801,7 @@ class DialogueBatcher(object):
         for d in dialogues:
             if i >= len(d.agents):
                 print(d.agents, i)
-                print(d.lf_tokens)
+                print(d.lf_turns)
                 assert False
         return [dialogue.agents[i] for dialogue in dialogues]
 

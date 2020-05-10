@@ -25,11 +25,12 @@ def build_kb_vocab(dialogues, special_symbols=[]):
 
 
 def build_lf_vocab_simple(dialogues):
+    print('[Warning] unknown function used.')
     vocab = Vocabulary(offset=0, unk=True)
     for dialogue in dialogues:
         assert dialogue.is_int is False
-        for lf in dialogue.lf_tokens:
-           vocab.add_words(lf)
+        for lf in dialogue.lf_turns:
+           vocab.add_words(lf['intent'])
     vocab.add_words(sequence_markers, special=True)
     print('LF vocabulary size:', vocab.size)
     return vocab
@@ -60,7 +61,7 @@ def build_lf_vocab(dialogues, special_symbols=[], entity_forms=[], except_words=
 
     for dialogue in dialogues:
         assert dialogue.is_int is False
-        for lf in dialogue.lf_tokens:
+        for lf in dialogue.lf_turns:
             # for token in lf:
             # if is_entity(lf):
             #     _add_entity(token)
