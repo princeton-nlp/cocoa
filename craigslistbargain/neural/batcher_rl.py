@@ -610,6 +610,7 @@ class ToMBatch(RawBatch):
         intent = state[2][:, :length*RawBatch.intent_size][:, -RawBatch.intent_size*2:]
         price = state[2][:, length*RawBatch.intent_size:length*(RawBatch.intent_size+1)][:, -2:]
         pmask = state[2][:, length*(RawBatch.intent_size+1):length*(RawBatch.intent_size+2)][:, -2:]
+        # One step state
         self.identity_state = torch.cat([intent, price, pmask], dim=-1)
         # self.identity_state = state[2][:, -(RawBatch.intent_size+2)*2:]
         self.extra = state[1][:, :3]

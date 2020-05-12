@@ -26,8 +26,9 @@ def add_model_arguments(parser):
     from onmt.modules.SRU import CheckSRU
     group = parser.add_argument_group('Model')
 
-    parser.add_argument('--tom-hidden-size', type=int, default=64, help='start from specific epoch.')
-    parser.add_argument('--hidden-depth', type=int, default=1, help='start from specific epoch.')
+    group.add_argument('--tom-hidden-size', type=int, default=64, help='start from specific epoch.')
+    group.add_argument('--hidden-depth', type=int, default=1, help='start from specific epoch.')
+    group.add_argument('--tom-model', type=str, default='history', choices=['naive', 'history', 'id_tom', 'id', 'fixed_id_tom'])
 
     group.add_argument('--dia-num', type=int, default=0, help='')
     group.add_argument('--state-length', type=int, default=2, help='')

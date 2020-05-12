@@ -257,10 +257,10 @@ class HistoryEncoder(nn.Module):
 
             uttr_emb = output.reshape(batch_size, -1)
 
-            hidden_input = torch.cat([uttr_emb, state, dia_emb], dim=-1)
+            hidden_input = torch.cat([uttr_emb, extra, dia_emb], dim=-1)
         else:
 
-            hidden_input = torch.cat([state, dia_emb], dim=-1)
+            hidden_input = torch.cat([extra, dia_emb], dim=-1)
 
         emb = self.hidden_layer(hidden_input)
 
@@ -421,9 +421,11 @@ class HistoryModel(nn.Module):
 
     def forward(self, *input):
         with torch.set_grad_enabled(not self.fix_encoder):
-            emb, next_hidden, identity = self.encoder(*input)
-        output = self.decoder(emb)
-        return output, next_hidden, identity
+            # return emb, next_hidden, (identity)
+            e_output = self.encoder(*input)
+
+        d_output = self.decoder(e_output[0])
+        return (d_output,) + e_output[1:]
 
 class PolicyModel(nn.Module):
     """

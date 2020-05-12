@@ -91,9 +91,7 @@ if __name__ == '__main__':
                         help='directory of templates for IR-based NLG')
 
     parser.add_argument('--get-dialogues', default=False, action='store_true')
-    parser.add_argument('--identity-test', default=False, action='store_true')
     parser.add_argument('--tom-test', default=False, action='store_true')
-    parser.add_argument('--ban-identity', default=False, action='store_true')
     parser.add_argument('--load-identity-from', default=None, type=str, help='load critic model from another checkpoint')
     parser.add_argument('--load-sample', default=None, type=str)
 
@@ -112,7 +110,7 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
 
     dump_args()
-    if args.identity_test or args.tom_test:
+    if args.tom_test:
         # Single thread
         print('[Info] Running in debug mode for identity test.')
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)

@@ -123,11 +123,16 @@ class RLTrainer(BaseTrainer):
             identity, next_hidden = self.tom.encoder.identity(batch.identity_state, batch.extra, hidden_state)
             predictions = None
         else:
-            predictions, next_hidden, identity = self.tom(batch.uttr, batch.state,
-                                                          (batch.identity_state, batch.extra, hidden_state))
+            output = self.tom(batch.uttr, batch.state,
+                               (batch.identity_state, batch.extra, hidden_state))
+            if len(output) == 3:
+                predictions, next_hidden, identity = output
+            else:
+                predictions, next_hidden = output
+                identity = None
         return predictions, next_hidden, identity
 
-    def _tom_gradient_accumulation(self, batch_iter, strategy, model, only_identity=False):
+    def _tom_gradient_accumulation(self, batch_iter, strategy, model, ret_table):
         model.train()
 
         h = None
@@ -149,18 +154,19 @@ class RLTrainer(BaseTrainer):
                     h = (h[0][:batch.size, :], h[1][:batch.size, :])
                 elif isinstance(h, torch.Tensor):
                     h = h[:batch.size, :]
-            pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h, only_identity=only_identity)
+            pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h, only_identity=(not ret_table['tom']))
 
             # Identity Loss
-            s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=identity.device)
-            loss = self.tom_identity_loss(identity, s)
-            accu = torch.gather(torch.softmax(identity, dim=1), 1, s.reshape(-1, 1))
-            identity_loss.append(loss.reshape(-1))
-            identity_accu.append(accu.reshape(-1))
-            pred_identity.append(identity.reshape(1, -1).detach())
+            if ret_table['id']:
+                s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=identity.device)
+                loss = self.tom_identity_loss(identity, s)
+                accu = torch.gather(torch.softmax(identity, dim=1), 1, s.reshape(-1, 1))
+                identity_loss.append(loss.reshape(-1))
+                identity_accu.append(accu.reshape(-1))
+                pred_identity.append(identity.reshape(1, -1).detach())
 
             # ToM Loss
-            if not only_identity:
+            if ret_table['tom']:
                 intent, price = pred
                 loss0, loss1, batch_stats = self._compute_loss(tom_batch, policy=intent, price=price, loss=self.tom_loss)
                 intent_accu = torch.gather(torch.softmax(intent, dim=1), 1, tom_batch.act_intent.reshape(-1, 1))
@@ -181,7 +187,7 @@ class RLTrainer(BaseTrainer):
         # strategy = torch.tensor([strategy]*preds.shape[0], dtype=torch.int64, device=preds.device)
         # (-1,), (-1, 1) -> (-1,) *2
         # print('loss & accu:', loss, accu)
-        return (identity_loss, tom_intent_loss, tom_price_loss), (identity_accu, tom_intent_accu), \
+        return {'id':[identity_loss], 'tom':[tom_intent_loss, tom_price_loss]}, {'id':[identity_accu], 'tom':[tom_intent_accu]}, \
                (pred_identity, pred_intent, pred_price, strategies)
 
     def _sort_merge_batch(self, batch_iters, batch_size, device=None):
@@ -233,24 +239,26 @@ class RLTrainer(BaseTrainer):
         return ret
 
     def update_tom(self, args, batch_iters, strategy, model,
-                   update_tom=True, update_identity=True, only_identity=True, dump_name=None):
+                   update_table=None, ret_table=None, dump_name=None):
         # print('optim', type(self.optim['tom']))
         cur_t = time.time()
-        # batch_iters, sorted_id, batch_length = self._sort_merge_batch(batch_iters, 1024)
+        if not update_table:
+            update_table = {'id': True, 'tom': True}
+        if not ret_table:
+            ret_table = {'id': True, 'tom': True}
+
         batch_iters, sorted_id, batch_length = batch_iters
         # print('merge batch: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
-        if not (update_identity or update_tom or only_identity):
-            valid_tom = True
-        else:
-            valid_tom = False
-        valid_tom = False
+
+        # TODO: split_by_strategy?
+        split_by_strategy = False
 
         model.zero_grad()
-        loss = [[], [], []]
-        accu = [[], []]
-        step_loss = [[], [], []]
-        step_accu = [[], []]
+        loss = {'id': [[]], 'tom': [[], []]}
+        accu = {'id': [[]], 'tom': [[]]}
+        step_loss = {'id': [[]], 'tom': [[], []]}
+        step_accu = {'id': [[]], 'tom': [[]]}
         # step_loss = [[] for i in range(20)]
         # step_accu = [[] for i in range(20)]
         output_data = []
@@ -267,7 +275,7 @@ class RLTrainer(BaseTrainer):
 
         for i, b in enumerate(batch_iters):
             stra = [strategy[j] for j in sorted_id[i]]
-            l, a, logs = self._tom_gradient_accumulation(b, stra, model, only_identity=only_identity)
+            l, a, logs = self._tom_gradient_accumulation(b, stra, model, ret_table=ret_table)
 
             # print('[DEBUG] {} time {}s.'.format('grad_accu', time.time() - cur_t))
             # cur_t = time.time()
@@ -284,50 +292,62 @@ class RLTrainer(BaseTrainer):
             #     else:
             #         if l[j+1].shape[0] > ll.shape[0]:
             #             loss.append(ll[l[j+1].shape[0]:])
-            if not valid_tom:
+            if not split_by_strategy:
                 stra = None
+            # loss
+            # l['tom']=[loss_intent, loss_price]
+            # l['tom'][0] = [Tensor, Tensor, ...], whose length is number of steps
+            # loss['tom'] = [loss_intent, loss_price]
+            # loss['tom'] = [Tensor, ...], whose length is number of batch
+            for key in l:
+                l_key = l[key]
+                if not ret_table[key]: continue
+                for j, ll in enumerate(l_key):
+                    tmp = torch.cat(ll, dim=0)
+                    loss[key][j].append(self.split_by_strategy(tmp, stra))
+                add_list(step_loss[key], l_key, stra)
 
-            for j, ll in enumerate(l):
-                if j > 0 and only_identity:
-                    break
-                tmp = torch.cat(ll, dim=0)
-                loss[j].append(self.split_by_strategy(tmp, stra))
-            for j, aa in enumerate(a):
-                if j > 0 and only_identity:
-                    break
-                tmp = torch.cat(aa, dim=0)
-                accu[j].append(self.split_by_strategy(tmp, stra))
-            # step loss
-            # step accuracy
-            add_list(step_loss, l, stra)
-            add_list(step_accu, a, stra)
+            for key in a:
+                a_key = a[key]
+                if not ret_table[key]: continue
+                for j, aa in enumerate(a_key):
+                    tmp = torch.cat(aa, dim=0)
+                    accu[key][j].append(self.split_by_strategy(tmp, stra))
+                add_list(step_accu[key], a_key, stra)
 
             # print('[DEBUG] {} time {}s.'.format('append', time.time() - cur_t))
             # cur_t = time.time()
 
         # print('calculate loss: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
-        if valid_tom:
-            step_num = [[np.sum([dd[i].shape[0] for dd in d]) for d in step_loss[0]]
-                        for i in range(2)]
-        else:
-            step_num = [np.sum([dd.shape[0] for dd in d]) for d in step_loss[0]]
+        step_num = None
+        for key in ['id', 'tom']:
+            if not ret_table[key]:
+                continue
 
-        for i, l in enumerate(loss):
-            if i > 0 and only_identity:
-                break
-            loss[i] = torch.cat(l, dim=0).mean()
-            if valid_tom:
-                step_loss[i] = [[torch.cat([dd[j] for dd in d], dim=0).mean().item() if len(d) > 0 else None for d in step_loss[i]]
-                                for j in range(2)]
-            else:
-                step_loss[i] = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_loss[i]]
+            if step_num is None:
+                if split_by_strategy:
+                    if ret_table['id']:
+                        step_num = [[np.sum([dd[i].shape[0] for dd in d]) for d in step_loss[key][0]]
+                                    for i in range(2)]
+                    else:
 
-        for i, a in enumerate(step_accu):
-            if i > 0 and only_identity:
-                break
-            accu[i] = torch.cat(accu[i], dim=0).mean().item()
-            step_accu[i] = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_accu[i]]
+                        step_num = [[np.sum([dd[i].shape[0] for dd in d]) for d in step_loss[key][0]]
+                                    for i in range(2)]
+                else:
+                    step_num = [np.sum([dd.shape[0] for dd in d]) for d in step_loss[key][0]]
+
+            for i, l in enumerate(loss[key]):
+                loss[key][i] = torch.cat(l, dim=0).mean()
+                if split_by_strategy:
+                    step_loss[key][i] = [[torch.cat([dd[j] for dd in d], dim=0).mean().item() if len(d) > 0 else None for d in step_loss[key][i]]
+                                    for j in range(2)]
+                else:
+                    step_loss[key][i] = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_loss[key][i]]
+
+            for i, a in enumerate(accu[key]):
+                accu[key][i] = torch.cat(a, dim=0).mean().item()
+                step_accu[key][i] = [torch.cat(d, dim=0).mean().item() if len(d)>0 else None for d in step_accu[key][i]]
 
         # print('returen infos: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
@@ -341,26 +361,34 @@ class RLTrainer(BaseTrainer):
         # cur_t = time.time()
 
         # update
-        if update_identity:
-            loss[0].backward()
-            self.optim['tom_identity'].step()
+        if update_table['id']:
+            loss['id'][0].backward()
+            if self.optim.get('tom_identity') is not None:
+                self.optim['tom_identity'].step()
+            else:
+                print('[Warning] update identity, but no identity exists.')
 
-        if update_tom:
-            l = loss[1] + loss[2]*100
+        if update_table['tom']:
+            l = loss['tom'][0] + loss['tom'][1]*100
             l.backward()
             self.optim['tom'].step()
 
         # print('[DEBUG] {} time {}s.'.format('backward', time.time() - cur_t))
         # cur_t = time.time()
 
-        for i, l in enumerate(loss):
-            if isinstance(loss[i], torch.Tensor):
-                loss[i] = loss[i].item()
-            else:
-                loss[i] = None
+        for key in ['id', 'tom']:
+            for i, l in enumerate(loss[key]):
+                if isinstance(loss[key][i], torch.Tensor):
+                    loss[key][i] = loss[key][i].item()
+                else:
+                    loss[key][i] = None
 
         # print('udpate model: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
+        loss = loss['id'] + loss['tom']
+        accu = accu['id'] + accu['tom']
+        step_loss = step_loss['id'] + step_loss['tom']
+        step_accu = step_accu['id'] + step_accu['tom']
 
         return loss, \
                accu, (step_loss, step_accu, step_num)

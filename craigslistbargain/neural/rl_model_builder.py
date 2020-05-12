@@ -10,7 +10,7 @@ import onmt.io
 import onmt.Models
 import onmt.modules
 from onmt.RLModels import PolicyDecoder, PolicyModel, ValueModel, ValueDecoder, \
-    HistoryIDEncoder, CurrentEncoder, HistoryIdentity, \
+    HistoryEncoder, HistoryIDEncoder, CurrentEncoder, HistoryIdentity, \
     HistoryModel, CurrentModel, \
     MixedPolicy, SinglePolicy
 from onmt.Utils import use_gpu
@@ -52,7 +52,11 @@ def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, h
     if use_history:
         extra_size = 3
         diaact_size += 1
-        encoder = HistoryIDEncoder(identity, diaact_size*2+extra_size, embeddings, output_size,
+        if identity is None:
+            encoder = HistoryEncoder(diaact_size * 2, extra_size, embeddings, output_size,
+                                       hidden_depth=hidden_depth)
+        else:
+            encoder = HistoryIDEncoder(identity, diaact_size*2+extra_size, embeddings, output_size,
                                  hidden_depth=hidden_depth)
     else:
         encoder = CurrentEncoder(diaact_size*opt.state_length+extra_size, embeddings, output_size,
@@ -168,11 +172,16 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
     src_embeddings = make_embeddings(model_opt, src_dict, model_opt.word_vec_size)
     rl_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size)
     # tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size, use_history=True)
-    tom_identity = make_identity(model_opt, intent_size, model_opt.tom_hidden_size,
-                                 hidden_depth=model_opt.hidden_depth, identity_dim=2)
-    tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size,
-                               use_history=True, hidden_depth=model_opt.hidden_depth, identity=tom_identity,
-                               hidden_size=model_opt.tom_hidden_size)
+    if model_opt.tom_model in ['history', 'naive']:
+        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size,
+                                   use_history=(model_opt.tom_model == 'history'), hidden_depth=model_opt.hidden_depth,
+                                   identity=None, hidden_size=model_opt.tom_hidden_size)
+    else:
+        tom_identity = make_identity(model_opt, intent_size, model_opt.tom_hidden_size,
+                                     hidden_depth=model_opt.hidden_depth, identity_dim=2)
+        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size,
+                                   use_history=True, hidden_depth=model_opt.hidden_depth, identity=tom_identity,
+                                   hidden_size=model_opt.tom_hidden_size)
     rl_encoder.fix_emb = True
     tom_encoder.fix_emb = True
 

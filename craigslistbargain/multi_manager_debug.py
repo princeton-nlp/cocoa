@@ -88,7 +88,8 @@ class MultiRunner:
                  'critic': build_optim(args, system.env.critic, None)}
         if system.env.tom_model is not None:
             optim['tom'] = build_optim(args, system.env.tom_model, None)
-            optim['tom_identity'] = build_optim(args, system.env.tom_model.encoder.identity, None)
+            if args.tom_model not in ['naive', 'history']:
+                optim['tom_identity'] = build_optim(args, system.env.tom_model.encoder.identity, None)
             # optim['tom']._set_rate(0.1)
         optim['critic']._set_rate(0.05)
 
@@ -164,29 +165,34 @@ class MultiRunner:
         env = self.systems[model_idx].env
         return env.model.state_dict(), env.critic.state_dict()
 
-    def train_tom(self, model_idx, batch_iters, strategy, learn_type='co-train', dump_file=None):
+    def train_tom(self, model_idx, batch_iters, strategy, update_table=None, ret_table=None, dump_file=None):
         env = self.systems[model_idx].env
-        if learn_type == 'identity':
-            use_tom, use_identity, only_identity = False, True, True
-        elif learn_type == 'tom':
-            use_tom, use_identity, only_identity = True, False, False
-        else: # learn_type == 'co-train'
-            use_tom, use_identity, only_identity = True, True, False
+        # if learn_type == 'id':
+        #     update = {'id': True, 'tom': False}
+        #     ret = {'id': True, 'tom': False}
+        # elif learn_type == 'id_tom':
+        #     update = {'id': True, 'tom': True}
+        #     ret = {'id': True, 'tom': True}
+        # elif learn_type == 'fixed_id_tom':
+        #     update = {'id': False, 'tom': True}
+        #     ret = {'id': True, 'tom': True}
+        # elif learn_type in ['history', 'naive']:
+        #     update = {'id': False, 'tom': True}
+        #     ret = {'id': False, 'tom': True}
+        # else:
+        #     raise NameError('unknown learn_type ')
 
         train_loss = self.trainer.update_tom(self.args, batch_iters, strategy, env.tom_model,
-                                             update_tom=use_tom, update_identity=use_identity,
-                                             only_identity=only_identity, dump_name=dump_file)
+                                             update_table=update_table,
+                                             ret_table=ret_table, dump_name=dump_file)
         return train_loss
 
-    def valid_tom(self, model_idx, batch_iters, strategy, learn_type, dump_file=None):
+    def valid_tom(self, model_idx, batch_iters, strategy, update_table=None, ret_table=None, dump_file=None):
         env = self.systems[model_idx].env
-        if learn_type == 'identity':
-            only_identity = True
-        else:
-            only_identity = False
+        update_table = {'id': False, 'tom': False}
         valid_loss = self.trainer.update_tom(self.args, batch_iters, strategy,
-                                             env.tom_model, update_tom=False, update_identity=False,
-                                             only_identity=only_identity, dump_name=dump_file)
+                                             env.tom_model, update_table=update_table,
+                                             ret_table=ret_table, dump_name=dump_file)
         return valid_loss
 
     def split_batch(self, batch_iters, batch_size, device=None):
@@ -391,12 +397,27 @@ class MultiManager():
         if args.only_run:
             batch_size = 1
 
-        if args.identity_test:
-            learn_type = 'identity'
-        elif args.tom_test:
-            learn_type = 'tom'
+        # if args.tom_model == 'id':
+        #     learn_type = 'identity'
+        # elif args.tom_model in ['history', 'naive']:
+        #     learn_type = 'tom'
+        # else:# == 'idtom'
+        #     learn_type = 'co-train'
+
+        if args.tom_model == 'id':
+            update_table = {'id': True, 'tom': False}
+            ret_table = {'id': True, 'tom': False}
+        elif args.tom_model == 'id_tom':
+            update_table = {'id': True, 'tom': True}
+            ret_table = {'id': True, 'tom': True}
+        elif args.tom_model == 'fixed_id_tom':
+            update_table = {'id': False, 'tom': True}
+            ret_table = {'id': True, 'tom': True}
+        elif args.tom_model in ['history', 'naive']:
+            update_table = {'id': False, 'tom': True}
+            ret_table = {'id': False, 'tom': True}
         else:
-            learn_type = 'co-train'
+            raise NameError('unknown learn_type ')
 
         num_worker = self.update_worker_list()
         worker = self.worker_conn[0]
@@ -428,7 +449,8 @@ class MultiManager():
         dev_batch = _batch_iters[1-train_agent][train_size:]
         dev_strategy = strategies[1-train_agent][train_size:]
 
-        if learn_type == 'tom':
+        # if not, only learn identifier
+        if not args.tom_model == 'id':
             dev_batches = [[], []]
             dev_strategies = [[], []]
             for i, s in enumerate(dev_strategy):
@@ -442,11 +464,10 @@ class MultiManager():
         step_range = 10
         step_writer = [SummaryWriter(logdir='logs/{}/step_{}'.format(args.name, i)) for i in range(step_range)]
 
-
         # split training batch
         _, train_batch_splited = worker.local_send(
             ['split_batch', (train_batch, 1024)])
-        if learn_type == 'tom':
+        if args.tom_model != 'id':
             dev_batch_splited = [None, None]
             _, dev_batch_splited[0] = worker.local_send(
                 ['split_batch', (dev_batch[0], 1024)]
@@ -460,34 +481,30 @@ class MultiManager():
             )
 
         def draw_dev_info(loss, accu, step_info, name, w, i):
-            w.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), loss[1], i)
-            w.add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), accu[1], i)
-            w.add_scalar('tom{}/{}_price_loss'.format(train_agent, name), loss[2], i)
-            w.add_scalar('tom{}/{}_total_loss'.format(train_agent, name), loss[1] + loss[2], i)
+            if ret_table['id']:
+                w.add_scalar('identity{}/{}_loss'.format(train_agent, name), loss[0], i)
+                w.add_scalar('identity{}/{}_accuracy'.format(train_agent, name), accu[0], i)
+            if ret_table['tom']:
+                w.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), loss[1], i)
+                w.add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), accu[1], i)
+                w.add_scalar('tom{}/{}_price_loss'.format(train_agent, name), loss[2], i)
+                w.add_scalar('tom{}/{}_total_loss'.format(train_agent, name), loss[1] + loss[2], i)
             w.flush()
 
         # Draw outputs on the tensorboard
         def draw_info(loss, accu, step_info, name, i):
-            # print('draw', name)
-            # identity
-            self.writer.add_scalar('identity{}/{}_loss'.format(train_agent, name), loss[0], i)
-            self.writer.add_scalar('identity{}/{}_accuracy'.format(train_agent, name), accu[0], i)
+            draw_dev_info(loss, accu, None, name, self.writer, i)
 
-            if learn_type != 'identity':
-                self.writer.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), loss[1], i)
-                self.writer.add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), accu[1], i)
-                self.writer.add_scalar('tom{}/{}_price_loss'.format(train_agent, name), loss[2], i)
-                self.writer.add_scalar('tom{}/{}_total_loss'.format(train_agent, name), loss[1] + loss[2], i)
-            self.writer.flush()
             for j, w in enumerate(step_writer):
                 if j >= len(step_info[2]):
                     break
                 if math.isnan(step_info[2][j]) or step_info[2][j] == 0:
                     continue
-                w.add_scalar('identity{}/{}_loss'.format(train_agent, name), step_info[0][0][j], i)
-                w.add_scalar('identity{}/{}_accuracy'.format(train_agent, name), step_info[1][0][j], i)
+                if ret_table['id']:
+                    w.add_scalar('identity{}/{}_loss'.format(train_agent, name), step_info[0][0][j], i)
+                    w.add_scalar('identity{}/{}_accuracy'.format(train_agent, name), step_info[1][0][j], i)
 
-                if learn_type != 'identity':
+                if ret_table['tom']:
                     w.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), step_info[0][1][j], i)
                     w.add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), step_info[1][1][j], i)
 
@@ -500,7 +517,7 @@ class MultiManager():
             # print('train.send:')
             info = worker.local_send(
                 ['train_tom', (train_agent, train_batch_splited,
-                               train_strategy, learn_type,
+                               train_strategy, update_table, ret_table,
                                'cache/{}/train_pred_{}.pkl'.format(args.name, i))])
             train_loss, train_accu, train_step_info = info[1]
             draw_info(train_loss, train_accu, train_step_info, 'train', i)
@@ -517,14 +534,15 @@ class MultiManager():
             #     ['valid_tom', pkl.dumps((train_agent, dev_batch,
             #                              dev_strategy, 'cache/{}/dev_pred_{}.pkl'.format(args.name, i)))])
             # dev_loss, dev_step_info = pkl.loads(info[1])
-            if learn_type == 'tom':
+            if args.tom_model != 'id':
+                # divide by 2 different id
                 dev_loss = [0]*3
                 dev_accu = [0]*2
                 for j in range(2):
                     ratio = len(dev_strategy[j]) / (len(dev_strategy[0]) + len(dev_strategy[1]))
                     info = worker.local_send(
                         ['valid_tom', (train_agent, dev_batch_splited[j],
-                                       dev_strategy[j], learn_type,
+                                       dev_strategy[j], update_table, ret_table,
                                        'cache/{}/dev{}_pred_{}.pkl'.format(args.name, j, i))])
                     tmp_loss, tmp_accu, dev_step_info = info[1]
                     dev_loss[2] += ratio * tmp_loss[2]
@@ -534,7 +552,7 @@ class MultiManager():
             else:
                 info = worker.local_send(
                     ['valid_tom', (train_agent, dev_batch_splited,
-                                   dev_strategy, learn_type,
+                                   dev_strategy, update_table, ret_table,
                                    'cache/{}/dev_pred_{}.pkl'.format(args.name, i))])
                 dev_loss, dev_accu, dev_step_info = info[1]
                 draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
@@ -547,10 +565,10 @@ class MultiManager():
                 # print('dev_step_info:', dev_step_info[2])
             print('[train{}/{}]\t time:{:.2f}s.'.format(i+1, args.epochs, time.time()-cur_t))
             cur_t = time.time()
-            if learn_type != 'tom':
+            if update_table['id']:
                 print('\t<identity> train loss{:.5f} accu{:.5f}, valid loss{:.5f} accu{:.5f}, '
                       .format(train_loss[0], train_accu[0], dev_loss[0], dev_accu[0]))
-            if learn_type != 'identity':
+            if update_table['tom']:
                 print('\t<tom> train ploss{:.5f} accu{:.5f}, valid ploss{:.5f} accu{:.5f}, '.
                       format(train_loss[2], train_accu[1], dev_loss[2], dev_accu[1]))
             # print('\t<tom> train_loss:{:.5f}, valid_loss:{:.5f}, ')
@@ -561,7 +579,8 @@ class MultiManager():
 
             # Save models
 
-            if learn_type == 'identity':
+            if not update_table['tom']:
+                # When only update id
                 score = dev_accu[0]
                 score_type = 'accu'
             else:
@@ -569,6 +588,7 @@ class MultiManager():
                 score_type = 'loss'
 
             if (i+1)%30 == 0:
+                # Only update best model
                 worker.local_send(['save_best_model', (i, score, score_type, True)])
 
                 # print('[DEBUG] {} time {}s.'.format('dump_model', time.time() - cur_t))
