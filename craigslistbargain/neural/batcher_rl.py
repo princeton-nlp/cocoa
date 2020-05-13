@@ -614,7 +614,10 @@ class ToMBatch(RawBatch):
         self.identity_state = torch.cat([intent, price, pmask], dim=-1)
         # self.identity_state = state[2][:, -(RawBatch.intent_size+2)*2:]
         self.extra = state[1][:, :3]
-        self.state = torch.cat([self.identity_state, self.extra], dim=-1)
+        # self.state = torch.cat([self.identity_state, self.extra], dim=-1)
+        # # Ignore last prices, but use multi-steps state
+        # self.original_state = torch.cat([self.extra, state[2]], dim=-1)
+        self.state = state[2]
         self.last_price = state[1][:, -2:]
         self.uttr = uttr
         self.act_intent = act[0]

@@ -9,7 +9,7 @@ import onmt
 import onmt.io
 import onmt.Models
 import onmt.modules
-from onmt.RLModels import PolicyDecoder, PolicyModel, ValueModel, ValueDecoder, \
+from onmt.RLModels import \
     HistoryEncoder, HistoryIDEncoder, CurrentEncoder, HistoryIdentity, \
     HistoryModel, CurrentModel, \
     MixedPolicy, SinglePolicy
@@ -43,6 +43,7 @@ def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, h
     # encoder = StateEncoder(intent_size=intent_size, output_size=output_size,
     #                     state_length=opt.state_length, extra_size=3 if opt.dia_num>0 else 0 )
 
+    # intent + price
     diaact_size = (intent_size+1)
     extra_size = 3 + 2
     if hidden_size is None:
@@ -51,16 +52,26 @@ def make_encoder(opt, embeddings, intent_size, output_size, use_history=False, h
         embeddings = None
     if use_history:
         extra_size = 3
+        # + pmask
         diaact_size += 1
         if identity is None:
-            encoder = HistoryEncoder(diaact_size * 2, extra_size, embeddings, output_size,
-                                       hidden_depth=hidden_depth)
+            encoder = HistoryIDEncoder(None, diaact_size * 2, extra_size, embeddings, output_size,
+                                       hidden_depth=hidden_depth, rnn_state=True)
         else:
-            encoder = HistoryIDEncoder(identity, diaact_size*2+extra_size, embeddings, output_size,
-                                 hidden_depth=hidden_depth)
+            # encoder = HistoryIDEncoder(identity, diaact_size*2+extra_size, embeddings, output_size,
+            #                            hidden_depth=hidden_depth)
+            encoder = HistoryIDEncoder(identity, diaact_size * 2, extra_size, embeddings, output_size,
+                                       hidden_depth=hidden_depth, rnn_state=True)
     else:
-        encoder = CurrentEncoder(diaact_size*opt.state_length+extra_size, embeddings, output_size,
-                                 hidden_depth=hidden_depth)
+        if identity is None:
+            encoder = CurrentEncoder(diaact_size*opt.state_length+extra_size, embeddings, output_size,
+                                     hidden_depth=hidden_depth)
+        else:
+            extra_size = 3
+            # + pmask
+            diaact_size += 1
+            encoder = HistoryIDEncoder(identity, diaact_size * opt.state_length, extra_size, embeddings, output_size,
+                                       hidden_depth=hidden_depth)
 
     return encoder
 
@@ -173,15 +184,15 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
     rl_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size)
     # tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size, use_history=True)
     if model_opt.tom_model in ['history', 'naive']:
-        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size,
-                                   use_history=(model_opt.tom_model == 'history'), hidden_depth=model_opt.hidden_depth,
+        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.tom_hidden_size,
+                                   use_history=(model_opt.tom_model == 'history'), hidden_depth=model_opt.tom_hidden_depth,
                                    identity=None, hidden_size=model_opt.tom_hidden_size)
     else:
-        tom_identity = make_identity(model_opt, intent_size, model_opt.tom_hidden_size,
-                                     hidden_depth=model_opt.hidden_depth, identity_dim=2)
-        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.hidden_size,
-                                   use_history=True, hidden_depth=model_opt.hidden_depth, identity=tom_identity,
-                                   hidden_size=model_opt.tom_hidden_size)
+        tom_identity = make_identity(model_opt, intent_size, model_opt.id_hidden_size,
+                                     hidden_depth=model_opt.id_hidden_depth, identity_dim=2)
+        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.tom_hidden_size,
+                                   use_history=('history' in model_opt.tom_model), hidden_depth=model_opt.tom_hidden_depth,
+                                   identity=tom_identity, hidden_size=model_opt.tom_hidden_size)
     rl_encoder.fix_emb = True
     tom_encoder.fix_emb = True
 
@@ -189,7 +200,7 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
     tgt_dict = mappings['tgt_vocab']
     actor_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, model_opt.hidden_size, price_action=True)
     critic_decoder = make_decoder(model_opt, model_opt.hidden_size, 1, model_opt.hidden_size, output_value=True)
-    tom_decoder = make_decoder(model_opt, model_opt.hidden_size, intent_size, model_opt.hidden_size)
+    tom_decoder = make_decoder(model_opt, model_opt.tom_hidden_size, intent_size, model_opt.tom_hidden_size, hidden_depth=1)
 
     # tom_decoder = make_decoder(model_opt, model_opt.hidden_size, 2, model_opt.hidden_size, output_value=True)
     # print('decoder', decoder)

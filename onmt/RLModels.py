@@ -13,71 +13,11 @@ from onmt.Utils import aeq
 
 from .Models import RNNEncoder
 
-
-class PolicyDecoder(nn.Module):
-
-    max_price, min_price = 2, -0.5
-
-    def __init__(self, encoder_size, intent_size, num_layer=2, hidden_size=128, use_utterance=False):
-        super(PolicyDecoder, self).__init__()
-
-        last_size = encoder_size
-        hidden_layers = []
-        for i in range(num_layer):
-            hidden_layers += [nn.Linear(last_size, hidden_size), nn.ReLU(hidden_size)]
-            last_size = hidden_size
-        self.hidden_layers = nn.Sequential(*hidden_layers)
-
-        self.intent_layer = nn.Linear(last_size, intent_size)
-        self.price_layer = nn.Linear(last_size, 2)
-
-        self.mu, self.logvar = None, None
-
-    def reparameterize(self, mu, logvar):
-        rdm = torch.randn_like(mu)
-        if mu.device.type == 'gpu':
-            rdm = rdm.cuda()
-        eps = torch.autograd.Variable(rdm)
-        z = mu + eps * torch.exp(logvar / 2)
-        return z
-
-    def forward(self, e_output):
-
-        e_output = self.hidden_layers(e_output)
-
-        policy = self.intent_layer(e_output)
-        # policy = torch.softmax(policy.mul(intent_mask), dim=1)
-
-        p_dis = self.price_layer(e_output)
-        p_mean = p_dis[:,0]
-        p_var  = p_dis[:,1]
-        self.mu = p_mean
-        # self.logvar = p_var
-        self.logvar = p_var = torch.ones_like(self.mu) * math.log(0.1)
-        # print('mean, var: ', p_mean.item(), torch.exp(p_var / 2).item(), self.mu, self.logvar)
-        # if self.training:
-        #     p = self.reparameterize(p_mean, p_var)
-        # else:
-        #     p = p_mean
-        #
-        # # TODO: test p_mean
-        p = p_mean
-
-        p_mean = p_mean.mul((p_mean < PolicyDecoder.max_price).float()) + \
-                 torch.ones_like(p_mean, device=p_mean.device).mul((p_mean >= PolicyDecoder.max_price).float())
-        p_mean = p_mean.mul((p_mean > PolicyDecoder.min_price).float()) + \
-                 torch.zeros_like(p_mean, device=p_mean.device).mul((p_mean <= PolicyDecoder.min_price).float())
-        # assert torch.max(p_mean) < 2
-        # assert torch.max(p_mean) > -0.5
-        # p = p_mean
-        # p[p>1]=1
-        # p[p<0]=0
-
-        return policy, p_mean, p_var
-
-
 class MultilayerPerceptron(nn.Module):
-
+    """
+        final_output:
+            If true, last layer also have activation function.
+    """
     def __init__(self, input_size, layer_size, layer_depth, final_output=None):
         super(MultilayerPerceptron, self).__init__()
 
@@ -157,9 +97,12 @@ class HistoryIdentity(nn.Module):
         self.fix_emb = False
         self.identity_dim = identity_dim
 
+
         if rnn_type == 'lstm':
+            self.rnnh_number = 2
             self.dia_rnn = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
         else:
+            self.rnnh_number = 1
             self.dia_rnn = torch.nn.RNNCell(input_size=diaact_size, hidden_size=last_lstm_size)
 
         hidden_input = last_lstm_size + extra_size
@@ -197,7 +140,7 @@ class HistoryEncoder(nn.Module):
         if rnn_type == 'lstm':
             self.dia_rnn = torch.nn.LSTMCell(input_size=diaact_size, hidden_size=last_lstm_size)
         else:
-            self.dia_rnn = torch.nn.RNNCell(input_size=diaact_size, hidden_size=last_lstm_size)
+            self.dia_rnn = torch.nn.RNNCell(input_size=diaact_size, hidden_size=last_lstm_size, nonlinearity='relu')
 
         # hidden_input = last_lstm_size + extra_size
         #
@@ -268,18 +211,42 @@ class HistoryEncoder(nn.Module):
 
 
 class HistoryIDEncoder(nn.Module):
-
-    def __init__(self, identity, extra_size, embeddings, output_size,
-                 hidden_size=64, hidden_depth=2, rnn_type='rnn', fix_identity=True):
+    """
+        ID move to the last layer
+        Final output is [hidden, identity], so the size of hidden is (output_size-identity_size).
+    """
+    def __init__(self, identity, state_size, extra_size, embeddings, output_size,
+                 hidden_size=64, hidden_depth=2, rnn_type='rnn', fix_identity=True, rnn_state=False):
         super(HistoryIDEncoder, self).__init__()
 
         self.fix_emb = False
         self.fix_identity = fix_identity
         self.ban_identity = False
+        self.rnn_state = rnn_state
+        # For split input rnn hidden
+        self.id_rnnh_number = 0
+        self.state_rnnh_number = 0
 
         self.identity = identity
         self.uttr_emb = embeddings
-        identity_size = identity.identity_dim
+        hidden_input = extra_size
+
+        if identity:
+            identity_size = identity.identity_dim
+        else:
+            identity_size = 0
+
+        if rnn_state:
+            self.state_rnnh_number = 1
+            last_lstm_size = hidden_size
+            if rnn_type == 'lstm':
+                self.dia_rnn = torch.nn.LSTMCell(input_size=state_size, hidden_size=last_lstm_size)
+            else:
+                self.dia_rnn = torch.nn.RNNCell(input_size=state_size, hidden_size=last_lstm_size, nonlinearity='relu')
+            hidden_input += last_lstm_size
+        else:
+            hidden_input += state_size
+
 
         if embeddings is not None:
             uttr_emb_size = embeddings.embedding_dim
@@ -288,22 +255,42 @@ class HistoryIDEncoder(nn.Module):
             else:
                 self.uttr_rnn = torch.nn.RNN(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
 
-            hidden_input = hidden_size + extra_size + identity_size
-        else:
-            hidden_input = extra_size + identity_size
+            hidden_input += hidden_size
 
-        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size, hidden_depth)
+        if identity:
+            self.id_rnnh_number = self.identity.rnnh_number
 
-    def forward(self, uttr, state, identity_state):
-        identity, next_hidden = self.identity(*identity_state)
-        batch_size = state.shape[0]
-        if self.fix_identity:
-            _identity = identity.detach()
+        self.hidden_layer = MultilayerPerceptron(hidden_input, output_size - identity_size, hidden_depth)
+
+    def forward(self, uttr, dia_act, state, extra, rnn_hiddens):
+        encoder_input = [extra]
+        next_rnnh = ()
+        batch_size = dia_act.shape[0]
+
+        # split rnn_hiddens
+        if not isinstance(rnn_hiddens, tuple):
+            rnn_hiddens = (rnn_hiddens,)
+        id_rnnh = rnn_hiddens[-self.id_rnnh_number:]
+        state_rnnh = rnn_hiddens[:self.state_rnnh_number]
+        if self.id_rnnh_number == 1: id_rnnh = id_rnnh[0]
+        if self.state_rnnh_number == 1: state_rnnh = state_rnnh[0]
+
+        # State Part
+        if self.rnn_state:
+            next_hidden = self.dia_rnn(dia_act, state_rnnh)
+            if isinstance(next_hidden, tuple):
+                # For LSTM
+                dia_emb = next_hidden[0].reshape(batch_size, -1)
+                next_rnnh = next_hidden
+            else:
+                # For RNN
+                dia_emb = next_hidden.reshape(batch_size, -1)
+                next_rnnh = (next_hidden,)
+            encoder_input.append(dia_emb)
         else:
-            _identity = identity
-        if self.ban_identity:
-            _identity.fill_(0)
-        _identity = torch.softmax(_identity, dim=1)
+            encoder_input.append(state)
+
+        # Uttrance part
         if uttr is not None:
             uttr = uttr.copy()
             with torch.set_grad_enabled(not self.fix_emb):
@@ -323,15 +310,29 @@ class HistoryIDEncoder(nn.Module):
                 output = output[0]
 
             uttr_emb = output.reshape(batch_size, -1)
+            encoder_input.append(uttr_emb)
 
-            hidden_input = torch.cat([uttr_emb, state, _identity], dim=-1)
-        else:
-
-            hidden_input = torch.cat([state, _identity], dim=-1)
-
+        # Main part
+        hidden_input = torch.cat(encoder_input, dim=-1)
         emb = self.hidden_layer(hidden_input)
 
-        return emb, next_hidden, identity
+        # Identity part
+        identity = None
+        if self.identity:
+            identity, next_hidden = self.identity(dia_act, extra, id_rnnh)
+            if isinstance(next_hidden, tuple): next_rnnh = next_rnnh + next_hidden
+            else: next_rnnh = next_rnnh + (next_hidden,)
+
+            if self.fix_identity:
+                _identity = identity.detach()
+            else:
+                _identity = identity
+            if self.ban_identity:
+                _identity.fill_(0)
+            _identity = torch.softmax(_identity, dim=1)
+            emb = torch.cat([emb, _identity], dim=-1)
+
+        return emb, next_rnnh, identity
 
 
 class SinglePolicy(nn.Module):
@@ -375,27 +376,6 @@ class MixedPolicy(nn.Module):
         return intent_output, price_output
 
 
-class ValueDecoder(nn.Module):
-
-    def __init__(self, encoder_size, num_layer=2, hidden_size=128):
-        super(ValueDecoder, self).__init__()
-
-        last_size = encoder_size
-        hidden_layers = []
-        for i in range(num_layer):
-            hidden_layers += [nn.Linear(last_size, hidden_size), nn.ReLU(hidden_size)]
-            last_size = hidden_size
-        self.hidden_layers = nn.Sequential(*hidden_layers)
-
-        self.output_layer = nn.Linear(last_size, 1)
-
-    def forward(self, e_output):
-        e_output = self.hidden_layers(e_output)
-        value = self.output_layer(e_output)
-
-        return value
-
-
 class CurrentModel(nn.Module):
 
     def __init__(self, encoder, decoder, fix_encoder=False):
@@ -426,65 +406,3 @@ class HistoryModel(nn.Module):
 
         d_output = self.decoder(e_output[0])
         return (d_output,) + e_output[1:]
-
-class PolicyModel(nn.Module):
-    """
-        Core trainable object in OpenNMT. Implements a trainable interface
-        for a simple, generic encoder + decoder(output action) model.
-
-        Args:
-          encoder (:obj:`EncoderBase`): an encoder object
-          decoder (:obj:`RNNDecoderBase`): a decoder object
-          multi<gpu (bool): setup for multigpu support
-
-          encoder + policy
-        """
-
-    def __init__(self, encoder, decoder, multigpu=False, fix_encoder=False):
-        self.multigpu = multigpu
-        super(PolicyModel, self).__init__()
-        self.fix_encoder = fix_encoder
-        self.encoder = encoder
-        self.decoder = decoder
-
-    def forward(self, e_intent, e_price, e_pmask, e_extra=None, utterance=None):
-        """
-        """
-        if utterance is not None:
-            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra, utterance)
-        else:
-            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra)
-        if self.fix_encoder:
-            enc_final = enc_final.detach()
-        policy, price, price_var = self.decoder(enc_final)
-        return policy, price, price_var
-
-
-class ValueModel(nn.Module):
-    """
-        encoder + value
-    """
-
-    def __init__(self, encoder, decoder, multigpu=False, fix_encoder=False):
-        self.multigpu = multigpu
-        super(ValueModel, self).__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.fix_encoder = fix_encoder
-        # encoder.eval()
-
-    def forward(self, e_intent, e_price, e_pmask, e_extra=None, utterance=None):
-        if utterance is not None:
-            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra, utterance)
-        else:
-            enc_final = self.encoder(e_intent, e_price, e_pmask, e_extra)
-        if self.fix_encoder:
-            enc_final = enc_final.detach()
-        value = self.decoder(enc_final)
-        return value
-
-    # def eval(self):
-    #     self.decoder.eval()
-    #
-    # def train(self, mode=True):
-    #     self.docoder.train()

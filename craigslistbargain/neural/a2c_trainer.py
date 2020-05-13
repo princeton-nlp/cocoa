@@ -123,8 +123,8 @@ class RLTrainer(BaseTrainer):
             identity, next_hidden = self.tom.encoder.identity(batch.identity_state, batch.extra, hidden_state)
             predictions = None
         else:
-            output = self.tom(batch.uttr, batch.state,
-                               (batch.identity_state, batch.extra, hidden_state))
+            output = self.tom(batch.uttr, batch.identity_state, batch.state,
+                              batch.extra, hidden_state)
             if len(output) == 3:
                 predictions, next_hidden, identity = output
             else:
@@ -151,7 +151,8 @@ class RLTrainer(BaseTrainer):
             tom_batch = ToMBatch.from_raw(batch, strategy)
             if h is not None:
                 if isinstance(h, tuple):
-                    h = (h[0][:batch.size, :], h[1][:batch.size, :])
+                    h = tuple(map(lambda x: x[:batch.size, :], h))
+                    # h = (h[0][:batch.size, :], h[1][:batch.size, :])
                 elif isinstance(h, torch.Tensor):
                     h = h[:batch.size, :]
             pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h, only_identity=(not ret_table['tom']))

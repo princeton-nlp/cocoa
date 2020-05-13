@@ -407,7 +407,7 @@ class MultiManager():
         if args.tom_model == 'id':
             update_table = {'id': True, 'tom': False}
             ret_table = {'id': True, 'tom': False}
-        elif args.tom_model == 'id_tom':
+        elif args.tom_model in ['id_tom', 'id_history_tom']:
             update_table = {'id': True, 'tom': True}
             ret_table = {'id': True, 'tom': True}
         elif args.tom_model == 'fixed_id_tom':
@@ -545,8 +545,20 @@ class MultiManager():
                                        dev_strategy[j], update_table, ret_table,
                                        'cache/{}/dev{}_pred_{}.pkl'.format(args.name, j, i))])
                     tmp_loss, tmp_accu, dev_step_info = info[1]
-                    dev_loss[2] += ratio * tmp_loss[2]
-                    dev_accu[1] += ratio * tmp_accu[1]
+                    for x in range(3):
+                        if isinstance(tmp_loss[x], float):
+                            dev_loss[x] += ratio * tmp_loss[x]
+                        else:
+                            if tmp_loss[x] != [] and tmp_loss[x] is not None:
+                                print(tmp_loss[x])
+                            dev_loss[x] = None
+                    for x in range(2):
+                        if isinstance(tmp_accu[x], float):
+                            dev_accu[x] += ratio * tmp_accu[x]
+                        else:
+                            if tmp_accu[x] != [] and tmp_accu[x] is not None:
+                                print(tmp_accu[x])
+                            dev_loss[x] = None
                     draw_dev_info(tmp_loss, tmp_accu, dev_step_info, 'dev', dev_writer[j], i)
                 draw_dev_info(dev_loss, dev_accu, None, 'dev', self.writer, i)
             else:
