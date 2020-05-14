@@ -73,7 +73,7 @@ class Batch(object):
 
     @staticmethod
     def int_to_onehot(tensor, onehot_size):
-        batch_size = tensor.shape[0]
+        batch_size = np.prod(tensor.shape)
         tensor = tensor.reshape(-1, 1)
         real_size = tensor.shape[0]
         onehot = torch.zeros((real_size, onehot_size), device=tensor.device).scatter(1, tensor, 1)
@@ -626,6 +626,7 @@ class ToMBatch(RawBatch):
         self.strategy = strategy
 
         self.strategy = self.to_tensor(strategy, 'long', cuda=self.state.device.type!='cpu')
+        self.strategy = Batch.int_to_onehot(self.strategy, 2)
 
         self.tensor_attributes = ['state', 'identity_state', 'extra', 'uttr', 'last_price',
                                   'act_intent', 'act_price', 'act_price_mask', 'strategy']

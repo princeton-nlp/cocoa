@@ -118,13 +118,17 @@ class RLTrainer(BaseTrainer):
         # print('max price', torch.max(price))
         return value, policy, price
 
-    def _run_batch_tom_identity(self, batch, hidden_state, only_identity=False):
+    def _run_batch_tom_identity(self, batch, hidden_state, only_identity=False, id_gt=False):
+        if id_gt:
+            id_gt = batch.strategy
+        else:
+            id_gt = None
         if only_identity:
             identity, next_hidden = self.tom.encoder.identity(batch.identity_state, batch.extra, hidden_state)
             predictions = None
         else:
             output = self.tom(batch.uttr, batch.identity_state, batch.state,
-                              batch.extra, hidden_state)
+                              batch.extra, hidden_state, id_gt)
             if len(output) == 3:
                 predictions, next_hidden, identity = output
             else:
@@ -132,7 +136,7 @@ class RLTrainer(BaseTrainer):
                 identity = None
         return predictions, next_hidden, identity
 
-    def _tom_gradient_accumulation(self, batch_iter, strategy, model, ret_table):
+    def _tom_gradient_accumulation(self, batch_iter, strategy, model, ret_table, id_gt=False):
         model.train()
 
         h = None
@@ -148,14 +152,15 @@ class RLTrainer(BaseTrainer):
         pred_identity = []
 
         for i, batch in enumerate(batch_iter):
-            tom_batch = ToMBatch.from_raw(batch, strategy)
+            tom_batch = ToMBatch.from_raw(batch, strategy[:batch.size])
             if h is not None:
                 if isinstance(h, tuple):
                     h = tuple(map(lambda x: x[:batch.size, :], h))
                     # h = (h[0][:batch.size, :], h[1][:batch.size, :])
                 elif isinstance(h, torch.Tensor):
                     h = h[:batch.size, :]
-            pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h, only_identity=(not ret_table['tom']))
+            pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h,
+                                                             only_identity=(not ret_table['tom']), id_gt=id_gt)
 
             # Identity Loss
             if ret_table['id']:
@@ -276,7 +281,7 @@ class RLTrainer(BaseTrainer):
 
         for i, b in enumerate(batch_iters):
             stra = [strategy[j] for j in sorted_id[i]]
-            l, a, logs = self._tom_gradient_accumulation(b, stra, model, ret_table=ret_table)
+            l, a, logs = self._tom_gradient_accumulation(b, stra, model, ret_table=ret_table, id_gt=args.idgt)
 
             # print('[DEBUG] {} time {}s.'.format('grad_accu', time.time() - cur_t))
             # cur_t = time.time()

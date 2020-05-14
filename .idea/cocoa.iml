@@ -4,9 +4,18 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/craigslistbargain" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/craigslistbargain/apex_logs" />
+      <excludeFolder url="file://$MODULE_DIR$/craigslistbargain/cache" />
+      <excludeFolder url="file://$MODULE_DIR$/craigslistbargain/checkpoint" />
+      <excludeFolder url="file://$MODULE_DIR$/craigslistbargain/data/pic" />
+      <excludeFolder url="file://$MODULE_DIR$/craigslistbargain/logs" />
+      <excludeFolder url="file://$MODULE_DIR$/craigslistbargain/p_logs" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.5 (tom)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.5 (tom_new)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="PyDocumentationSettings">
+    <option name="renderExternalDocumentation" value="true" />
   </component>
   <component name="TemplatesService">
     <option name="TEMPLATE_CONFIGURATION" value="Jinja2" />
@@ -17,7 +26,6 @@
     </option>
   </component>
   <component name="TestRunnerService">
-    <option name="projectConfiguration" value="Nosetests" />
     <option name="PROJECT_TEST_RUNNER" value="Nosetests" />
   </component>
 </module>

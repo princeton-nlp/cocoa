@@ -262,7 +262,7 @@ class HistoryIDEncoder(nn.Module):
 
         self.hidden_layer = MultilayerPerceptron(hidden_input, output_size - identity_size, hidden_depth)
 
-    def forward(self, uttr, dia_act, state, extra, rnn_hiddens):
+    def forward(self, uttr, dia_act, state, extra, rnn_hiddens, id_gt=None):
         encoder_input = [extra]
         next_rnnh = ()
         batch_size = dia_act.shape[0]
@@ -319,17 +319,23 @@ class HistoryIDEncoder(nn.Module):
         # Identity part
         identity = None
         if self.identity:
-            identity, next_hidden = self.identity(dia_act, extra, id_rnnh)
-            if isinstance(next_hidden, tuple): next_rnnh = next_rnnh + next_hidden
-            else: next_rnnh = next_rnnh + (next_hidden,)
-
-            if self.fix_identity:
-                _identity = identity.detach()
+            if id_gt is not None:
+                identity = id_gt
+                _identity = id_gt
+                print(id_gt)
+                next_rnnh = next_rnnh + (torch.zeros_like(id_gt),)
             else:
-                _identity = identity
-            if self.ban_identity:
-                _identity.fill_(0)
-            _identity = torch.softmax(_identity, dim=1)
+                identity, next_hidden = self.identity(dia_act, extra, id_rnnh)
+                if isinstance(next_hidden, tuple): next_rnnh = next_rnnh + next_hidden
+                else: next_rnnh = next_rnnh + (next_hidden,)
+
+                if self.fix_identity:
+                    _identity = identity.detach()
+                else:
+                    _identity = identity
+                if self.ban_identity:
+                    _identity.fill_(0)
+                _identity = torch.softmax(_identity, dim=1)
             emb = torch.cat([emb, _identity], dim=-1)
 
         return emb, next_rnnh, identity

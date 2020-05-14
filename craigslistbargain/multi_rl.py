@@ -95,6 +95,8 @@ if __name__ == '__main__':
     parser.add_argument('--load-identity-from', default=None, type=str, help='load critic model from another checkpoint')
     parser.add_argument('--load-sample', default=None, type=str)
 
+    parser.add_argument('--idgt', action='store_true', default=False, help="identity ground truth as model\'s input.")
+
     parser.add_argument('--seed', type=int, default=0)
 
     cocoa.options.add_scenario_arguments(parser)
