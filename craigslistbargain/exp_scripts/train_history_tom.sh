@@ -14,7 +14,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --report-every 50 --max-turns 20 --num-dialogues 2560 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 --epochs 2000 --use-utterance \
---model lf2lf --model-type a2c --tom-test --load-sample cache/hard_pmask/data.pkl \
+--model lf2lf --model-type a2c --tom-test --load-sample cache/hard_pmask_7/data.pkl \
 --learning-rate 0.001 --name ${EXP_NAME} \
 --tom-hidden-size 128 --tom-hidden-depth 2 \
 --tom-model ${MODEL_NAME} ${USE_GPU}

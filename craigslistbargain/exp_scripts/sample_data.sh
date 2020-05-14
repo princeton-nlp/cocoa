@@ -1,5 +1,5 @@
 USE_GPU=$1
-EXP_NAME="gtid_tom_7"
+EXP_NAME="hard_pmask_7"
 # tom_itentity_test
 mkdir checkpoint/${EXP_NAME}
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
