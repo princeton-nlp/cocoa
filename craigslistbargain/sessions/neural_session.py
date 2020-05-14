@@ -40,7 +40,12 @@ class NeuralSession(Session):
         # min/expect
         # price strategy: high/low/decay
         self.tom_type = env.tom_type
-        self.price_strategy_distribution = {'name': ['insist', 'decay'], 'prob': [0.5, 0.5]}
+        strategy_name = ['insist', 'decay']
+        strategy_name = ['insist', 'decay', 'persuaded']
+        strategy_name = ['insist', 'decay', 'persuaded', 'convex', 'concave', 'wait', 'sigmoid']
+        self.price_strategy_distribution = \
+            {'name': strategy_name,
+             'prob': [1./len(strategy_name)]*len(strategy_name)}
         self.price_strategy = env.price_strategy
         self.acpt_range = [0.4, 1]
 
@@ -583,6 +588,68 @@ class PytorchNeuralSession(NeuralSession):
         return RawBatch.generate(encoder_args, decoder_args, context_data,
                 self.lf_vocab, cuda=self.cuda)
 
+    @staticmethod
+    def get_price(length, strategy, current_price):
+        factor = length
+        o_factor = factor
+
+        # decay until 0.7
+        factor = min(1., factor * (1/0.7))
+
+        if strategy == 'insist':
+            prange = [1., 1.]
+            p = prange[0] * (1 - factor) + prange[1] * (factor)
+        elif strategy == 'decay':
+            prange = [1., 0.4]
+            p = prange[0] * (1 - factor) + prange[1] * (factor)
+            # print('pfactor', p, factor)
+        elif strategy == 'persuaded':
+            prange = [1., 0.4]
+            step = 1. / 5
+            if o_factor < 1:
+                # decay
+                p = current_price - step * (prange[0] - prange[1])
+            else:
+                p = current_price
+        else:
+            prange = [1., 0.4]
+            x = factor
+            if strategy == 'convex':
+                factor = 1-(1-(x-1)**2)**0.5
+            elif strategy == 'concave':
+                factor = (1-x**2)**0.5
+            elif strategy == 'sigmoid':
+                y = math.exp(-10*x+5)
+                factor = y/(1+y)
+            elif strategy == 'wait':
+                if x < 0.5:
+                    factor = (0.25-(x-0.5)**2)**0.5
+                else:
+                    factor = 1-(0.25-(x-0.5)**2)**0.5
+            else:
+                # p = oldp
+                print('Unknown price strategy: ', strategy)
+                assert NotImplementedError()
+            factor = max(min(factor, 1.), 0.)
+            p = prange[0] * (1 - factor) + prange[1] * (factor)
+
+        return p
+
+    @staticmethod
+    def get_acpt_range(length, strategy, current_price):
+        factor = length
+        # factor = batch.state[1][0, -3].item()
+        if strategy == 'insist':
+            acpt_range = [1., 0.7]
+        elif strategy == 'decay':
+            prange = [1., 0.4]
+            p = prange[0]*(1-factor) + prange[1]*(factor)
+            acpt_range = [1., p-0.1]
+        #elif self.price_strategy == 'persuaded':
+        else:
+            acpt_range = [1., current_price]
+        return acpt_range
+
     def generate(self, temperature=1, is_fake=False, acpt_range=None):
         if len(self.dialogue.agents) == 0:
             self.dialogue._add_utterance(1 - self.agent, [], lf={'intent': 'start'})
@@ -595,14 +662,17 @@ class PytorchNeuralSession(NeuralSession):
         # get acpt_range
         if self.env.name == 'pt-neural-r':
             factor = batch.state[1][0, -3].item()
-            if self.price_strategy == 'insist':
-                acpt_range = [1., 0.7]
-            elif self.price_strategy == 'decay':
-                prange = [1., 0.4]
-                p = prange[0]*(1-factor) + prange[1]*(factor)
-                acpt_range = [1., p-0.1]
-            elif self.price_strategy == 'persuaded':
-                acpt_range = [1., prices[0, 0].item()]
+            acpt_range = self.get_acpt_range(factor, self.price_strategy, prices[0, 0].item())
+            # if self.price_strategy == 'insist':
+            #     acpt_range = [1., 0.7]
+            # elif self.price_strategy == 'decay':
+            #     prange = [1., 0.4]
+            #     p = prange[0]*(1-factor) + prange[1]*(factor)
+            #     acpt_range = [1., p-0.1]
+            # elif self.price_strategy == 'persuaded':
+            #     acpt_range = [1., prices[0, 0].item()]
+            # else:
+            #     acpt_range = [1., prices[0, 0].item()]
 
         output_data = self.generator.generate_batch(rlbatch, enc_state=None, whole_policy=is_fake,
                                                     temperature=temperature, acpt_range=acpt_range)
@@ -620,27 +690,28 @@ class PytorchNeuralSession(NeuralSession):
 
             # Decay till 1/2 max_length
             factor = batch.state[1][0, -3].item()
-            o_factor = factor
-            factor = min(1., factor*2)
-
-            if self.price_strategy == 'insist':
-                prange = [1., 1.]
-                p = prange[0]*(1-factor) + prange[1]*(factor)
-            elif self.price_strategy == 'decay':
-                prange = [1., 0.4]
-                p = prange[0]*(1-factor) + prange[1]*(factor)
-                # print('pfactor', p, factor)
-            elif self.price_strategy == 'persuaded':
-                prange = [1., 0.4]
-                if o_factor < 1:
-                    # decay
-                    p = prices[0, 0].item() - step*(prange[0]-prange[1])
-                else:
-                    p = prices[0, 0].item()
-            else:
-                p = oldp
-                print('Unknown price strategy: ', self.price_strategy)
-                assert NotImplementedError()
+            p = self.get_price(factor, self.price_strategy, prices[0, 0].item())
+            # o_factor = factor
+            # factor = min(1., factor*2)
+            #
+            # if self.price_strategy == 'insist':
+            #     prange = [1., 1.]
+            #     p = prange[0]*(1-factor) + prange[1]*(factor)
+            # elif self.price_strategy == 'decay':
+            #     prange = [1., 0.4]
+            #     p = prange[0]*(1-factor) + prange[1]*(factor)
+            #     # print('pfactor', p, factor)
+            # elif self.price_strategy == 'persuaded':
+            #     prange = [1., 0.4]
+            #     if o_factor < 1:
+            #         # decay
+            #         p = prices[0, 0].item() - step*(prange[0]-prange[1])
+            #     else:
+            #         p = prices[0, 0].item()
+            # else:
+            #     p = oldp
+            #     print('Unknown price strategy: ', self.price_strategy)
+            #     assert NotImplementedError()
 
             if isinstance(p, int):
                 print('p is int')

@@ -189,7 +189,7 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
                                    identity=None, hidden_size=model_opt.tom_hidden_size)
     else:
         tom_identity = make_identity(model_opt, intent_size, model_opt.id_hidden_size,
-                                     hidden_depth=model_opt.id_hidden_depth, identity_dim=2)
+                                     hidden_depth=model_opt.id_hidden_depth, identity_dim=7)
         tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.tom_hidden_size,
                                    use_history=('history' in model_opt.tom_model), hidden_depth=model_opt.tom_hidden_depth,
                                    identity=tom_identity, hidden_size=model_opt.tom_hidden_size)

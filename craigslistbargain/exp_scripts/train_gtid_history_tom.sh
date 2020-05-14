@@ -1,5 +1,5 @@
-EXP_NAME="gtid_tom_7"
-MODEL_NAME="fixed_id_tom"
+EXP_NAME="gtid_history_tom_7"
+MODEL_NAME="fixed_id_history_tom"
 USE_GPU=$1
 
 mkdir checkpoint/${EXP_NAME}

@@ -394,6 +394,7 @@ class MultiManager():
         save_every = 100
 
         batch_size = 100
+        split_results = False
         if args.only_run:
             batch_size = 1
 
@@ -410,7 +411,7 @@ class MultiManager():
         elif args.tom_model in ['id_tom', 'id_history_tom']:
             update_table = {'id': True, 'tom': True}
             ret_table = {'id': True, 'tom': True}
-        elif args.tom_model == 'fixed_id_tom':
+        elif args.tom_model in ['fixed_id_tom', 'fixed_id_history_tom']:
             update_table = {'id': False, 'tom': True}
             ret_table = {'id': True, 'tom': True}
         elif args.tom_model in ['history', 'naive']:
@@ -450,7 +451,7 @@ class MultiManager():
         dev_strategy = strategies[1-train_agent][train_size:]
 
         # if not, only learn identifier
-        if not args.tom_model == 'id':
+        if args.tom_model != 'id' and split_results:
             dev_batches = [[], []]
             dev_strategies = [[], []]
             for i, s in enumerate(dev_strategy):
@@ -467,7 +468,7 @@ class MultiManager():
         # split training batch
         _, train_batch_splited = worker.local_send(
             ['split_batch', (train_batch, 1024)])
-        if args.tom_model != 'id':
+        if args.tom_model != 'id' and split_results:
             dev_batch_splited = [None, None]
             _, dev_batch_splited[0] = worker.local_send(
                 ['split_batch', (dev_batch[0], 1024)]
@@ -534,7 +535,7 @@ class MultiManager():
             #     ['valid_tom', pkl.dumps((train_agent, dev_batch,
             #                              dev_strategy, 'cache/{}/dev_pred_{}.pkl'.format(args.name, i)))])
             # dev_loss, dev_step_info = pkl.loads(info[1])
-            if args.tom_model != 'id':
+            if args.tom_model != 'id' and split_results:
                 # divide by 2 different id
                 dev_loss = [0]*3
                 dev_accu = [0]*2
@@ -567,7 +568,8 @@ class MultiManager():
                                    dev_strategy, update_table, ret_table,
                                    'cache/{}/dev_pred_{}.pkl'.format(args.name, i))])
                 dev_loss, dev_accu, dev_step_info = info[1]
-                draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
+                # draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
+                draw_dev_info(dev_loss, dev_accu, None, 'dev', self.writer, i)
 
             # print('[DEBUG] {} time {}s.'.format('valid', time.time() - cur_t))
             # cur_t = time.time()

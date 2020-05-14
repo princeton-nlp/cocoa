@@ -322,7 +322,6 @@ class HistoryIDEncoder(nn.Module):
             if id_gt is not None:
                 identity = id_gt
                 _identity = id_gt
-                print(id_gt)
                 next_rnnh = next_rnnh + (torch.zeros_like(id_gt),)
             else:
                 identity, next_hidden = self.identity(dia_act, extra, id_rnnh)

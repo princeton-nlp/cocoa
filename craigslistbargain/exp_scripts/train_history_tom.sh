@@ -1,4 +1,4 @@
-EXP_NAME="history_tom"
+EXP_NAME="history_tom_7"
 MODEL_NAME="history"
 USE_GPU=$1
 

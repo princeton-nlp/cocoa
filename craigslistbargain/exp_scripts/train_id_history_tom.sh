@@ -1,5 +1,5 @@
-EXP_NAME="gtid_tom_7"
-MODEL_NAME="fixed_id_tom"
+EXP_NAME="id_history_tom_7"
+MODEL_NAME="id_history_tom"
 USE_GPU=$1
 
 mkdir checkpoint/${EXP_NAME}
@@ -17,4 +17,4 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --model lf2lf --model-type a2c --tom-test --load-sample cache/hard_pmask_7/data.pkl \
 --learning-rate 0.001 --name ${EXP_NAME} \
 --tom-hidden-size 128 --tom-hidden-depth 2 --id-hidden-size 128 --id-hidden-depth 2 \
---tom-model ${MODEL_NAME} --idgt ${USE_GPU}
+--tom-model ${MODEL_NAME} ${USE_GPU}
