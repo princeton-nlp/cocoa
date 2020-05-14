@@ -1,1 +1,1 @@
-srun -A pnlp  --ntasks-per-node=1  --cpus-per-task=4 --gres=gpu:1 --pty zsh
+srun -A pnlp  --ntasks-per-node=1  --cpus-per-task=1 --gres=gpu:1 --pty zsh

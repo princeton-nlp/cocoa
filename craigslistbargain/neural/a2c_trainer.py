@@ -369,8 +369,11 @@ class RLTrainer(BaseTrainer):
             else:
                 print('[Warning] update identity, but no identity exists.')
 
+        if ret_table['tom']:
+            loss['tom'][1] *= 1000
+
         if update_table['tom']:
-            l = loss['tom'][0] + loss['tom'][1]*100
+            l = loss['tom'][0] + loss['tom'][1]
             l.backward()
             self.optim['tom'].step()
 
