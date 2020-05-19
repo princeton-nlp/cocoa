@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -A pnlp
-#SBATCH --job-name=train-id
+#SBATCH --job-name=train-fixed-id-tom
 #SBATCH --ntasks-per-node=1
-#SBATCH --output=logs/output_train_id_%j.txt
+#SBATCH --output=logs/output_train_fixed_id_tom_%j.txt
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH -t 96:00:00
@@ -27,4 +27,4 @@ which python
 cd /n/fs/pnlp/runzhey/cocoa/craigslistbargain
 
 # tom_itentity_test
-bash exp_scripts/train_id.sh "--gpu 0"
+bash exp_scripts/train_fixed_uttr_id_history_tom.sh "--gpu 0"

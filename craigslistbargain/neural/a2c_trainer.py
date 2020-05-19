@@ -108,6 +108,7 @@ class RLTrainer(BaseTrainer):
 
         self.critic = agents[training_agent].env.critic
         self.tom = agents[training_agent].env.tom_model
+        self.vocab = agents[training_agent].env.vocab
         self.model_type = args.model_type
         self.use_utterance = False
         self.tom_identity_loss = torch.nn.CrossEntropyLoss(reduction='none')
@@ -124,7 +125,8 @@ class RLTrainer(BaseTrainer):
         else:
             id_gt = None
         if only_identity:
-            identity, next_hidden = self.tom.encoder.identity(batch.identity_state, batch.extra, hidden_state)
+            identity, next_hidden = \
+                self.tom.encoder.identity(batch.identity_state, batch.extra, hidden_state, uttr=batch.uttr)
             predictions = None
         else:
             output = self.tom(batch.uttr, batch.identity_state, batch.state,
@@ -243,6 +245,22 @@ class RLTrainer(BaseTrainer):
         ret[0]=torch.masked_select(t, s)
         ret[1]=torch.masked_select(t, 1-s)
         return ret
+
+    def add_strategy_in_language(self, batch_iters, strategies):
+        for i in range(2):
+            if i == 0:
+                continue
+            # for each dialogue
+            for j in range(len(batch_iters[i])):
+                c = self.vocab.size-1-strategies[i][j]
+                # for each sentences
+                for k, b in enumerate(batch_iters[i][j]):
+                    if random.randint(0, 2) > 0:
+                        continue
+                    tmp = b.uttr[0].numpy()
+                    l = np.prod(tmp.shape)
+                    tmp = np.insert(tmp, random.randint(2, l-1), c, axis=1)
+                    b.uttr[0] = torch.tensor(tmp, device=b.uttr[0].device)
 
     def update_tom(self, args, batch_iters, strategy, model,
                    update_table=None, ret_table=None, dump_name=None):

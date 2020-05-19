@@ -27,4 +27,4 @@ which python
 cd /n/fs/pnlp/runzhey/cocoa/craigslistbargain
 
 # tom_itentity_test
-bash exp_scripts/train_id.sh "--gpu 0"
+bash exp_scripts/train_uttr_id_history_tom.sh "--gpu 0"

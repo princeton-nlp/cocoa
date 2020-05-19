@@ -199,6 +199,9 @@ class MultiRunner:
         ret = self.trainer._sort_merge_batch(batch_iters, batch_size, device=device)
         return ret
 
+    def add_strategy_in_language(self, batch_iters, strategies):
+        self.trainer.add_strategy_in_language(batch_iters, strategies)
+
     def send(self, cmd):
         if cmd[0] == 'quit':
             return
@@ -405,10 +408,10 @@ class MultiManager():
         # else:# == 'idtom'
         #     learn_type = 'co-train'
 
-        if args.tom_model == 'id':
+        if args.tom_model in ['id', 'uttr_id']:
             update_table = {'id': True, 'tom': False}
             ret_table = {'id': True, 'tom': False}
-        elif args.tom_model in ['id_tom', 'id_history_tom']:
+        elif args.tom_model in ['uttr_id_history_tom', 'id_tom', 'id_history_tom']:
             update_table = {'id': True, 'tom': True}
             ret_table = {'id': True, 'tom': True}
         elif args.tom_model in ['fixed_id_tom', 'fixed_id_history_tom']:
@@ -419,6 +422,9 @@ class MultiManager():
             ret_table = {'id': False, 'tom': True}
         else:
             raise NameError('unknown learn_type ')
+
+        if args.fix_id:
+            update_table['id'] = False
 
         num_worker = self.update_worker_list()
         worker = self.worker_conn[0]
@@ -441,6 +447,12 @@ class MultiManager():
             _batch_iters, batch_info, example, v_str = info[1]
 
         _rewards, strategies = batch_info
+
+        # Single Thread!
+        if args.strategy_in_words:
+            worker.local_send(
+                ['add_strategy_in_language', (_batch_iters, strategies)]
+            )
         self.dump_examples(example, v_str, 0)
 
         # Divide the training set

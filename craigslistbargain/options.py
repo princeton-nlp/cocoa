@@ -33,6 +33,7 @@ def add_model_arguments(parser):
     group.add_argument('--hidden-depth', type=int, default=1, help='model network depth.')
     group.add_argument('--tom-model', type=str, default='history',
                        choices=['naive', 'history', 'id_tom', 'id', 'fixed_id_tom',
+                                'uttr_id_history_tom', 'uttr_id',
                                 'id_history_tom', 'fixed_id_history_tom'])
 
     group.add_argument('--dia-num', type=int, default=0, help='')

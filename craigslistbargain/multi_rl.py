@@ -90,6 +90,10 @@ if __name__ == '__main__':
     parser.add_argument('--nlg-dir', type=str, default='data/nlg_templates_dict.json',
                         help='directory of templates for IR-based NLG')
 
+    parser.add_argument('--fix-id', action='store_true', default=False, help='Fix identity')
+    parser.add_argument('--strategy-in-words', action='store_true', default=False,
+                        help='add strategy directly in language part.')
+
     parser.add_argument('--get-dialogues', default=False, action='store_true')
     parser.add_argument('--tom-test', default=False, action='store_true')
     parser.add_argument('--load-identity-from', default=None, type=str, help='load critic model from another checkpoint')

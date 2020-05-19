@@ -91,11 +91,13 @@ class CurrentEncoder(nn.Module):
 class HistoryIdentity(nn.Module):
 
     def __init__(self, diaact_size, last_lstm_size, extra_size, identity_dim,
+                 uttr_emb=None,
                  hidden_size=64, hidden_depth=2, rnn_type='rnn'):
         super(HistoryIdentity, self).__init__()
 
         self.fix_emb = False
         self.identity_dim = identity_dim
+        self.uttr_emb = uttr_emb
 
 
         if rnn_type == 'lstm':
@@ -107,9 +109,41 @@ class HistoryIdentity(nn.Module):
 
         hidden_input = last_lstm_size + extra_size
 
+        # language part
+        if uttr_emb:
+            uttr_emb_size = uttr_emb.embedding_dim
+            # if rnn_type == 'lstm':
+            self.uttr_rnn = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+            # else:
+            #     self.uttr_rnn = torch.nn.RNN(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+            hidden_input += hidden_size
+
         self.hidden_layer = MultilayerPerceptron(hidden_input, hidden_size, hidden_depth, final_output=identity_dim)
 
-    def forward(self, diaact, extra, last_hidden):
+    def _uttr_forward(self, uttr, batch_size):
+        # Uttrance part
+        # uttr: [tensor, tensor, ...], each tensor in shape (len_str, 1).
+        uttr = uttr.copy()
+        with torch.set_grad_enabled(not self.fix_emb):
+            for i, u in enumerate(uttr):
+                if u.dtype != torch.int64:
+                    print('uttr_emb:', uttr)
+                # print('uttr_emb', next(self.uttr_emb.parameters()).device, u.device)
+                uttr[i] = self.uttr_emb(u).reshape(-1, self.uttr_emb.embedding_dim)
+            # print(uttr[i].shape)
+        uttr = torch.nn.utils.rnn.pack_sequence(uttr, enforce_sorted=False)
+        # uttr = torch.nn.utils.rnn.pack_padded_sequence(uttr, lengths, batch_first=True, enforce_sorted=False)
+
+        _, output = self.uttr_rnn(uttr)
+
+        # For LSTM case, output=(h_1, c_1)
+        if isinstance(output, tuple):
+            output = output[0]
+
+        uttr_emb = output.reshape(batch_size, -1)
+        return uttr_emb
+
+    def forward(self, diaact, extra, last_hidden, uttr=None):
         batch_size = diaact.shape[0]
         next_hidden = self.dia_rnn(diaact, last_hidden)
         if isinstance(next_hidden, tuple):
@@ -119,7 +153,12 @@ class HistoryIdentity(nn.Module):
             # For RNN
             dia_emb = next_hidden.reshape(batch_size, -1)
 
-        hidden_input = torch.cat([dia_emb, extra], dim=-1)
+        encoder_input = [dia_emb, extra]
+
+        if self.uttr_emb is not None:
+            encoder_input.append(self._uttr_forward(uttr, batch_size))
+
+        hidden_input = torch.cat(encoder_input, dim=-1)
 
         emb = self.hidden_layer(hidden_input)
 
@@ -250,10 +289,10 @@ class HistoryIDEncoder(nn.Module):
 
         if embeddings is not None:
             uttr_emb_size = embeddings.embedding_dim
-            if rnn_type == 'lstm':
-                self.uttr_rnn = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
-            else:
-                self.uttr_rnn = torch.nn.RNN(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+            # if rnn_type == 'lstm':
+            self.uttr_rnn = torch.nn.LSTM(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
+            # else:
+            #     self.uttr_rnn = torch.nn.RNN(input_size=uttr_emb_size, hidden_size=hidden_size, batch_first=True)
 
             hidden_input += hidden_size
 
@@ -291,7 +330,8 @@ class HistoryIDEncoder(nn.Module):
             encoder_input.append(state)
 
         # Uttrance part
-        if uttr is not None:
+        if self.uttr_emb is not None:
+            # uttr: [tensor, tensor, ...], each tensor in shape (len_str, 1).
             uttr = uttr.copy()
             with torch.set_grad_enabled(not self.fix_emb):
                 for i, u in enumerate(uttr):
@@ -324,7 +364,7 @@ class HistoryIDEncoder(nn.Module):
                 _identity = id_gt
                 next_rnnh = next_rnnh + (torch.zeros_like(id_gt),)
             else:
-                identity, next_hidden = self.identity(dia_act, extra, id_rnnh)
+                identity, next_hidden = self.identity(dia_act, extra, id_rnnh, uttr)
                 if isinstance(next_hidden, tuple): next_rnnh = next_rnnh + next_hidden
                 else: next_rnnh = next_rnnh + (next_hidden,)
 

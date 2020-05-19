@@ -23,12 +23,14 @@ def make_embeddings(opt, word_dict, emb_length, for_encoder=True):
     return nn.Embedding(len(word_dict), emb_length)
 
 
-def make_identity(opt, intent_size, hidden_size, hidden_depth, identity_dim=2):
+def make_identity(opt, intent_size, hidden_size, hidden_depth, identity_dim=2, emb=None):
     diaact_size = (intent_size+1+1)
     extra_size = 3
     if hidden_size is None:
         hidden_size = opt.hidden_size
-    identity = HistoryIdentity(diaact_size * 2, hidden_size, extra_size, identity_dim=identity_dim, hidden_depth=hidden_depth)
+    identity = HistoryIdentity(diaact_size * 2, hidden_size, extra_size,
+                               identity_dim=identity_dim, hidden_depth=hidden_depth,
+                               uttr_emb=emb)
 
     return identity
 
@@ -188,9 +190,13 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
                                    use_history=(model_opt.tom_model == 'history'), hidden_depth=model_opt.tom_hidden_depth,
                                    identity=None, hidden_size=model_opt.tom_hidden_size)
     else:
+        id_emb, tom_emb = None, src_embeddings
+        if model_opt.tom_model in ['uttr_id_tom', 'uttr_id']:
+            id_emb, tom_emb = src_embeddings, None
+
         tom_identity = make_identity(model_opt, intent_size, model_opt.id_hidden_size,
-                                     hidden_depth=model_opt.id_hidden_depth, identity_dim=7)
-        tom_encoder = make_encoder(model_opt, src_embeddings, intent_size, model_opt.tom_hidden_size,
+                                     hidden_depth=model_opt.id_hidden_depth, identity_dim=7, emb=id_emb)
+        tom_encoder = make_encoder(model_opt, tom_emb, intent_size, model_opt.tom_hidden_size,
                                    use_history=('history' in model_opt.tom_model), hidden_depth=model_opt.tom_hidden_depth,
                                    identity=tom_identity, hidden_size=model_opt.tom_hidden_size)
     rl_encoder.fix_emb = True
