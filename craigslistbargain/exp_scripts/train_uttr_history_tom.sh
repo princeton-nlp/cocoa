@@ -1,5 +1,5 @@
 EXP_NAME="uttr_history_tom_7"
-MODEL_NAME="uttr_history"
+MODEL_NAME="history"
 USE_GPU=$1
 
 mkdir checkpoint/${EXP_NAME}
