@@ -161,6 +161,7 @@ def transfer_actor_model(model, checkpoint, model_opt, model_name='model'):
             p.data.uniform_(-model_opt.param_init, model_opt.param_init)
 
 def init_model(model, checkpoint, model_opt, model_name='model'):
+
     # Load the model states from checkpoint or initialize them.
     if checkpoint is not None:
         print('Loading model parameters.')
@@ -169,7 +170,9 @@ def init_model(model, checkpoint, model_opt, model_name='model'):
         if model_opt.param_init != 0.0:
             print('Intializing model parameters.')
             for p in model.parameters():
-                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+                # don't init embedding
+                if p.requires_grad:
+                    p.data.uniform_(-model_opt.param_init, model_opt.param_init)
 
 def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'):
     # print('rnn-type', model_opt.rnn_type)
@@ -191,7 +194,7 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
                                    identity=None, hidden_size=model_opt.tom_hidden_size)
     else:
         id_emb, tom_emb = None, src_embeddings
-        if model_opt.tom_model in ['uttr_id_tom', 'uttr_id']:
+        if model_opt.tom_model in ['uttr_id_history_tom', 'uttr_id']:
             id_emb, tom_emb = src_embeddings, None
 
         tom_identity = make_identity(model_opt, intent_size, model_opt.id_hidden_size,
@@ -201,6 +204,9 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
                                    identity=tom_identity, hidden_size=model_opt.tom_hidden_size)
     rl_encoder.fix_emb = True
     tom_encoder.fix_emb = True
+    if tom_encoder.identity is not None:
+        tom_encoder.identity.fix_emb = True
+    src_embeddings.weight.requires_grad_(False)
 
     # Make decoder.
     tgt_dict = mappings['tgt_vocab']

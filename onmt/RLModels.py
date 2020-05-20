@@ -173,7 +173,6 @@ class HistoryEncoder(nn.Module):
                  hidden_size=64, hidden_depth=2, rnn_type='rnn', fix_identity=True):
         super(HistoryEncoder, self).__init__()
 
-        self.fix_emb = False
         last_lstm_size = hidden_size
 
         if rnn_type == 'lstm':
