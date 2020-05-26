@@ -25,6 +25,8 @@ from neural.a2c_trainer import RLStatistics
 from tensorboardX import SummaryWriter
 
 import os
+from buffer import ReplayBuffer
+import torch
 
 try:
     import thread
@@ -110,40 +112,43 @@ class MultiRunner:
         data = self.trainer.sample_data(i, batch_size, self.args, real_batch=real_batch)
         return data
 
-    def train(self, cmd):
-        epoch, batches, rewards, train_mode = cmd
-        if train_mode == 'normal':
-            pretrain_number = 3
-            for i in range(pretrain_number):
+    def train(self, epoch, batches, rewards, train_mode):
+        update_table = {'policy': True, 'value': True}
+        with torch.autograd.set_detect_anomaly(True):
+            if train_mode == 'normal':
+                pretrain_number = 3
+                update_table['policy'] = False
+                for i in range(pretrain_number):
+                    info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                                   discount=self.args.discount_factor, update_table=update_table)
+                update_table['policy'] = True
                 info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                               discount=self.args.discount_factor, fix_policy=True)
-
-            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                           discount=self.args.discount_factor)
-
-            for i in range(pretrain_number):
+                                               discount=self.args.discount_factor, update_table=update_table)
+                update_table['policy'] = False
+                for i in range(pretrain_number):
+                    info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                                   discount=self.args.discount_factor, update_table=update_table)
+            elif train_mode == 'fix_value':
+                update_table['value'] = False
                 info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                               discount=self.args.discount_factor, fix_policy=True)
-        elif train_mode == 'fix_value':
-            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                           discount=self.args.discount_factor, fix_value=True)
-        elif train_mode == 'fix_policy':
-            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                           discount=self.args.discount_factor, fix_policy=True)
-        else:
-            info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
-                                           discount=self.args.discount_factor)
+                                               discount=self.args.discount_factor, update_table=update_table)
+            elif train_mode == 'fix_policy':
+                update_table['policy'] = False
+                info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                               discount=self.args.discount_factor, update_table=update_table)
+            else:
+                info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
+                                               discount=self.args.discount_factor, update_table=update_table)
         return info
 
-    def valid(self, cmd):
-        start, length = cmd
+    def valid(self, start, length):
         infos = self.trainer.validate(self.args, length, start=start)
         return infos
 
-    def save_model(self, cmd):
-        i, valid_stats = cmd
+    def save_model(self, i, valid_stats, score_type):
         self.trainer.drop_checkpoint(self.args, i + 1, valid_stats,
-                                     model_opt=self.trainer.agents[self.trainer.training_agent].env.model_args)
+                                     model_opt=self.trainer.agents[self.trainer.training_agent].env.model_args,
+                                     score_type=score_type)
         # if self.args.update_oppo:
         #     self.trainer.update_opponent(['policy', 'critic'])
 
@@ -352,16 +357,13 @@ class MultiManager():
         for j in range(2):
             self.writer.add_scalar('agent{}/reward'.format(j), np.mean(all_rewards[j]), ii)
             if len(losses[j]) > 0:
-                tmp = np.concatenate(losses[j], axis=0)
-                tmp = np.mean(tmp, axis=0)
-                # tmp = losses[j]
-                self.writer.add_scalar('agent{}/total_loss'.format(j), tmp[0], ii)
-                self.writer.add_scalar('agent{}/policy_loss'.format(j), tmp[1], ii)
-                self.writer.add_scalar('agent{}/entropy_loss'.format(j), tmp[2], ii)
-                self.writer.add_scalar('agent{}/value_loss'.format(j), tmp[3], ii)
-                self.writer.add_scalar('agent{}/intent_loss'.format(j), tmp[4], ii)
-                self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[5], ii)
-                self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
+                for k in losses[j][0]:
+                    tmp = []
+                    for l in losses[j]:
+                        tmp.append(l[k])
+                    tmp = np.concatenate(tmp[j])
+                    tmp = np.mean(tmp)
+                    self.writer.add_scalar('agent{}/{}'.format(j, k), tmp, ii)
         self.writer.flush()
 
     def _draw_tensorboard_valid(self, ii, all_rewards):
@@ -654,15 +656,38 @@ class MultiManager():
         num_worker = self.update_worker_list()
 
         worker = self.worker_conn[0]
+        max_epoch = args.num_dialogues // batch_size
+        max_epoch = args.epochs
+        batch_size = args.batch_size
 
-        for i in range(args.num_dialogues // batch_size):
+        save_every = max(50, max_epoch // 100)
+        report_every = max(1, max_epoch // 100)
+
+        device = 'cpu'
+        if len(args.gpuid) > 0:
+            device = "cuda:{}".format(args.gpuid[0])
+
+        policy_buffer = ReplayBuffer.get_instance('policy')
+        value_buffer = ReplayBuffer.get_instance('value')
+
+        for epoch in range(max_epoch):
+            last_time = time.time()
+            policy_buffer.empty()
             # _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
-            info = worker.send(['simulate', i, batch_size, batch_size])
+            # print('=' * 5 + ' [Epoch {}/{} running.]'.format(epoch, max_epoch))
+            tt = time.time()
+            info = worker.send(['simulate', epoch, batch_size, batch_size])
             _batch_iters, batch_info, example, _ = pkl.loads(info[1])
             _rewards, strategies = batch_info
+
+            policy_buffer.add_batch_iters(_batch_iters[0],
+                                          add_dict={'reward': _rewards[0], 'strategy': strategies[0]})
+            value_buffer.add_batch_iters(_batch_iters[0],
+                                          add_dict={'reward': _rewards[0], 'strategy': strategies[0]})
+
             # For debug
-            print("rewards:", np.mean(_rewards[0]), np.mean(_rewards[1]))
-            print("rewards_num:", len(_rewards[0]), len(_rewards[1]))
+            # print("rewards:", np.mean(_rewards[0]), np.mean(_rewards[1]))
+            # print("rewards_num:", len(_rewards[0]), len(_rewards[1]))
 
             k = -1
             # for k in range(pretrain_rounds):
@@ -682,36 +707,35 @@ class MultiManager():
             # for k in range(pretrain_rounds):
             #     loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
             #                            discount=args.discount_factor, fix_policy=True)
+            tt = time.time()
+            value_update = min(value_buffer.size//batch_size, 5)
+            for i in range(value_update):
+                batch_iters, _, ret_add = value_buffer.sample_batch(batch_size, add_info={'reward'}, to_device=device)
+                worker.local_send(
+                    ['train', (epoch, batch_iters, ret_add['reward'], 'fix_policy')])
 
-            info = worker.send(
-                ['train', pkl.dumps((i, _batch_iters[0], _rewards[0], self.args.train_mode))])
-            loss = pkl.loads(info[1])
+            batch_iters, _, ret_add = policy_buffer.sample_batch(batch_size, add_info={'reward'}, to_device=device)
+
+            info = worker.local_send(
+                ['train', (epoch, batch_iters, ret_add['reward'], '')])
+            loss = info[1]
+            print('train time:', time.time()-tt)
 
             # Draw outputs on the tensorboard
-            self._draw_tensorboard((i + 1) * batch_size, [[loss], []],
+            self._draw_tensorboard((epoch + 1) * batch_size, [[loss], []],
                                    _rewards)
-            # history_train_losses[self.training_agent].append(loss)
-            #
-            # if (i + 1) % tensorboard_every == 0:
-            #     ii = (i + 1) * batch_size
-            #     for j in range(2):
-            #         self.writer.add_scalar('agent{}/reward'.format(j),
-            #                                np.mean(self.all_rewards[j][-tensorboard_every:]), ii)
-            #         if len(history_train_losses[j]) >= tensorboard_every:
-            #             tmp = np.concatenate(history_train_losses[j][-tensorboard_every:], axis=0)
-            #             tmp = np.mean(tmp, axis=0)
-            #             self.writer.add_scalar('agent{}/total_loss'.format(j), tmp[0], ii)
-            #             self.writer.add_scalar('agent{}/policy_loss'.format(j), tmp[1], ii)
-            #             self.writer.add_scalar('agent{}/entropy_loss'.format(j), tmp[2], ii)
-            #             self.writer.add_scalar('agent{}/value_loss'.format(j), tmp[3], ii)
-            #             self.writer.add_scalar('agent{}/intent_loss'.format(j), tmp[4], ii)
-            #             self.writer.add_scalar('agent{}/price_loss'.format(j), tmp[5], ii)
-            #             self.writer.add_scalar('agent{}/logp_loss'.format(j), tmp[6], ii)
 
-            valid_info = worker.send(['valid', (0, 200)])
-            valid_stats, _, _ = pkl.loads(valid_info[1])
+            print('\t<train> reward{:.3f}, {:.3f} pg_loss {:.5f}, value_loss {:.5f}, value_update {}'
+                  .format(np.mean(_rewards[0]), np.mean(_rewards[1]), loss['pg_loss'][0,0], loss['value_loss'][0,0], value_update))
 
-            worker.send(['save_model', pkl.dumps((i, valid_stats[0]))])
+            if (epoch+1)%save_every == 0:
+                valid_info = worker.local_send(['valid', (0, 200)])
+                valid_stats, _, _ = valid_info[1]
+                valid_reward = [vs.mean_reward() for vs in valid_stats]
+                self._draw_tensorboard_valid((epoch + 1) * batch_size, valid_reward)
+                print('\t<valid> reward{:.3f}, {:.3f}'.format(valid_reward[0], valid_reward[1]))
+                worker.local_send(['save_model', (epoch, valid_reward[0], 'reward')])
+            print('=' * 5 + ' [Epoch {}/{} for {:.3f}s.]'.format(epoch+1, max_epoch, time.time() - last_time))
             # # Save model
             # if (i + 1) % save_every == 0:
             #     # TODO: valid in dev set
@@ -725,6 +749,7 @@ class MultiManager():
             #         print('valid ', valid_stats.str_loss())
 
     def run(self):
+        # deprecated
         # self.run_local_workers()
         args = self.args
         rewards = [None] * 2
@@ -752,7 +777,7 @@ class MultiManager():
         for epoch in range(args.start_epoch, max_epoch):
             batches = []
             rewards = [[], []]
-            print('=' * 5 + ' [Epoch {}/{} running.]'.format(epoch, max_epoch))
+
             task_lists = self.allocate_tasks(num_worker, batch_size)
 
             # Use workers to get trajectories

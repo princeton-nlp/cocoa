@@ -98,20 +98,20 @@ class EntropyLoss(nn.Module):
     def __init__(self):
         super(EntropyLoss, self).__init__()
 
-    def forward(self, enc_policy, enc_price, tgt_policy, tgt_price, pmask=None):
-        logpolicy = enc_policy
-        logpolicy = logpolicy - logpolicy.max(dim=1, keepdim=True)[0]
-        policy = logpolicy.exp() + 1e-6
-        logpolicy = policy.log()
-        z0 = policy.sum(dim=1)
-        # print('policy', logpolicy, policy)
-        policy = policy / z0
-        logpolicy = torch.log(policy)
-        # loss = torch.sum(policy.mul(torch.log(z0) - logpolicy), dim=1)
-        loss = torch.sum(policy.mul(-logpolicy), dim=1)
-        # print('policy', loss, logpolicy, policy)
-        stats = self._stats(loss.mean(), enc_policy.shape[0])
-        return loss, stats
+    def forward(self, p):
+        if len(p.shape) == 1:
+            p = p.reshape(1, -1)
+        assert len(p.shape) == 2
+        policy = torch.softmax(p, dim=-1)
+        logp = policy.log()
+        loss = torch.sum(policy.mul(-logp), dim=-1)
+        return loss
+
+    # def forward(self, enc_policy, enc_price, tgt_policy, tgt_price, pmask=None):
+    #     loss0 = self._entropy(enc_policy)
+    #     loss1 = self._entropy(enc_price)
+
+
 
     def _stats(self, loss, word_num):
         return Statistics(loss.item(), 0, word_num, 0, 0)

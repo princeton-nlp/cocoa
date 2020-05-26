@@ -26,6 +26,8 @@ from multi_manager_debug import MultiManager as MultiManager_DEBUG, MultiRunner 
 
 import options
 
+from buffer import ReplayBuffer
+
 def dump_args():
     # dump all the args at checkpoints
     fpath = '{}/{}.txt'.format(args.model_path, args.name)
@@ -116,6 +118,11 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
 
     dump_args()
+
+    # on policy for policy buffer
+    ReplayBuffer.global_init('policy')
+    ReplayBuffer.global_init('value')
+
     if args.tom_test:
         # Single thread
         print('[Info] Running in debug mode for identity test.')

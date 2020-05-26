@@ -10,6 +10,7 @@ from collections import defaultdict
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 from core.controller import Controller
@@ -426,117 +427,118 @@ class RLTrainer(BaseTrainer):
         critic.train()
 
         values = []
-        p_losses = []
-        e_losses = []
-        penalties = []
+        losses = [[], []]
+        ents = [[], []]
 
         # batch_iter gives a dialogue
         policy_stats = Statistics()
+        # For value: deprecated
         for_value = False
 
+        # In one batch, from sentence 1 to n.
         for i, batch in enumerate(batch_iter):
             # print("batch: \nencoder{}\ndecoder{}\ntitle{}\ndesc{}".format(batch.encoder_inputs.shape, batch.decoder_inputs.shape, batch.title_inputs.shape, batch.desc_inputs.shape))
             # batch.mask_last_price()
             rlbatch = RLBatch.from_raw(batch, None, None)
-            value, policy, price = self._run_batch_a2c(rlbatch)
-            # print('train_policy is:', policy)
-            if not for_value:
-                policy_loss, pl_stats = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.train_loss)
-                # print('policy_loss is:', policy_loss)
-                policy_stats.update(pl_stats)
+            value, i_pred, p_pred = self._run_batch_a2c(rlbatch)
 
-            entropy_loss, _ = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.entropy_loss)
+            # The last sentence may only need to predict value?
+            # if not for_value:
+                # intent_loss, price_stats, batch_stats = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.train_loss)
+            # print('it', i_pred, rlbatch.act_intent)
+            # print('price', p_pred, rlbatch.act_price)
+            intent_loss = F.cross_entropy(i_pred, rlbatch.act_intent.reshape(-1), reduction='none')
+            pact_loss = F.cross_entropy(p_pred, rlbatch.act_price.reshape(-1), reduction='none')
+                # print('policy_loss is:', policy_loss)
+                # policy_stats.update(pl_stats)
+
+            # entropy_loss, _ = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.entropy_loss)
+
+            intent_ent = self.entropy_loss(i_pred)
+            pact_ent = self.entropy_loss(p_pred)
+            pact_loss = pact_loss.reshape(-1, 1)*rlbatch.act_price_mask
+            pact_ent = pact_ent.reshape(-1, 1)*rlbatch.act_price_mask
+
+            # policy_loss = intent_loss + pact_loss
+            # entropy_loss = intent_ent + pact_ent
+
 
             # penalty = ((price-1)**2).mul((price>2).float()) + ((price-0)**2).mul((price<0.5).float())
             # penalty = ((price > 2).float()).mul((price - 1) ** 2) + ((price < 0.5).float()).mul((price - 0) ** 2)
-            penalty = ((price > 2).float()).mul(0.1) + ((price < 0.5).float()).mul(0.1)
-            penalty = torch.zeros_like(price, device=price.device)
+            # penalty = ((price > 2).float()).mul(0.1) + ((price < 0.5).float()).mul(0.1)
+            # penalty = torch.zeros_like(price, device=price.device)
 
-            if not for_value:
-                penalties.append(penalty.view(-1))
-                p_losses.append(policy_loss.view(-1))
-                e_losses.append(entropy_loss.view(-1))
+            # if not for_value:
+            # penalties.append(penalty.view(-1))
+            losses[0].append(intent_loss.reshape(-1))
+            losses[1].append(pact_loss.reshape(-1))
+            ents[0].append(intent_ent.reshape(-1))
+            ents[1].append(pact_ent.reshape(-1))
             values.append(value.view(-1))
 
-        # print('allnll ', nll)
-        rewards = [0] * len(values)
-        rewards[-1] = torch.ones(1) * reward
+        # regular = torch.cat(penalties)
+        regular = None
 
-        old_rewards = [0] * len(values)
-        old_rewards[-1] = torch.ones(1) * reward
-        for i in range(len(rewards) - 2, -1, -1):
-            rewards[i] = torch.ones(1) * rewards[i]
-            old_rewards[i] = old_rewards[i + 1] * discount
+        value_loss = []
+        pg_losses = ([], [])
+        ret = torch.tensor([], device=values[0].device, dtype=torch.float)
+        cur_size = 0
+        for i in range(len(batch_iter)-1, -1, -1):
+            ret = discount*ret
+            if cur_size < batch_iter[i].size:
+                step = batch_iter[i].size - cur_size
+                tmp = torch.tensor(reward[cur_size:cur_size+step], device=value[0].device, dtype=torch.float)
+                ret = torch.cat([ret, tmp])
+                cur_size += step
+            # value loss
+            value_loss.append(F.mse_loss(values[i], ret, reduction='none'))
+            # self._compute_loss(None, value=values[i], oracle=ret[:cur_size], loss=self.critic_loss)
+            # policy loss
+            adv = ret-values[i].detach()
+            # print('infos', ret[:cur_size].shape, values[i].shape, losses[0][i].shape, losses[1][i].shape, adv.shape)
+            pg_losses[0].append(adv*losses[0][i])
+            pg_losses[1].append(adv*losses[1][i])
 
-        for i in range(len(rewards) - 2, -1, -1):
-            rewards[i] += (values[i + 1].cpu().item()) * discount
+        value_loss = torch.cat(value_loss, dim=0)
+        pg_losses = tuple(torch.cat(pl, dim=0) for pl in pg_losses)
+        ents = tuple(torch.cat(e, dim=0) for e in ents)
+        losses = tuple(torch.cat(e, dim=0) for e in losses)
 
-        # print(old_rewards)
+        return pg_losses, ents, value_loss, regular, (losses, policy_stats)
 
-        new_rewards = torch.cat(rewards)
-        new_values = torch.cat(values)
-        if for_value:
-            old_rewards = torch.cat(old_rewards[:-1])
-            rewards = torch.cat(rewards[:-1])
-            values = torch.cat(values[:-1])  # (total_seq_len, batch_size)
-        else:
-            old_rewards = torch.cat(old_rewards)
-            rewards = torch.cat(rewards)
-            values = torch.cat(values)  # (total_seq_len, batch_size)
-
-        if self.cuda:
-            new_rewards = new_rewards.cuda()
-            new_values = new_values.cuda()
-            old_rewards = old_rewards.cuda()
-            rewards = rewards.cuda()
-            values = values.cuda()
-
-
-        value_loss, vl_stats = self._compute_loss(None, value=new_values, oracle=new_rewards, loss=self.critic_loss)
-        # print('values', values, p_losses)
-        old_p_losses = torch.cat(p_losses).view(rewards.shape)
-        # p_losses = old_p_losses.mul(old_rewards).mean()
-        # print('shapes', old_p_losses, old_rewards)
-        # p_losses = old_p_losses.mul(old_rewards).mean()
-        if self.model_type == 'reinforce':
-            p_losses = old_p_losses.mul(old_rewards)
-        else:
-            p_losses = old_p_losses.mul(rewards - values.detach())
-        e_losses = torch.cat(e_losses)
-        regular = torch.cat(penalties)
-        return p_losses, e_losses, value_loss, regular, (old_p_losses, policy_stats)
-
-    def update_a2c(self, args, batch_iters, rewards, model, critic, discount=0.95, fix_policy=False, fix_value=False):
-        p_losses, e_losses, value_loss, regular = None, None, None, None
-        old_p_losses = None
+    def update_a2c(self, args, batch_iters, rewards, model, critic, discount=0.95, update_table=None):
+        if update_table is None:
+            update_table = {'value': False, 'policy': False}
+        pg_losses, e_losses, value_loss, p_losses = None, None, None, None
         policy_stats = Statistics()
+        cur = 0
         for i, bi in enumerate(batch_iters):
-            p,e,v,r, info = self._gradient_accumulation(bi, rewards[i], model, critic, discount)
-            if p_losses is None:
-                p_losses, e_losses, value_loss, regular = p,e,v,r
-                old_p_losses = info[0]
+            p, e, v, _, info = self._gradient_accumulation(bi, rewards[cur: cur+bi[0].size], model, critic, discount)
+            if pg_losses is None:
+                pg_losses, e_losses, value_loss = p, e, v
+                p_losses = info[0]
             else:
-                p_losses = torch.cat([p_losses, p], dim=-1)
-                e_losses = torch.cat([e_losses, e], dim=-1)
+                pg_losses = tuple(torch.cat([pg_losses[i], p[i]], dim=-1) for i in range(2))
+                e_losses = tuple(torch.cat([e_losses[i], e[i]], dim=-1) for i in range(2))
                 value_loss = torch.cat([value_loss, v], dim=-1)
-                regular = torch.cat([regular, r], dim=-1)
-                old_p_losses = torch.cat([old_p_losses, info[0]], dim=-1)
+                p_losses = tuple(torch.cat([p_losses[i], info[0][i]], dim=-1) for i in range(2))
             policy_stats.update(info[1])
 
         # Update step
-        p_losses = p_losses.mean()
-        e_losses = e_losses.mean()
+        # p_losses = p_losses.mean()
+        # e_losses = e_losses.mean()
         value_loss = value_loss.mean()
-        regular = regular.mean()
 
-        # final_loss = p_losses - self.ent_coef * e_losses + self.val_coef * value_loss + self.p_reg_coef * regular
-        # final_loss = p_losses + self.val_coef * value_loss
-        final_loss = p_losses - self.ent_coef * e_losses + self.val_coef * value_loss + self.p_reg_coef * regular
-        model_loss = p_losses - self.ent_coef * e_losses + self.p_reg_coef * regular
+        # Total loss = Policy gradient loss - entropy * entropy coefficient + Value coefficient * value loss
+        # print('pgl', pg_losses[0])
+        # print('el', e_losses[0])
+        model_loss = tuple(pg_losses[i].mean() - self.ent_coef * e_losses[i].mean() for i in range(2))
         critic_loss = self.val_coef * value_loss
+        pg_loss = model_loss[0] + model_loss[1]
+        total_loss = pg_loss + critic_loss
 
         # print('all loss', final_loss, p_losses, e_losses, value_loss)
-        assert not torch.isnan(final_loss)
+        assert not torch.isnan(total_loss)
         # final_loss.backward()
         # model_loss.backward()
         # critic_loss.backward()
@@ -546,23 +548,29 @@ class RLTrainer(BaseTrainer):
 
         # if not self.model_type == "reinforce":
         if not args.only_run:
-            if not fix_value:
+            if update_table['value']:
                 critic.zero_grad()
                 critic_loss.backward()
                 nn.utils.clip_grad_norm_(critic.parameters(), 1.)
                 self.optim['critic'].step()
 
-            if not fix_policy:
+            if update_table['policy']:
                 model.zero_grad()
-                model_loss.backward()
+                pg_loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 1.)
                 self.optim['model'].step()
 
-        return torch.cat([final_loss.view(-1), p_losses.view(-1), e_losses.view(-1),
-                          value_loss.view(-1),
-                          torch.ones(1, device=final_loss.device) * policy_stats.mean_loss(0),
-                          torch.ones(1, device=final_loss.device) * policy_stats.mean_loss(1),
-                          old_p_losses.mean().view(-1) ],).view(1,-1).cpu().data.numpy()
+        ret = {'total_loss': total_loss,
+               'pg_loss': pg_loss,
+               'pg_loss0': model_loss[0],
+               'pg_loss1': model_loss[1],
+               'value_loss': critic_loss,
+               'entropy0': e_losses[0],
+               'entropy1': e_losses[1],
+               'policy_loss0': p_losses[0],
+               'policy_loss1': p_losses[1],
+        }
+        return {k: ret[k].reshape(1, -1).cpu().data.numpy() for k in ret}
 
     def validate(self, args, valid_size, valid_critic=False, start=0, split='dev', exchange=None):
         rate = 0.5
@@ -645,6 +653,8 @@ class RLTrainer(BaseTrainer):
             self.agents[self.training_agent^1].env.critic.load_state_dict(tmp_model_dict)
 
     def get_temperature(self, epoch, batch_size, args):
+        # deprecated
+        return 1
         if args.only_run or args.warmup_epochs == 0:
             return 1
         half = args.num_dialogues // batch_size / 2

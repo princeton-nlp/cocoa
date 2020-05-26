@@ -141,7 +141,7 @@ class SimpleLoss(nn.Module):
         # if pmask.sum() > 0:
         #     loss1 = loss1 * loss1.shape[0] / pmask.sum()
         loss1 = alpha * loss1
-        loss = loss0 + loss1
+        # loss = loss0 + loss1
 
         correct_num, word_num = self._get_correct_num(enc_policy, tgt_policy)
         price_num = torch.sum(tgt_price).item()
@@ -409,7 +409,12 @@ class SLTrainer(BaseTrainer):
         return path
 
     def save_best_checkpoint(self, checkpoint, opt, valid_stats, score_type='loss'):
-        if self.best_valid_loss is None or valid_stats < self.best_valid_loss:
+        update_best = False
+        if score_type == 'loss' and (self.best_valid_loss is None or valid_stats < self.best_valid_loss):
+            update_best = True
+        if score_type == 'reward' and (self.best_valid_loss is None or valid_stats > self.best_valid_loss):
+            update_best = True
+        if update_best:
             self.best_valid_loss = valid_stats
             path = '{root}/{model}_best.pt'.format(
                 root=opt.model_path,

@@ -477,8 +477,8 @@ class RawBatch(Batch):
 
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
-        sentence, extra, _ = self.state
-        state_length = self.state[0].shape[1] // (intent_size+1)
+        sentence, extra = self.state_0, self.state_1
+        state_length = self.state_0.shape[1] // (intent_size+1)
         intents = sentence[:, (state_length-1)*intent_size: state_length*intent_size]
         prices = extra[:, -2:]
         intents = list(intents.argmax(dim=1).reshape(-1).cpu().numpy())
@@ -534,19 +534,39 @@ class RawBatch(Batch):
         state, uttr, act, prob \
             = cls.convert_data(encoder_args=encoder_args, decoder_args=decoder_args, context_data=context_data,
                      vocab=vocab, cuda=cuda)
-        return cls(state, uttr, act, prob)
+        build_dict = {'state': state, 'uttr': uttr, 'act': act, 'prob': prob}
+        return cls(**build_dict)
 
     @property
     def size(self):
-        if self.state is None:
+        if getattr(self, 'state', None) is None and getattr(self, 'state_0', None) is None:
             return 0
-        if isinstance(self.state, tuple):
-            return self.state[0].shape[0]
+        if (not hasattr(self, 'state')) or isinstance(self.state, tuple):
+            return self.state_0.shape[0]
         else:
             return self.state.shape[0]
 
-    def __init__(self, state, uttr, act, prob):
-        self.state, self.uttr, self.act, self.prob = state, uttr, act, prob
+    def __init__(self, **kwargs):
+        """ Special rules: tuple elements will be storage separately.
+        uttr data format: [Tensor]
+        other: Tensor or list
+            TODO: use Tensor rather than list
+
+        """
+        self.tensor_attributes = []
+        for k in kwargs:
+            if isinstance(kwargs[k], tuple):
+                # TODO: remove redundant code
+                # redundant but necessary for now
+                self.__setattr__(k, kwargs[k])
+
+                for i, v in enumerate(kwargs[k]):
+                    new_k = "{}_{}".format(k, i)
+                    self.tensor_attributes.append(new_k)
+                    self.__setattr__(new_k, v)
+            else:
+                self.tensor_attributes.append(k)
+                self.__setattr__(k, kwargs[k])
 
 
 class RLBatch(RawBatch):
@@ -562,34 +582,73 @@ class RLBatch(RawBatch):
 
     @classmethod
     def from_raw(cls, rawBatch, reward, done):
-        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.prob
-        return cls(state, uttr, act, prob, reward, done)
+        uttr, prob =rawBatch.uttr, rawBatch.prob
+        state = (rawBatch.state_0, rawBatch.state_1, rawBatch.state_2)
+        act = (rawBatch.act_0, rawBatch.act_1, rawBatch.act_2, rawBatch.act_3)
+        # super(RLBatch, self).__init__()
+        state = torch.cat(state[:2], dim=-1)
+        prob = prob
+        uttr = uttr
+        act_intent = act[0]
+        act_price = act[2]
+        act_price_mask = act[3]
+        # self.value = []
+        reward = reward
+        done = done
+        build_dict = {'state': state, 'uttr': uttr, 'act_intent': act_intent,
+                      'act_price': act_price, 'act_price_mask':act_price_mask,
+                      'reward': reward, 'done': done, 'prob':prob}
+        return cls(**build_dict)
+        # self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
     def __len__(self):
         return self.state.shape[0]
-
-    def __init__(self, state, uttr, act, prob, reward, done):
-        # super(RLBatch, self).__init__()
-        self.state = torch.cat(state[:2], dim=-1)
-        self.prob = prob
-        self.uttr = uttr
-        self.act_intent = act[0]
-        self.act_price = act[2]
-        self.act_price_mask = act[3]
-        # self.value = []
-        self.reward = reward
-        self.done = done
-
-        self.tensor_attributes = ['state', 'uttr', 'act_intent', 'act_price', 'act_price_mask']
 
 
 class ToMBatch(RawBatch):
     @classmethod
     def from_raw(cls, rawBatch, strategy):
-        state, uttr, act, prob = rawBatch.state, rawBatch.uttr, rawBatch.act, rawBatch.prob
+        uttr, prob =rawBatch.uttr, rawBatch.prob
+        state = (rawBatch.state_0, rawBatch.state_1, rawBatch.state_2)
+        act = (rawBatch.act_0, rawBatch.act_1, rawBatch.act_2, rawBatch.act_3)
         # print('i_s:', -(RawBatch.intent_size+1)*2)
         # state = (state[0][:, -(RawBatch.intent_size+1)*2:], state[1])
-        return cls(state, uttr, act, strategy)
+        length = state[2].shape[1] // (RawBatch.intent_size+2)
+        intent = state[2][:, :length*RawBatch.intent_size][:, -RawBatch.intent_size*2:]
+        price = state[2][:, length*RawBatch.intent_size:length*(RawBatch.intent_size+1)][:, -2:]
+        pmask = state[2][:, length*(RawBatch.intent_size+1):length*(RawBatch.intent_size+2)][:, -2:]
+        # One step state
+        identity_state = torch.cat([intent, price, pmask], dim=-1)
+        # self.identity_state = state[2][:, -(RawBatch.intent_size+2)*2:]
+        extra = state[1][:, :3]
+        # self.state = torch.cat([self.identity_state, self.extra], dim=-1)
+        # # Ignore last prices, but use multi-steps state
+        # self.original_state = torch.cat([self.extra, state[2]], dim=-1)
+        state = state[2]
+        last_price = state[1][:, -2:]
+        uttr = uttr
+        act_intent = act[0]
+        act_price = act[1]
+        act_price_mask = act[3]
+        strategy = strategy
+
+        strategy = cls.to_tensor(strategy, 'long', cuda=state.device.type!='cpu')
+        strategy = Batch.int_to_onehot(strategy.squeeze(), 7)
+
+        tensor_attributes = ['state', 'identity_state', 'extra', 'uttr', 'last_price',
+                                  'act_intent', 'act_price', 'act_price_mask', 'strategy']
+        build_dict = {
+            'state': state,
+            'identity_state': identity_state,
+            'extra': extra,
+            'uttr': uttr,
+            'act_intent': act_intent,
+            'act_price': act_price,
+            'act_price_mask': act_price_mask,
+            'last_price': last_price,
+            'strategy': strategy,
+        }
+        return cls(**build_dict)
 
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
@@ -602,34 +661,6 @@ class ToMBatch(RawBatch):
 
     def __len__(self):
         return self.state.shape[0]
-
-    def __init__(self, state, uttr, act, strategy):
-        # super(SLBatch, self).__init__()
-        # self.state = torch.cat([state[2], state[1][:, :3]], dim=-1)
-        length = state[2].shape[1] // (RawBatch.intent_size+2)
-        intent = state[2][:, :length*RawBatch.intent_size][:, -RawBatch.intent_size*2:]
-        price = state[2][:, length*RawBatch.intent_size:length*(RawBatch.intent_size+1)][:, -2:]
-        pmask = state[2][:, length*(RawBatch.intent_size+1):length*(RawBatch.intent_size+2)][:, -2:]
-        # One step state
-        self.identity_state = torch.cat([intent, price, pmask], dim=-1)
-        # self.identity_state = state[2][:, -(RawBatch.intent_size+2)*2:]
-        self.extra = state[1][:, :3]
-        # self.state = torch.cat([self.identity_state, self.extra], dim=-1)
-        # # Ignore last prices, but use multi-steps state
-        # self.original_state = torch.cat([self.extra, state[2]], dim=-1)
-        self.state = state[2]
-        self.last_price = state[1][:, -2:]
-        self.uttr = uttr
-        self.act_intent = act[0]
-        self.act_price = act[1]
-        self.act_price_mask = act[3]
-        self.strategy = strategy
-
-        self.strategy = self.to_tensor(strategy, 'long', cuda=self.state.device.type!='cpu')
-        self.strategy = Batch.int_to_onehot(self.strategy.squeeze(), 7)
-
-        self.tensor_attributes = ['state', 'identity_state', 'extra', 'uttr', 'last_price',
-                                  'act_intent', 'act_price', 'act_price_mask', 'strategy']
 
 
 class SLBatch(Batch):
