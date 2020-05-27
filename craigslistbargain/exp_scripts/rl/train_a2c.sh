@@ -10,7 +10,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
 --model-path checkpoint/${EXP_NAME} --mappings mappings/language \
---optim adam --learning-rate 0.001 ${LR} \
+--optim adam --learning-rate ${LR} \
 --agents pt-neural pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 10000 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
