@@ -486,6 +486,7 @@ class NeuralSession(Session):
 
         lf = self._raw_token_to_lf(tokens)
         utterance = self._lf_to_utterance(lf)
+        lf['price_act'] = output_data.get('price_act')
 
         event = self._to_event(utterance, lf, output_data)
         uttr = self.env.preprocessor.process_event(event, self.kb)
@@ -612,7 +613,7 @@ class PytorchNeuralSession(NeuralSession):
             else:
                 p = current_price
         else:
-            prange = [1., 0.4]
+            prange = [0.4, 1.]
             x = factor
             if strategy == 'convex':
                 factor = 1-(1-(x-1)**2)**0.5
@@ -658,6 +659,7 @@ class PytorchNeuralSession(NeuralSession):
         rlbatch = RLBatch.from_raw(batch, None, None)
 
         intents, prices = batch.get_pre_info(self.lf_vocab)
+        # print('last price:', self.env.name, prices)
 
         # get acpt_range
         if self.env.name == 'pt-neural-r':
@@ -691,6 +693,7 @@ class PytorchNeuralSession(NeuralSession):
             # Decay till 1/2 max_length
             factor = batch.state[1][0, -3].item()
             p = self.get_price(factor, self.price_strategy, prices[0, 0].item())
+            # print('pstra:', self.price_strategy, p)
             # o_factor = factor
             # factor = min(1., factor*2)
             #
@@ -717,6 +720,7 @@ class PytorchNeuralSession(NeuralSession):
                 print('p is int')
             # print('prices', prices)
             p = max(p, prices[0, 1].item())
+            p = min(p, prices[0, 0].item())
             output_data['price'] = p
             # print('after:', p, output_data['price'])
         if self.env.name != 'pt-neural-r':
@@ -735,6 +739,8 @@ class PytorchNeuralSession(NeuralSession):
                 p = prices[0, 0].item()-0.1
             else:
                 print('what\'s wrong?', p_act)
+
+            p = min(p, prices[0, 0].item())
             p = max(p, prices[0, 1].item())
 
             output_data['original_price'] = p

@@ -110,6 +110,7 @@ class RLTrainer(BaseTrainer):
         self.critic = agents[training_agent].env.critic
         self.tom = agents[training_agent].env.tom_model
         self.vocab = agents[training_agent].env.vocab
+        self.lf_vocab = agents[training_agent].env.lf_vocab
         self.model_type = args.model_type
         self.use_utterance = False
         self.tom_identity_loss = torch.nn.CrossEntropyLoss(reduction='none')
@@ -600,7 +601,8 @@ class RLTrainer(BaseTrainer):
             total_stats.update(stats)
             oppo_total_stats.update(oppo_stats)
             examples.append(example)
-            verbose_str.append(self.example_to_str(example, controller, rewards, sid+start))
+            stra = [controller.sessions[i].price_strategy for i in range(2)]
+            verbose_str.append(self.example_to_str(example, controller, rewards, sid+start, stra))
         # print('='*20, 'END VALIDATION', '='*20)
         self.model.train()
         self.critic.train()
@@ -669,12 +671,16 @@ class RLTrainer(BaseTrainer):
             if "real_uttr" in e.metadata.keys():
                 ret.append("[{}: {}]\t{}\t{}\t\"{}\"".format(e.time, e.agent, e.action, e.data, e.metadata["real_uttr"]))
             else:
+                intent = e.metadata.get('intent')
+                intent = self.lf_vocab.to_word(intent)
                 ret.append("[{}: {}]\t{}\t{}".format(e.time, e.agent, e.action, e.data))
-                ret.append("        \t{}\t{}".format(e.metadata.get('intent'), e.metadata.get('price')))
+                ret.append("        <{}>\t{}\t{}".format(intent, e.metadata.get('price'), e.metadata.get('price_act')))
         return ret 
         
 
-    def example_to_str(self, example, controller, rewards, sid=None):
+    def example_to_str(self, example, controller, rewards, sid=None, strategies=None):
+        if strategies is None:
+            strategies = [None, None]
         verbose_str = []
         from core.price_tracker import PriceScaler
         if sid is not None:
@@ -684,6 +690,7 @@ class RLTrainer(BaseTrainer):
             s = 'Agent[{}: {}], bottom ${}, top ${}'.format(session_id, session.kb.role, bottom, top)
             verbose_str.append(s)
         verbose_str.append("They are negotiating for "+session.kb.facts['item']['Category'])
+        verbose_str.append("strategy: {}, {}".format(strategies[0], strategies[1]))
 
         strs = self.example_to_text(example)
         for str in strs:
@@ -734,11 +741,10 @@ class RLTrainer(BaseTrainer):
                 T = next(batch_iter)
                 _batch_iters[session_id].append(list(batch_iter))
 
-
-                # if train_policy or args.model_type == 'tom':
-
+            stra = [controller.sessions[i].price_strategy for i in range(2)]
             examples.append(example)
-            verbose_str = self.example_to_str(example, controller, rewards, sid)
+            verbose_str = self.example_to_str(example, controller, rewards, sid,
+                                              stra)
 
             if args.verbose:
                 for s in verbose_str:

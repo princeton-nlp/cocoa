@@ -677,7 +677,7 @@ class MultiManager():
             # print('=' * 5 + ' [Epoch {}/{} running.]'.format(epoch, max_epoch))
             tt = time.time()
             info = worker.send(['simulate', epoch, batch_size, batch_size])
-            _batch_iters, batch_info, example, _ = pkl.loads(info[1])
+            _batch_iters, batch_info, example, v_str = pkl.loads(info[1])
             _rewards, strategies = batch_info
 
             policy_buffer.add_batch_iters(_batch_iters[0],
@@ -729,8 +729,11 @@ class MultiManager():
                   .format(np.mean(_rewards[0]), np.mean(_rewards[1]), loss['pg_loss'][0,0], loss['value_loss'][0,0], value_update))
 
             if (epoch+1)%save_every == 0:
+                self.dump_examples(example, v_str, epoch, 'train')
                 valid_info = worker.local_send(['valid', (0, 200)])
-                valid_stats, _, _ = valid_info[1]
+                valid_stats, example, v_str = valid_info[1]
+                self.dump_examples(example, v_str, epoch, 'dev')
+
                 valid_reward = [vs.mean_reward() for vs in valid_stats]
                 self._draw_tensorboard_valid((epoch + 1) * batch_size, valid_reward)
                 print('\t<valid> reward{:.3f}, {:.3f}'.format(valid_reward[0], valid_reward[1]))
