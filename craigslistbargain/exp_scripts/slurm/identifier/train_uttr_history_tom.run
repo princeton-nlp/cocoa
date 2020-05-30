@@ -42,7 +42,7 @@ for i in $(seq $SD_START $SD_END)
 do
 #  echo $(expr $i \* 3 + 1);
   echo "run task #${i}"
-  bash exp_scripts/identifier/train_uttr_history_tom.sh "_${i}" "--gpuid 0" "${i}" 2>&1 | tee logs/uttr_id_history_tom_${i}.log &
+  bash exp_scripts/identifier/train_uttr_history_tom.sh "_${i}" "--gpuid 0" "${i}" 2>&1 | tee logs/uttr_history_tom_${i}.log &
 done
 
 wait

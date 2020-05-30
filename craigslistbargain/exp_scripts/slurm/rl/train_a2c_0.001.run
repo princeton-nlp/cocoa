@@ -39,7 +39,7 @@ fi
 for i in $(seq $SD_START $SD_END)
 do
 #  echo $(expr $i \* 3 + 1);
-  bash exp_scripts/rl/train_a2c.sh "_0.001_${i}" "--gpuid 0" "--seed ${i}" "0.001" 2>&1 | tee logs/output_train_a2c_0.001_${i}.log &
+  bash exp_scripts/rl/train_a2c.sh "_0.001_${i}" "--gpuid 0" "${i}" "0.001" 2>&1 | tee logs/output_train_a2c_0.001_${i}.log &
 done
 
 wait

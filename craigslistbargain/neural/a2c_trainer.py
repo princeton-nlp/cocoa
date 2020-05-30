@@ -262,7 +262,7 @@ class RLTrainer(BaseTrainer):
                 for k, b in enumerate(batch_iters[i][j]):
                     if random.randint(0, 2) > 0:
                         continue
-                    tmp = b.uttr[0].numpy()
+                    tmp = b.uttr[0].cpu().numpy()
                     l = np.prod(tmp.shape)
                     tmp = np.insert(tmp, random.randint(2, l-1), c, axis=1)
                     b.uttr[0] = torch.tensor(tmp, device=b.uttr[0].device)
