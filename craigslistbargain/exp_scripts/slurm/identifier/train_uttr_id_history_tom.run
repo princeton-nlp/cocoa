@@ -41,7 +41,7 @@ fi
 for i in $(seq $SD_START $SD_END)
 do
   echo "run task #${i}"
-  bash exp_scripts/identifier/train_uttr_id_history_tom.sh "_${i}" "--gpuid 0" "--seed ${i}" 2>&1 | tee logs/uttr_id_history_tom_${i}.log &
+  bash exp_scripts/identifier/train_uttr_id_history_tom.sh "_${i}" "--gpuid 0" "${i}" 2>&1 | tee logs/uttr_id_history_tom_${i}.log &
 done
 
 wait
