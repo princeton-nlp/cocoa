@@ -17,6 +17,7 @@ import numpy as np
 class LFSampler(Sampler):
 
     var_for_price = 0.1
+    INTENT_NUM = -1
 
     def __init__(self, model, vocab,
                  temperature=1, max_length=100, cuda=False, model_type='sl'):
@@ -43,8 +44,10 @@ class LFSampler(Sampler):
 
         self.policy_history = []
 
+        # init rl actions
+        _ = self.rl_actions
+        LFSampler.INTENT_NUM = len(self.vocab.ind_to_word)
 
-        # self.all_actions = self._get_all_actions()
     @staticmethod
     def softmax_with_mask(policy, mask=1):
         if isinstance(mask, torch.Tensor):
@@ -70,6 +73,24 @@ class LFSampler(Sampler):
         # (batch_size,), (batch_size, intent_size)
         return act, policy
 
+    def _run_batch_tom_identity(self, batch, hidden_state, only_identity=False, id_gt=False):
+        if id_gt:
+            id_gt = batch.strategy
+        else:
+            id_gt = None
+        if only_identity:
+            identity, next_hidden = \
+                self.model.encoder.identity(batch.identity_state, batch.extra, hidden_state, uttr=batch.uttr)
+            predictions = None
+        else:
+            output = self.model(batch.uttr, batch.identity_state, batch.state,
+                              batch.extra, hidden_state, id_gt)
+            if len(output) == 3:
+                predictions, next_hidden, identity = output
+            else:
+                predictions, next_hidden = output
+                identity = None
+        return predictions, next_hidden, identity
 
     def generate_batch(self, batch, gt_prefix=1, enc_state=None, whole_policy=False, special_actions=None,
                        temperature=1, acpt_range=None, hidden_state=None):
@@ -79,19 +100,11 @@ class LFSampler(Sampler):
         # Run the model
         if self.model_type in ['sl', 'rl']:
             policy, p_policy = self.model(batch.uttr, batch.state)
+            next_hidden = None
         else:
-            out, next_hidden = self.model(batch.state, batch.uttr, batch.extra, hidden_state)
+            # tom model
+            out, next_hidden, _ = self._run_batch_tom_identity(batch, hidden_state)
             policy, p_policy = out
-
-        # print('policy is:', policy)
-
-        # Get embeddings of target
-        # tgt_emb = self.model.encoder.embeddings(batch.target_intent)
-        # tgt_emb = torch.cat([tgt_emb, batch.target_price], )
-
-        # policy.sub_(policy.max(1, keepdim=True)[0].expand(policy.size(0), policy.size(1)))
-
-        # policy[batch.policy_mask == 0] = -100
 
         last_intent, last_price = batch.get_pre_info(self.vocab)
 
@@ -130,7 +143,6 @@ class LFSampler(Sampler):
                 policy[0, act_idx] = 1
                 prob = 1.
 
-
         # TODO: Not correct, for multiple data.
         original_price = price
         if intent not in self.price_actions:
@@ -143,11 +155,59 @@ class LFSampler(Sampler):
                "p_policy": p_policy,
                'prob': prob,
                'original_price': original_price,
+               'rnn_hidden': next_hidden
                }
         # ret["batch"] = batch
         return ret
 
-    def _get_all_actions(self, mean, logstd, p_num=5, no_sample=False):
+    def get_sl_actions(self, mean, logstd, sample_num=1):
+        # get all actions
+        all_actions = []
+        num_actions = len(self.vocab.word_to_ind)
+        actions = list(range(num_actions))
+        for i in actions:
+            if not i in self.price_actions:
+                all_actions.append([i, None])
+            for j in range(sample_num):
+                all_actions.append([i, mean])
+        return all_actions
+
+    _rl_actions = None
+    _rl_act_index = None
+    PACT_NUM = 4
+
+    @property
+    def rl_act_index(self):
+        if self._rl_act_index is None:
+            _ = self.rl_actions
+        return self._rl_act_index
+
+    @property
+    def rl_actions(self):
+        if LFSampler._rl_actions is not None:
+            return LFSampler._rl_actions
+
+        # get all actions
+        all_actions = []
+        num_actions = len(self.vocab.word_to_ind)
+        actions = list(range(num_actions))
+        idx = 0
+        LFSampler._rl_actions = {}
+        for i in actions:
+            if not i in self.price_actions:
+                all_actions.append((i, None))
+                LFSampler._rl_actions[all_actions[-1]] = idx
+                idx += 1
+            else:
+                for j in range(self.PACT_NUM):
+                    all_actions.append((i, j))
+                    LFSampler._rl_actions[all_actions[-1]] = idx
+                    idx += 1
+
+        LFSampler._rl_actions = all_actions
+        return all_actions
+
+    def _old_get_all_actions(self, mean, logstd, p_num=5, no_sample=False):
         # prices
         self.prices = []
         step = 0.05

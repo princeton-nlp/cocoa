@@ -23,6 +23,7 @@ from neural.batcher_rl import RLBatch, RawBatch, ToMBatch
 
 from neural.rl_trainer import RLTrainer as BaseTrainer
 from neural.sl_trainer import Statistics, SimpleLoss
+from neural.generator import LFSampler
 
 import math, time, sys
 
@@ -239,13 +240,15 @@ class RLTrainer(BaseTrainer):
         return bs, ids, bl
 
     @staticmethod
-    def split_by_strategy(t, s):
+    def split_by_strategy(t, s, s_num=5):
         if s is None:
             return t
-        s = torch.Tensor(s, dtype=torch.uint8, device=t.device).reshape(-1, 1)
-        ret = [0,1]
-        ret[0]=torch.masked_select(t, s)
-        ret[1]=torch.masked_select(t, 1-s)
+        s = torch.tensor(s, dtype=torch.uint8, device=t.device).reshape(-1, 1)
+        ret = [0]*s_num
+        for i in range(s_num):
+            ret[i] = torch.masked_select(t, s == i)
+        # ret[0]=torch.masked_select(t, s)
+        # ret[1]=torch.masked_select(t, 1-s)
         return ret
 
     def add_strategy_in_language(self, batch_iters, strategies):
@@ -422,7 +425,7 @@ class RLTrainer(BaseTrainer):
         return loss, \
                accu, (step_loss, step_accu, step_num)
 
-    def _gradient_accumulation(self, batch_iter, reward, model, critic, discount=0.95):
+    def _gradient_accumulation(self, batch_iter, reward, model, critic, discount=1):
         # Compute losses
         model.train()
         critic.train()
@@ -664,10 +667,77 @@ class RLTrainer(BaseTrainer):
         i_s, i_e = 0, half
         return min(t_e, t_s + (t_e - t_s) * 1. * epoch / args.warmup_epochs)
         # return min(1., 1.*epoch/half)
-    
-    def example_to_text(self, exmaple):
+
+    @staticmethod
+    def merge_policy(i_policy, p_policy):
+        actions = LFSampler._rl_actions
+        policy = torch.zeros(len(actions), dtype=torch.float32)
+        # print('merge, ', i_policy, p_policy)
+        i_policy = i_policy.reshape(-1)
+        p_policy = p_policy.reshape(-1)
+
+        for i, act in enumerate(actions):
+            policy[i] = i_policy[act[0]]
+            if act[1] is not None:
+                policy[i] = policy[i] * p_policy[act[1]]
+
+        return policy
+
+    # @staticmethod
+    def sort_policy(self, policy, actions, display_num=-1, to_word=str):
+        # print('sort', policy, actions)
+        scored_actions = [(policy.reshape(-1)[i].data.item(), actions[i]) for i in range(len(actions))]
+        scored_actions = sorted(scored_actions, reverse=True, key=lambda x: x[0])
+        if display_num == -1:
+            return scored_actions
+        s = ""
+        for i in range(display_num):
+
+            sp, sa = scored_actions[i]
+            if isinstance(sa, tuple):
+                act = self.lf_vocab.to_word(sa[0])
+                if sa[1] is not None:
+                    act = act + "," + str(sa[1])
+            else:
+                act = to_word(sa)
+            s = s + "{}:{:.3f} ".format(act, sp)
+        return scored_actions, s
+
+    def append_policy_info(self, e, ret, prefix="", display_num=3):
+        output_data = e.metadata['output_data']
+        pact_size = np.prod(output_data['p_policy'].shape)
+        use_tom = output_data.get('tom_p') is not None
+
+        # print(LFSampler.INTENT_NUM, LFSampler._rl_actions)
+
+        # sl agent
+        if pact_size == 1:
+            _, s = self.sort_policy(output_data['policy'], list(range(LFSampler.INTENT_NUM)),
+                                    display_num, self.lf_vocab.to_word)
+            ret.append(prefix+"policy: "+s)
+        else:
+            # rl agent
+            _, s = self.sort_policy(output_data['policy'], list(range(LFSampler.INTENT_NUM)),
+                                    display_num, self.lf_vocab.to_word)
+            ret.append(prefix+"i_policy: "+s)
+            _, s = self.sort_policy(output_data['p_policy'], list(range(LFSampler.PACT_NUM)), display_num)
+            ret.append(prefix+"p_policy: "+s)
+            policy = RLTrainer.merge_policy(output_data['policy'], output_data['p_policy'])
+            _, s = self.sort_policy(policy, LFSampler._rl_actions, display_num*2)
+            ret.append(prefix + "policy: " + s)
+
+            # tom agent
+            if use_tom:
+                _, s = self.sort_policy(output_data['tominf_p2'], LFSampler._rl_actions, display_num*2)
+                ret.append(prefix + "tom_p2: " + s)
+                _, s = self.sort_policy(output_data['tominf_p'], LFSampler._rl_actions, display_num * 2)
+                ret.append(prefix + "tom_p: " + s)
+                _, s = self.sort_policy(output_data['tom_ev'], LFSampler._rl_actions, display_num * 2)
+                ret.append(prefix + "tom_ev: " + s)
+
+    def example_to_text(self, example):
         ret = []
-        for i, e in enumerate(exmaple.events):
+        for i, e in enumerate(example.events):
             if "real_uttr" in e.metadata.keys():
                 ret.append("[{}: {}]\t{}\t{}\t\"{}\"".format(e.time, e.agent, e.action, e.data, e.metadata["real_uttr"]))
             else:
@@ -675,8 +745,9 @@ class RLTrainer(BaseTrainer):
                 intent = self.lf_vocab.to_word(intent)
                 ret.append("[{}: {}]\t{}\t{}".format(e.time, e.agent, e.action, e.data))
                 ret.append("        <{}>\t{}\t{}".format(intent, e.metadata.get('price'), e.metadata.get('price_act')))
+                self.append_policy_info(e, ret, "  ")
+                # ret.append("        <{}>\t{}\t{}".format(, e.metadata.get('price'), e.metadata.get('price_act')))
         return ret 
-        
 
     def example_to_str(self, example, controller, rewards, sid=None, strategies=None):
         if strategies is None:

@@ -128,15 +128,12 @@ if __name__ == '__main__':
         print('[Info] Running in debug mode for identity test.')
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
         manager.learn_identity()
-    elif args.debug:
-        # Single thread
-        print('[Info] Running in debug mode.')
-        manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
-        manager.learn()
     elif args.get_dialogues:
         manager = MultiManager(args.num_cpus, args, MultiTrainer)
         manager.get_dialogues()
     else:
-        manager = MultiManager(args.num_cpus, args, MultiTrainer)
-        manager.run()
+        # manager = MultiManager(args.num_cpus, args, MultiTrainer)
+        # manager.run()
+        manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
+        manager.learn()
 

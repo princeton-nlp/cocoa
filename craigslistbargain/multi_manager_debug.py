@@ -6,6 +6,7 @@ import numpy as np
 import time
 
 from onmt.Utils import use_gpu
+import logging
 
 from cocoa.core.util import read_json
 from cocoa.core.schema import Schema
@@ -329,6 +330,7 @@ class MultiManager():
         init_dir(log_path, clean_all=True)
 
         self.writer = SummaryWriter(logdir='logs/{}'.format(args.name))
+        self.policies_log = [{}, {}]
 
     def run_local_workers(self):
         for w in self.local_workers:
@@ -628,7 +630,48 @@ class MultiManager():
                 # print('[DEBUG] {} time {}s.'.format('dump_model', time.time() - cur_t))
                 # cur_t = time.time()
 
+    def _log_policy(self, examples, dump_result):
+        policies = [{
+            'i_policy': [], 'p_policy': []
+        }, {
+            'i_policy': [], 'p_policy': []
+        }]
+        for ex in examples:
+            for e in ex.events:
+                i = e.agent
+                odata = e.metadata['output_data']
+                policies[i]['i_policy'].append(odata['policy'].reshape(1, -1))
+                if odata.get('p_policy') is not None:
+                    policies[i]['p_policy'].append(odata['p_policy'].reshape(1, -1))
 
+        for i in range(2):
+            for k in policies[i]:
+                if len(policies[i][k]) > 0:
+                    policies[i][k] = torch.cat(policies[i][k], dim=0).mean(dim=0, keepdim=True)
+                    if self.policies_log[i].get(k) is None:
+                        self.policies_log[i][k] = []
+                    self.policies_log[i][k].append(policies[i][k])
+                    if dump_result:
+                        logger = logging.getLogger('agent{}_plog_{}'.format(i, k))
+                        tmp = torch.cat(self.policies_log[i][k], dim=0).mean(dim=0)
+                        # tensor([x, x, x])
+                        logger.info(str(tmp.data)[8:-2].replace("        ", "").replace("\n", ""))
+
+    def _init_policy_logfiles(self, logdir):
+        formatter = logging.Formatter('%(message)s')
+        # stream_handler = logging.StreamHandler()
+        # stream_handler.setLevel(logging.DEBUG)
+        # stream_handler.setFormatter(formatter)
+        # logger.addHandler(stream_handler)
+        for i in range(2):
+            for name in ['i_policy', 'p_policy']:
+                file_handler = logging.FileHandler(os.path.join(logdir, 'agent{}_plog_{}.log'.format(i, name)))
+                file_handler.setLevel(level=logging.INFO)
+                file_handler.setFormatter(formatter)
+
+                logger = logging.getLogger('agent{}_plog_{}'.format(i, name))
+                logger.setLevel(level=logging.INFO)
+                logger.addHandler(file_handler)
 
     def learn(self):
         args = self.args
@@ -644,7 +687,7 @@ class MultiManager():
 
         history_train_losses = [[], []]
 
-        batch_size = 100
+        batch_size = 50
 
         pretrain_rounds = 3
         if args.only_run:
@@ -663,12 +706,16 @@ class MultiManager():
         save_every = max(50, max_epoch // 100)
         report_every = max(1, max_epoch // 100)
 
+        if args.debug:
+            save_every = 1
+
         device = 'cpu'
         if len(args.gpuid) > 0:
             device = "cuda:{}".format(args.gpuid[0])
 
         policy_buffer = ReplayBuffer.get_instance('policy')
         value_buffer = ReplayBuffer.get_instance('value')
+        self._init_policy_logfiles('logs/' + args.name)
 
         for epoch in range(max_epoch):
             last_time = time.time()
@@ -680,6 +727,8 @@ class MultiManager():
             _batch_iters, batch_info, example, v_str = pkl.loads(info[1])
             _rewards, strategies = batch_info
 
+            self._log_policy(example, (epoch+1) % save_every == 0)
+
             policy_buffer.add_batch_iters(_batch_iters[0],
                                           add_dict={'reward': _rewards[0], 'strategy': strategies[0]})
             value_buffer.add_batch_iters(_batch_iters[0],
@@ -689,24 +738,6 @@ class MultiManager():
             # print("rewards:", np.mean(_rewards[0]), np.mean(_rewards[1]))
             # print("rewards_num:", len(_rewards[0]), len(_rewards[1]))
 
-            k = -1
-            # for k in range(pretrain_rounds):
-            #     loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
-            #                            discount=args.discount_factor, fix_policy=True)
-            #     loss = worker.send(
-            #         ['train', pkl.dumps((i, _batch_iters, _rewards[self.training_agent], self.args.train_mode))])
-            #     if (k + 1) % 5 == 0:
-            #         _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
-            #     if loss[0, 3].item() < 0.2:
-            #         break
-            # if k >= 0:
-            #     print('Pretrained value function for {} rounds, and the final loss is {}.'.format(k + 1,
-            #                                                                                                loss[0, 3].item()))
-            # loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
-            #                        discount=args.discount_factor)
-            # for k in range(pretrain_rounds):
-            #     loss = self.update_a2c(args, _batch_iters, _rewards[self.training_agent], self.model, self.critic,
-            #                            discount=args.discount_factor, fix_policy=True)
             tt = time.time()
             value_update = min(value_buffer.size//batch_size, 5)
             for i in range(value_update):

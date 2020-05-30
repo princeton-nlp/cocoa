@@ -473,7 +473,7 @@ class RawBatch(Batch):
 
             val.append(tmp)
 
-        return RawBatch(*val)
+        return RawBatch(**{k:val[i] for i, k in enumerate(names)})
 
     def get_pre_info(self, lf_vocab):
         intent_size = lf_vocab.size
@@ -624,16 +624,15 @@ class ToMBatch(RawBatch):
         # self.state = torch.cat([self.identity_state, self.extra], dim=-1)
         # # Ignore last prices, but use multi-steps state
         # self.original_state = torch.cat([self.extra, state[2]], dim=-1)
-        state = state[2]
         last_price = state[1][:, -2:]
+        state = state[2]
         uttr = uttr
         act_intent = act[0]
         act_price = act[1]
         act_price_mask = act[3]
-        strategy = strategy
 
         strategy = cls.to_tensor(strategy, 'long', cuda=state.device.type!='cpu')
-        strategy = Batch.int_to_onehot(strategy.squeeze(), 7)
+        strategy = Batch.int_to_onehot(strategy.reshape(-1), 7)
 
         tensor_attributes = ['state', 'identity_state', 'extra', 'uttr', 'last_price',
                                   'act_intent', 'act_price', 'act_price_mask', 'strategy']
@@ -716,9 +715,11 @@ class DialogueBatcher(object):
             # decoder & target pad
             pad = self.mappings['tgt_vocab'].to_ind(markers.PAD)
 
-        attached_role = None
+        attached_role, attached_lfs, attached_uttr = None, None, None
+        attached_num = 0
         if attached_events is not None:
-            attached_events, attached_role = attached_events
+            attached_lfs, attached_role, attached_uttr = attached_events
+            attached_num = len(attached_lfs)
 
         if i == -1:
             i = len(dialogues[0].lfs)-1
@@ -740,10 +741,14 @@ class DialogueBatcher(object):
                 tokens = []
                 for d in dialogues:
                     # print('echo d.tokens: ', i, len(d.tokens), d.tokens)
-                    if i >= len(d.tokens):
-                        break
-                        # print('all length', i, len(d.tokens), len(d.token_turns), len(d.lf_tokens), len(d.lfs))
-                    tokens.append(d.tokens[i])
+                    if attached_num > 0:
+                        for uttr in attached_uttr:
+                            tokens.append(uttr)
+                    else:
+                        if i >= len(d.tokens):
+                            break
+                            # print('all length', i, len(d.tokens), len(d.token_turns), len(d.lf_tokens), len(d.lfs))
+                        tokens.append(d.tokens[i])
                 return tokens
             elif STAGE == 2:
                 pact = []
@@ -779,12 +784,12 @@ class DialogueBatcher(object):
                     oprices.append(oprice)
 
                 for d in dialogues:
-                    if attached_events is not None:
-                        for e in attached_events:
-                            lfs = d.lfs.copy()
-
+                    if attached_lfs is not None:
+                        lfs = d.lfs.copy()
+                        lfs.append(None)
+                        for e in attached_lfs:
                             # print('lfs: ', lfs)
-                            lfs.append(e)
+                            lfs[-1] = e
                             # print('lfs: ', lfs)
                             get_turns()
 
@@ -813,7 +818,7 @@ class DialogueBatcher(object):
                     if attached_events is not None:
                         droles = d.rid.copy()
                         droles.append(attached_role)
-                        for j in range(len(attached_events)):
+                        for j in range(attached_num):
                             get_roles()
                     else:
                         droles = d.rid

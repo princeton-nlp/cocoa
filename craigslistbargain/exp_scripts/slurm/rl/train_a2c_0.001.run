@@ -27,7 +27,19 @@ which python
 cd /n/fs/pnlp/runzhey/cocoa/craigslistbargain
 
 # tom_itentity_test
-bash exp_scripts/rl/train_a2c.sh "_0.001_0" "--gpuid 0" "--seed 0" "0.001" 2>&1 | tee logs/output_train_a2c_0.001_0.log &
-bash exp_scripts/rl/train_a2c.sh "_0.001_0" "--gpuid 0" "--seed 1" "0.001" 2>&1 | tee logs/output_train_a2c_0.001_1.log &
+SD_START=0
+SD_END=0
+if [ $# -eq 1 ];then
+  SD_END=$1
+elif [ $# -eq 2 ];then
+  SD_START=$1
+  SD_END=$2
+fi
+
+for i in $(seq $SD_START $SD_END)
+do
+#  echo $(expr $i \* 3 + 1);
+  bash exp_scripts/rl/train_a2c.sh "_0.001_${i}" "--gpuid 0" "--seed ${i}" "0.001" 2>&1 | tee logs/output_train_a2c_0.001_${i}.log &
+done
 
 wait

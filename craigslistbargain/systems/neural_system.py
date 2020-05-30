@@ -10,6 +10,7 @@ from cocoa.neural.beam import Scorer
 
 from neural.generator import get_generator
 from sessions.neural_session import PytorchNeuralSession
+from sessions.tom_session import PytorchNeuralTomSession
 from neural import rl_model_builder, get_data_generator, make_model_mappings
 from neural.preprocess import markers, TextIntMap, Preprocessor, Dialogue
 from neural.batcher_rl import DialogueBatcherFactory
@@ -130,13 +131,13 @@ class PytorchNeuralSystem(System):
 
 
         Env = namedtuple('Env', ['model', 'vocab', 'preprocessor', 'textint_map',
-            'stop_symbol', 'remove_symbols', 'gt_prefix',
+            'stop_symbol', 'remove_symbols', 'gt_prefix', 'lfint_map',
             'max_len', 'dialogue_batcher', 'cuda', 'lf_vocab',
             'dialogue_generator', 'utterance_builder', 'model_args', 'critic', 'usetom', 
             'name', 'price_strategy', 'tom_type', 'nlg_module', 'tom_generator', 'tom_model', 'id', 'model_type'])
         self.env = Env(actor, vocab, preprocessor, textint_map,
             stop_symbol=vocab.to_ind(markers.EOS), remove_symbols=remove_symbols,
-            gt_prefix=1,
+            gt_prefix=1, lfint_map=lfint_map,
             max_len=20, dialogue_batcher=dialogue_batcher, cuda=use_cuda, lf_vocab=lf_vocab,
             dialogue_generator=generator, utterance_builder=builder, model_args=model_args,
             critic=critic, usetom=(name == 'tom'), name=name,
@@ -150,7 +151,11 @@ class PytorchNeuralSystem(System):
 
     def new_session(self, agent, kb):
         if self.model_name in ('seq2seq', 'lf2lf'):
-            session = PytorchNeuralSession(agent, kb, self.env)
+            if self.env.usetom:
+                tom_sess = PytorchNeuralTomSession(1-agent, kb, self.env, True)
+                session = PytorchNeuralSession(agent, kb, self.env, tom_sess)
+            else:
+                session = PytorchNeuralSession(agent, kb, self.env, False)
         else:
             raise ValueError('Unknown model name {}'.format(self.model_name))
         if self.timed_session:

@@ -9,7 +9,9 @@ class Controller(BaseController):
         self.outcomes = [None, None]
         self.quit = False
 
-    def fake_step(self, agent, event):
+        self._tom_hidden = None
+
+    def fake_step(self, agent, event, tom_session=None):
         '''
                Simulate a dialogue.
         '''
@@ -23,19 +25,29 @@ class Controller(BaseController):
 
         for partner, other_session in enumerate(self.sessions):
             if agent != partner:
-                other_session.receive(event)
-                info_back = other_session.send(is_fake=True)
-                return info_back
+                if tom_session is not None and not isinstance(tom_session, bool):
+                    self._tom_hidden = tom_session.tom_hidden
+                    tom_session.receive(event)
+                    info_back = tom_session.send(is_fake=True, strategy=other_session.price_strategy_label)
+                    return info_back
+                else:
+                    other_session.receive(event)
+                    info_back = other_session.send(is_fake=True)
+                    return info_back
 
     def get_value(self, agent, events):
         for partner, other_session in enumerate(self.sessions):
             if agent != partner:
                 return other_session.get_value(events)
 
-    def step_back(self, agent):
-        for partner, other_session in enumerate(self.sessions):
-            if agent != partner:
-                other_session.step_back()
+    def step_back(self, agent, tom_session):
+        if not isinstance(tom_session, bool):
+            tom_session.tom_hidden = self._tom_hidden
+            tom_session.step_back()
+        else:
+            for partner, other_session in enumerate(self.sessions):
+                if agent != partner:
+                    other_session.step_back()
 
     def event_callback(self, event):
         if event.action == 'offer':

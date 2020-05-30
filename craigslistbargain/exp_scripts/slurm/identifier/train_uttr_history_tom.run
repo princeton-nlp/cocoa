@@ -29,4 +29,20 @@ which python
 cd ${PROJECT_PATH}cocoa/craigslistbargain
 
 # tom_itentity_test
-bash exp_scripts/train_uttr_history_tom.sh "--gpu 0"
+SD_START=0
+SD_END=0
+if [ $# -eq 1 ];then
+  SD_END=$1
+elif [ $# -eq 2 ];then
+  SD_START=$1
+  SD_END=$2
+fi
+
+for i in $(seq $SD_START $SD_END)
+do
+#  echo $(expr $i \* 3 + 1);
+  echo "run task #${i}"
+  bash exp_scripts/identifier/train_uttr_history_tom.sh "_${i}" "--gpuid 0" "--seed ${i}" 2>&1 | tee logs/uttr_id_history_tom_${i}.log &
+done
+
+wait

@@ -8,6 +8,7 @@ from nltk.tokenize import word_tokenize
 from multiprocessing import Pool
 import numpy as np
 import random
+from cocoa.core.entity import is_entity, Entity, CanonicalEntity
 
 class IRNLG(object):
     def __init__(self, args):
@@ -25,19 +26,28 @@ class IRNLG(object):
         #     else:
         #         self.gen_dic[tmp["category"]][tmp["intent"]][tmp["role"]] = [tmp["template"]]
 
-    def gen(self, lf, role, category):
+    def gen(self, lf, role, category, as_tokens=False):
         if self.gen_dic[category].get(lf.get('intent')) is None:
-            return ''
-        template = random.choice(self.gen_dic[category][lf.get('intent')][role])
+            # print('not in nlg:', lf, role, category)
+            return [''], (lf.get('intent'), role, category, 0)
+        tid = random.randint(0, len(self.gen_dic[category][lf.get('intent')][role])-1)
+        template = self.gen_dic[category][lf.get('intent')][role][tid]
         words = word_tokenize(template)
         new_words = []
         for i, wd in enumerate(words):
             if wd == "PPRRIICCEE" and lf.get('price'):
-                new_words.append(str(lf.get('price')))
+                if as_tokens:
+                    new_words.append(CanonicalEntity(type='price', value=lf.get('price')))
+                else:
+                    new_words.append('$'+str(lf.get('price')))
             else:
                 new_words.append(wd)
 
-        sentence = "".join([" "+i if not i.startswith("'") and i not in string.punctuation 
+        # TODO: raw uttrence
+        if as_tokens:
+            return new_words, (lf.get('intent'), role, category, tid)
+
+        sentence = "".join([" "+i if not i.startswith("'") and i not in string.punctuation
                         else i for i in new_words]).strip()
 
-        return sentence
+        return sentence, (lf.get('intent'), role, category, tid)

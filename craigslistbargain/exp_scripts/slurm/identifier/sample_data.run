@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -A pnlp
-#SBATCH --job-name=train-sl
+#SBATCH --job-name=sample-data
 #SBATCH --ntasks-per-node=1
-#SBATCH --output=output_sl_%j.txt
-#SBATCH --cpus-per-task=16
+#SBATCH --output=output_sample_%j.txt
+#SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH -t 96:00:00
-#SBATCH --mem 64G
+#SBATCH --mem 16G
 # sends mail when process begins, and
 # when it ends. Make sure you difine your email
 # address
@@ -27,4 +27,20 @@ which python
 cd /n/fs/pnlp/runzhey/cocoa/craigslistbargain
 
 # tom_itentity_test
-bash exp_scripts/sample_data.sh
+SD_START=0
+SD_END=0
+if [ $# -eq 1 ];then
+  SD_END=$1
+elif [ $# -eq 2 ];then
+  SD_START=$1
+  SD_END=$2
+fi
+
+for i in $(seq $SD_START $SD_END)
+do
+#  echo $(expr $i \* 3 + 1);
+  echo "run task #${i}"
+  bash exp_scripts/identifier/sample_data.sh "--gpuid 0" "--seed ${i}" 2>&1 | tee logs/sample_data_${i}.log &
+done
+
+wait

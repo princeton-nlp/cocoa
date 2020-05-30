@@ -31,6 +31,9 @@ class ToMModel(object):
     def estimate(self, uttr, lf):
         self.update_dialogue(uttr, lf)
         # ...
+        # for all a1
+
+
 
         self.recover_dialogue()
 

@@ -41,6 +41,7 @@ class TextIntMap(object):
     '''
     Map between text and int for visualizing results.
     '''
+    _uttr_buffer = {}
     def __init__(self, vocab, preprocessor):
         self.vocab = vocab
         self.entity_forms = preprocessor.entity_forms
@@ -57,13 +58,22 @@ class TextIntMap(object):
         inputs = np.array([self.text_to_int(utterance, 'decoding') for utterance in input_utterances])
         return inputs
 
-    def text_to_int(self, utterance, stage=None):
+    def text_to_int(self, utterance, stage=None, uid=None):
         '''
         Process entities in the utterance based on whether it is used for encoding, decoding
         or ground truth.
+
+        self._uttr_buffer is used for accelerating tom inference.
         '''
+        if uid is not None:
+            ret = self._uttr_buffer.get(uid)
+            if ret is not None:
+                return ret
         tokens = self.preprocessor.process_utterance(utterance, stage)
-        return [self.vocab.to_ind(token) for token in tokens]
+        ret = [self.vocab.to_ind(token) for token in tokens]
+        if uid is not None:
+            self._uttr_buffer[uid] = ret
+        return ret
 
     def int_to_text(self, inds, stage=None, prices=None):
         '''
@@ -182,7 +192,7 @@ class Dialogue(object):
         return {'intent': intent, 'price': price}
 
     # Input lf is raw lf here, {'intent': 'offer', 'price': Entity() }
-    def add_utterance(self, agent, utterance, lf=None, price_act=None):
+    def add_utterance(self, agent, utterance, lf=None, price_act=None, uid=None):
         utterance = utterance.copy()
         # Always start from the partner agent
         if len(self.agents) == 0 and agent == self.agent:
