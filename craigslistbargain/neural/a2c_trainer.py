@@ -487,8 +487,15 @@ class RLTrainer(BaseTrainer):
         pg_losses = ([], [])
         ret = torch.tensor([], device=values[0].device, dtype=torch.float)
         cur_size = 0
+        # td_error = adv = (discount*v[s']+r - v[s])
         for i in range(len(batch_iter)-1, -1, -1):
-            ret = discount*ret
+            # mid reward = 0,
+            # discount*v[s']+r = discount*v[s']
+            if ret.shape[0] > 0:
+                ret = discount * values[i+1][:ret.shape[0]].detach()
+
+            # s' do not exist
+            # discount*v[s']+r = r
             if cur_size < batch_iter[i].size:
                 step = batch_iter[i].size - cur_size
                 tmp = torch.tensor(reward[cur_size:cur_size+step], device=value[0].device, dtype=torch.float)
@@ -510,7 +517,7 @@ class RLTrainer(BaseTrainer):
 
         return pg_losses, ents, value_loss, regular, (losses, policy_stats)
 
-    def update_a2c(self, args, batch_iters, rewards, model, critic, discount=0.95, update_table=None):
+    def update_a2c(self, args, batch_iters, rewards, model, critic, discount=1, update_table=None):
         if update_table is None:
             update_table = {'value': False, 'policy': False}
         pg_losses, e_losses, value_loss, p_losses = None, None, None, None
