@@ -108,7 +108,9 @@ class LFSampler(Sampler):
 
         last_intent, last_price = batch.get_pre_info(self.vocab)
 
-        intent, policy = self.softmax_with_mask(policy, batch.policy_mask(self.vocab))
+        p_mask = batch.policy_mask(self.vocab)
+        intent, policy = self.softmax_with_mask(policy, p_mask)
+
         prob = policy[0, intent.item()].item()
         if self.model_type == 'rl':
             p_act, p_policy = self.softmax_with_mask(p_policy)

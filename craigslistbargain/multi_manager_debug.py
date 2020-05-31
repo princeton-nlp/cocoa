@@ -753,7 +753,7 @@ class MultiManager():
             print('train time:', time.time()-tt)
 
             # Draw outputs on the tensorboard
-            self._draw_tensorboard((epoch + 1) * batch_size, [[loss], []],
+            self._draw_tensorboard((epoch + 1) , [[loss], []],
                                    _rewards)
 
             print('\t<train> reward{:.3f}, {:.3f} pg_loss {:.5f}, value_loss {:.5f}, value_update {}'
@@ -766,7 +766,7 @@ class MultiManager():
                 self.dump_examples(example, v_str, epoch, 'dev')
 
                 valid_reward = [vs.mean_reward() for vs in valid_stats]
-                self._draw_tensorboard_valid((epoch + 1) * batch_size, valid_reward)
+                self._draw_tensorboard_valid((epoch + 1), valid_reward)
                 print('\t<valid> reward{:.3f}, {:.3f}'.format(valid_reward[0], valid_reward[1]))
                 worker.local_send(['save_model', (epoch, valid_reward[0], 'reward')])
             print('=' * 5 + ' [Epoch {}/{} for {:.3f}s.]'.format(epoch+1, max_epoch, time.time() - last_time))

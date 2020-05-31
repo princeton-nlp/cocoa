@@ -226,16 +226,20 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
     # tom_model = make_encoder(model_opt, src_embeddings, intent_size, 2, use_history=True)
 
     print('load type:', load_type)
+    if load_type == 'from_sl' and checkpoint.get('tom') is not None:
+        print('In fact, load from rl!')
+        load_type = 'from_rl'
 
+    # TODO: Random init, load from different tom
+    random_init_rl = False
     # First
     if load_type == 'from_sl':
-        transfer_actor_model(actor_model, checkpoint, model_opt, 'model')
+        if random_init_rl:
+            transfer_critic_model(actor_model, checkpoint, model_opt, 'model')
+        else:
+            transfer_actor_model(actor_model, checkpoint, model_opt, 'model')
         transfer_critic_model(critic_model, checkpoint, model_opt, 'model')
         init_model(tom_model, None, model_opt, 'tom')
-    # elif load_type == 'only_tom':
-    #     init_model(actor_model, checkpoint, model_opt, 'model')
-    #     init_model(critic_model, checkpoint, model_opt, 'critic')
-    #     init_model(tom_model, checkpoint, model_opt, 'tom')
     else:
         init_model(actor_model, checkpoint, model_opt, 'model')
         init_model(critic_model, checkpoint, model_opt, 'critic')

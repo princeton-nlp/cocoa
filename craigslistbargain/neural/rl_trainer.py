@@ -103,15 +103,10 @@ class EntropyLoss(nn.Module):
             p = p.reshape(1, -1)
         assert len(p.shape) == 2
         policy = torch.softmax(p, dim=-1)
-        logp = policy.log()
-        loss = torch.sum(policy.mul(-logp), dim=-1)
-        return loss
-
-    # def forward(self, enc_policy, enc_price, tgt_policy, tgt_price, pmask=None):
-    #     loss0 = self._entropy(enc_policy)
-    #     loss1 = self._entropy(enc_price)
-
-
+        d = torch.distributions.categorical.Categorical(probs=policy)
+        # logp = policy.log()
+        # loss = torch.sum(policy.mul(-logp), dim=-1)
+        return d.entropy()
 
     def _stats(self, loss, word_num):
         return Statistics(loss.item(), 0, word_num, 0, 0)
@@ -493,7 +488,7 @@ class RLTrainer(BaseTrainer):
         # No agreement
         if not self._is_agreed(example):
             # print('No agreement')
-            return {'seller': -1, 'buyer': -1}
+            return {'seller': -0.5, 'buyer': -0.5}
 
         rewards = {}
         targets = {}

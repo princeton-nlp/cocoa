@@ -58,7 +58,7 @@ class PytorchNeuralSystem(System):
             actor = model
             critic = None
             tom = None
-            print('sl model:', actor)
+            print('sl model:', 'actor')
         else:
             # Load the model.
             mappings, model, model_args = rl_model_builder.load_test_model(
@@ -84,9 +84,12 @@ class PytorchNeuralSystem(System):
                 print('[Info] Identity banned.')
                 tom.encoder.ban_identity = True
 
-            print('rl models', actor)
-            print(critic)
-            print(tom)
+            # print('rl models', actor)
+            # print(critic)
+            # print(tom)
+            print('rl models', 'actor')
+            print('critic')
+            print('tom')
 
         self.model_name = model_args.model
         vocab = mappings['utterance_vocab']

@@ -260,8 +260,8 @@ class RLTrainer(BaseTrainer):
                 c = self.vocab.size-1-strategies[i][j]
                 # for each sentences
                 for k, b in enumerate(batch_iters[i][j]):
-                    if random.randint(0, 2) > 0:
-                        continue
+                    # if random.randint(0, 2) > 0:
+                    #     continue
                     tmp = b.uttr[0].cpu().numpy()
                     l = np.prod(tmp.shape)
                     tmp = np.insert(tmp, random.randint(2, l-1), c, axis=1)
@@ -459,6 +459,14 @@ class RLTrainer(BaseTrainer):
             # entropy_loss, _ = self._compute_loss(rlbatch, policy=policy, price=price, loss=self.entropy_loss)
 
             intent_ent = self.entropy_loss(i_pred)
+            if torch.isnan(intent_ent.mean()):
+                isnan = torch.isnan(intent_ent.mean()).reshape(-1)
+                intent_ent = intent_ent.reshape(-1)
+                for j in range(isnan.shape[0]):
+                    if isnan[j] == 1:
+                        print('nan: ', i_pred[j])
+                        print('nan2: ', rlbatch.act_intent.reshape(-1)[j], intent_loss.reshape(-1)[j])
+                quit()
             pact_ent = self.entropy_loss(p_pred)
             pact_loss = pact_loss.reshape(-1, 1)*rlbatch.act_price_mask
             pact_ent = pact_ent.reshape(-1, 1)*rlbatch.act_price_mask
@@ -549,7 +557,12 @@ class RLTrainer(BaseTrainer):
         total_loss = pg_loss + critic_loss
 
         # print('all loss', final_loss, p_losses, e_losses, value_loss)
-        assert not torch.isnan(total_loss)
+        nan_str = "nan: {}, {}\n{}, {}\n{}\n{}, {}".\
+            format(torch.isnan(pg_losses[0].mean()), torch.isnan(pg_losses[1].mean()),
+                   torch.isnan(e_losses[0].mean()), torch.isnan(e_losses[1].mean()),
+                   torch.isnan(value_loss.mean()),
+                   torch.isnan(p_losses[0].mean()), torch.isnan(p_losses[1].mean()))
+        assert not torch.isnan(total_loss), nan_str
         # final_loss.backward()
         # model_loss.backward()
         # critic_loss.backward()
