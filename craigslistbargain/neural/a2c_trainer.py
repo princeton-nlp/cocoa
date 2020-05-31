@@ -260,8 +260,8 @@ class RLTrainer(BaseTrainer):
                 c = self.vocab.size-1-strategies[i][j]
                 # for each sentences
                 for k, b in enumerate(batch_iters[i][j]):
-                    # if random.randint(0, 2) > 0:
-                    #     continue
+                    if random.randint(0, 5) > 0:
+                        continue
                     tmp = b.uttr[0].cpu().numpy()
                     l = np.prod(tmp.shape)
                     tmp = np.insert(tmp, random.randint(2, l-1), c, axis=1)
