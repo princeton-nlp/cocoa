@@ -8,6 +8,11 @@ fi
 if [ $# -ge 4 ]; then
   LR=$4
 fi
+LOAD_SAMPLE="--load-sample cache/hard_pmask_7_${SEED}/data.pkl"
+if [ $# -ge 5 ]; then
+  LOAD_SAMPLE="--load-sample cache/$5/data.pkl"
+fi
+echo "load sample from ${LOAD_SAMPLE}"
 MODEL_NAME="history"
 
 mkdir checkpoint/${EXP_NAME}
@@ -22,7 +27,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --report-every 50 --max-turns 20 --num-dialogues 20 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 --epochs 2000 --use-utterance \
---model lf2lf --model-type a2c --tom-test --load-sample cache/hard_pmask_7_${SEED}/data.pkl \
+--model lf2lf --model-type a2c --tom-test ${LOAD_SAMPLE} \
 --learning-rate ${LR} --name ${EXP_NAME} --seed ${SEED} \
 --tom-hidden-size 128 --tom-hidden-depth 2 \
 --strategy-in-words --tom-model ${MODEL_NAME} ${USE_GPU}
