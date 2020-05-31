@@ -26,10 +26,25 @@ class IRNLG(object):
         #     else:
         #         self.gen_dic[tmp["category"]][tmp["intent"]][tmp["role"]] = [tmp["template"]]
 
-    def gen(self, lf, role, category, as_tokens=False):
+    def _add_strategy_in_uttr(self, uttr, stra):
+        # c = self.env.vocab.size - 1 - self.price_strategy_label
+        uttr = uttr.copy()
+        # for each sentences
+        if random.randint(0, 5) > 0:
+            return uttr
+        uttr.insert(random.randint(0, len(uttr)), stra)
+        return uttr
+
+    def gen(self, lf, role, category, as_tokens=False, add_stra=None):
         if self.gen_dic[category].get(lf.get('intent')) is None:
             # print('not in nlg:', lf, role, category)
-            return [''], (lf.get('intent'), role, category, 0)
+            new_words = ['']
+            if add_stra is not None:
+                new_words = self._add_strategy_in_uttr(new_words, add_stra)
+            if not as_tokens:
+                new_words = "".join(new_words)
+            return new_words, (lf.get('intent'), role, category, 0)
+
         tid = random.randint(0, len(self.gen_dic[category][lf.get('intent')][role])-1)
         template = self.gen_dic[category][lf.get('intent')][role][tid]
         words = word_tokenize(template)
@@ -42,6 +57,9 @@ class IRNLG(object):
                     new_words.append('$'+str(lf.get('price')))
             else:
                 new_words.append(wd)
+
+        if add_stra is not None:
+            new_words = self._add_strategy_in_uttr(new_words, add_stra)
 
         # TODO: raw uttrence
         if as_tokens:

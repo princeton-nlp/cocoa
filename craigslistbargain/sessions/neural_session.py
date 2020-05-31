@@ -258,12 +258,12 @@ class NeuralSession(Session):
             return {'intent': tokens[0], 'price': price}
         return {'intent': tokens[0]}
 
-    def _lf_to_utterance(self, lf, as_tokens=False):
+    def _lf_to_utterance(self, lf, as_tokens=False, add_stra=None):
         role = self.kb.facts['personal']['Role']
         category = self.kb.facts['item']['Category']
         tmplf = lf.copy()
         tmplf['intent'] = self.env.lf_vocab.to_word(tmplf['intent'])
-        utterance, uid = self.uttr_gen(tmplf, role, category, as_tokens=as_tokens)
+        utterance, uid = self.uttr_gen(tmplf, role, category, as_tokens=as_tokens, add_stra=add_stra)
         return utterance, uid
 
     @staticmethod
@@ -285,6 +285,15 @@ class NeuralSession(Session):
         p = min(p, pmax)
         p = max(p, pmin)
         return p
+
+    def _add_strategy_in_uttr(self, uttr):
+        c = self.env.vocab.size - 1 - self.price_strategy_label
+        uttr = uttr.copy()
+        # for each sentences
+        if random.randint(0, 5) > 0:
+            return uttr
+        uttr.insert(random.randint(0, len(uttr)), self.env.vocab.to_word(c))
+        return uttr
 
     def tom_inference(self, tokens, output_data):
         # For the step of choosing U2
@@ -317,9 +326,11 @@ class NeuralSession(Session):
             p_act = None
 
             tmp_lf = self._raw_token_to_lf(tmp_tokens)
-            tmp_u, uid = self._lf_to_utterance(tmp_lf)
+            tmp_u, uid = self._lf_to_utterance(tmp_lf,
+                                               add_stra=self.env.vocab.to_word(self.env.vocab.size - 1 - self.price_strategy_label))
             e = self._to_event(tmp_u, tmp_lf, output_data)
             tmp_u = self.env.preprocessor.process_event(e, self.kb)
+            # tmp_u = self._add_strategy_in_uttr(tmp_u)
 
             self.dialogue.add_utterance(self.agent, tmp_u, lf=tmp_lf, price_act=p_act)
 

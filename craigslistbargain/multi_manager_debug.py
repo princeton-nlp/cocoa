@@ -732,7 +732,7 @@ class MultiManager():
             policy_buffer.add_batch_iters(_batch_iters[0],
                                           add_dict={'reward': _rewards[0], 'strategy': strategies[0]})
             value_buffer.add_batch_iters(_batch_iters[0],
-                                          add_dict={'reward': _rewards[0], 'strategy': strategies[0]})
+                                         add_dict={'reward': _rewards[0], 'strategy': strategies[0]})
 
             # For debug
             # print("rewards:", np.mean(_rewards[0]), np.mean(_rewards[1]))
@@ -760,6 +760,8 @@ class MultiManager():
                   .format(np.mean(_rewards[0]), np.mean(_rewards[1]), loss['pg_loss'][0,0], loss['value_loss'][0,0], value_update))
 
             if (epoch+1)%save_every == 0:
+                self._dump_buffer(value_buffer, epoch+1)
+
                 self.dump_examples(example, v_str, epoch, 'train')
                 valid_info = worker.local_send(['valid', (0, 200)])
                 valid_stats, example, v_str = valid_info[1]
@@ -781,6 +783,18 @@ class MultiManager():
             #             self.update_opponent(['policy', 'critic'])
             #     else:
             #         print('valid ', valid_stats.str_loss())
+
+    def _dump_buffer(self, buffer, epoch, ):
+        args = self.args
+        path_pkl = '{root}/{model}_buffer{epoch}.pkl'.format(
+            root=args.model_path,
+            model=args.name,
+            epoch=epoch)
+        print('Save buffer at {}.'.format(path_pkl))
+        with open(path_pkl, 'wb') as f:
+            pkl.dump(buffer, f)
+        # with open(path_pkl, 'rb') as f:
+        #     bf = pkl.load(f)
 
     def run(self):
         # deprecated
