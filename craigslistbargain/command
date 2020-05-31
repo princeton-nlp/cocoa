@@ -18,15 +18,14 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
 --agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
---model-path checkpoint/a2c --mappings mappings/language \
+--model-path checkpoint/hard_pmask --mappings mappings/language \
 --optim adam --rnn-type RNN --rnn-size 300 --max-grad-norm -1 \
 --agents pt-neural pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 2560 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 --epochs 2000 --use-utterance \
---model lf2lf --model-type a2c --identity-test --load-sample cache/identity/data.pkl \
---learning-rate 0.001 --name hard_lr0.001_size128_adam2k --tom-hidden-size 128 --hidden-depth 1 --gpu 0
-
+--model lf2lf --model-type a2c --identity-test --load-sample cache/hard_pmask/data.pkl \
+--learning-rate 0.001 --name hard_pmask --tom-hidden-size 128 --hidden-depth 1 --gpu 0
 
 
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
@@ -39,10 +38,13 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --agents pt-neural pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 2560 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
---dia-num 20 --state-length 4 --epochs 2000 --use-utterance \
---model lf2lf --model-type a2c --tom-test --load-sample cache/identity/data.pkl \
---load-identity-from checkpoint/hard_identity/model_best.pt \
---learning-rate 0.001 --name tom_100ploss --tom-hidden-size 128 --hidden-depth 1 --gpu 0
+--dia-num 20 --state-length 4 --epochs 1000 --use-utterance \
+--model lf2lf --model-type a2c --tom-test --load-sample cache/hard_pmask/data.pkl \
+--ban-identity --learning-rate 0.001 --name tom_100ploss_pmask_noid --tom-hidden-size 128 --hidden-depth 1 --gpu 0 \
+
+--load-identity-from checkpoint/hard_pmask/model_best.pt \
+--learning-rate 0.001 --name tom_100ploss_pmask --tom-hidden-size 128 --hidden-depth 1 --gpu 0 \
+
 
 # With utterance as input:
 * --use-utterance

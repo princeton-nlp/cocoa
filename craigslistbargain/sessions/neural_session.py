@@ -56,6 +56,7 @@ class NeuralSession(Session):
         strategy_name = ['insist', 'decay']
         strategy_name = ['insist', 'decay', 'persuaded']
         strategy_name = ['insist', 'decay', 'persuaded', 'convex', 'concave', 'wait', 'sigmoid']
+        strategy_name = ['insist', 'decay', 'persuaded', 'convex', 'concave', 'low', 'high']
         self.price_strategy_distribution = \
             {'name': strategy_name,
              'prob': [1./len(strategy_name)]*len(strategy_name)}
@@ -630,6 +631,10 @@ class PytorchNeuralSession(NeuralSession):
                     factor = (0.25-(x-0.5)**2)**0.5
                 else:
                     factor = 1-(0.25-(x-0.5)**2)**0.5
+            elif strategy == 'high':
+                factor = 1 - x/2
+            elif strategy == 'low':
+                factor = (1-x) / 2
             else:
                 # p = oldp
                 print('Unknown price strategy: ', strategy)
