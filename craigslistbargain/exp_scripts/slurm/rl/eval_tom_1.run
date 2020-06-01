@@ -18,6 +18,12 @@ export PATH="/n/fs/pnlp/runzhey/miniconda3/bin:$PATH"
 export LANGUAGE=en_US.UTF-8
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+which python
+source activate tom_new
+#source /n/fs/pnlp/runzhey/miniconda3/etc/profile.d/conda.sh
+#conda activate tom_new
+which python
+cd /n/fs/pnlp/runzhey/cocoa/craigslistbargain
 
 # tom_itentity_test
 SD_START=0
