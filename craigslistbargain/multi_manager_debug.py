@@ -717,13 +717,16 @@ class MultiManager():
         value_buffer = ReplayBuffer.get_instance('value')
         self._init_policy_logfiles('logs/' + args.name)
 
+        sample_size = 32
+        train_size = 128
+
         for epoch in range(max_epoch):
             last_time = time.time()
             policy_buffer.empty()
             # _batch_iters, _rewards, example, _ = self.sample_data(i, batch_size, args)
             # print('=' * 5 + ' [Epoch {}/{} running.]'.format(epoch, max_epoch))
             tt = time.time()
-            info = worker.send(['simulate', epoch, batch_size, batch_size])
+            info = worker.send(['simulate', epoch, sample_size, sample_size])
             _batch_iters, batch_info, example, v_str = pkl.loads(info[1])
             _rewards, strategies = batch_info
 
@@ -739,13 +742,13 @@ class MultiManager():
             # print("rewards_num:", len(_rewards[0]), len(_rewards[1]))
 
             tt = time.time()
-            value_update = min(value_buffer.size//batch_size, 5)
+            value_update = min(value_buffer.size//train_size, 5)
             for i in range(value_update):
-                batch_iters, _, ret_add = value_buffer.sample_batch(batch_size, add_info={'reward'}, to_device=device)
+                batch_iters, _, ret_add = value_buffer.sample_batch(train_size, add_info={'reward'}, to_device=device)
                 worker.local_send(
                     ['train', (epoch, batch_iters, ret_add['reward'], 'fix_policy')])
 
-            batch_iters, _, ret_add = policy_buffer.sample_batch(batch_size, add_info={'reward'}, to_device=device)
+            batch_iters, _, ret_add = policy_buffer.sample_batch(train_size, add_info={'reward'}, to_device=device)
 
             info = worker.local_send(
                 ['train', (epoch, batch_iters, ret_add['reward'], '')])
