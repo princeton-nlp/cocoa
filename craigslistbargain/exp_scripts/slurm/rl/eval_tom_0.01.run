@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH -N 1
 #SBATCH -A pnlp
-#SBATCH --job-name=eval-tom-10
+#SBATCH --job-name=eval-tom-0.01
 #SBATCH --ntasks-per-node=1
-#SBATCH --output=logs/output_eval_tom_10_%j.txt
+#SBATCH --output=logs/output_eval_tom_0.01_%j.txt
 #SBATCH --cpus-per-task=4
 #SBATCH -t 96:00:00
 #SBATCH --mem 16G
@@ -41,7 +41,7 @@ for i in $(seq $SD_START $SD_END)
 do
 #  echo $(expr $i \* 3 + 1);
   echo $i
-  bash exp_scripts/rl/eval_tom.sh "_10_${i}" "" "${i}" "10" "${CHECK_POINT}" 2>&1 | tee logs/output_eval_tom_10_${i}.log &
+  bash exp_scripts/rl/eval_tom.sh "_0.01_${i}" "" "${i}" "0.01" "${CHECK_POINT}" 2>&1 | tee logs/output_eval_tom_0.01_${i}.log &
 done
 
 wait
