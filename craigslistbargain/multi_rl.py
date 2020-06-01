@@ -11,7 +11,7 @@ from cocoa.core.util import read_json
 from cocoa.core.schema import Schema
 from cocoa.core.scenario_db import ScenarioDB
 from cocoa.neural.loss import ReinforceLossCompute
-from .sessions.neural_session import NeuralSession
+from sessions.neural_session import NeuralSession
 import cocoa.options
 
 from core.scenario import Scenario
