@@ -726,7 +726,7 @@ class RLTrainer(BaseTrainer):
     def append_policy_info(self, e, ret, prefix="", display_num=3):
         output_data = e.metadata['output_data']
         pact_size = np.prod(output_data['p_policy'].shape)
-        use_tom = output_data.get('tom_p') is not None
+        use_tom = output_data.get('tominf_p') is not None
 
         # print(LFSampler.INTENT_NUM, LFSampler._rl_actions)
 
@@ -790,7 +790,31 @@ class RLTrainer(BaseTrainer):
         verbose_str.append(s)
         return verbose_str
 
-    def sample_data(self, i, sample_size, args, real_batch=None, batch_size=128):
+    def get_eval_dict(self, examples, strategies):
+        eval_dict, separate_edict = {}, [{} for _ in range(10)]
+        # len, s_rate, utility, fairness
+        for i, e in enumerate(examples):
+            role = e.scenario.kbs[0].role
+            l = len(e.events)
+            srate = self._is_agreed(e)
+            reward = self._margin_reward(e)[role]
+            ut = reward / 2 + 0.5
+            fa = 1 - abs(reward)
+            tmp_dict = {'length': l, 'success_rate': srate, 'reward': reward}
+            if srate:
+                tmp_dict['utility'] = ut
+                tmp_dict['fairness'] = fa
+            for k in tmp_dict:
+                if eval_dict.get(k) is None:
+                    eval_dict[k] = []
+                if separate_edict[strategies[i]].get(k) is None:
+                    separate_edict[strategies[i]][k] = []
+                eval_dict[k].append(tmp_dict[k])
+                separate_edict[strategies[i]][k].append(tmp_dict[k])
+
+        return eval_dict, separate_edict
+
+    def sample_data(self, i, sample_size, args, real_batch=None, batch_size=128, eval=False):
         if real_batch is None:
             real_batch = sample_size
         rewards = [0]*2
@@ -805,8 +829,12 @@ class RLTrainer(BaseTrainer):
         last_t = time.time()
         for j in range(real_batch):
             # Rollout
-            scenario, sid = self._get_scenario()
-            controller = self._get_controller(scenario, split='train')
+            if eval:
+                scenario, sid = self._get_scenario(scenario_id=j)
+                controller = self._get_controller(scenario, split='train', rate=0)
+            else:
+                scenario, sid = self._get_scenario()
+                controller = self._get_controller(scenario, split='train')
             controller.sessions[0].set_controller(controller)
             controller.sessions[1].set_controller(controller)
             example = controller.simulate(args.max_turns, verbose=args.verbose, temperature=self.get_temperature(i, sample_size, args))

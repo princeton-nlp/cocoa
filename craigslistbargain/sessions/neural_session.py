@@ -356,6 +356,7 @@ class NeuralSession(Session):
             self.dialogue.delete_last_utterance()
             self.controller.step_back(self.agent, self.tom_session)
             evs[i] = (NeuralSession.tominf_beta * info).exp()
+            tom_ev[i] = info
 
         # print('old_evs', evs)
         evs = evs / evs.sum()
@@ -367,7 +368,6 @@ class NeuralSession(Session):
             tmp_tokens = list(act)
             # pi = pi1 * pi2
             ev = evs[i]
-            tom_ev[i] = ev
             # ev = self.tominf_beta * ev
             tmp = output_data['policy'][0, act[0]]
             if act[1] is not None:
@@ -375,11 +375,9 @@ class NeuralSession(Session):
 
             p1[i] = tmp.cpu().data.item()
             p2[i] = ev.cpu().item()
-            tominf_p[i] = tmp.cpu().data.item()
-
-            # print('tmp,ev', i, tmp, ev )
 
             tmp = tmp * ev
+            tominf_p[i] = tmp.cpu().data.item()
             # tmp = info.exp()*self.tom_alpha + output_data['policy'][0, act[0]]*(1-self.tom_alpha)
 
             # choice the best action

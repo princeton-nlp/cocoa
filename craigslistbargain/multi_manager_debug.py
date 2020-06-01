@@ -2,6 +2,7 @@ import argparse
 import random
 import json
 import numpy as np
+import json
 
 import time
 
@@ -141,6 +142,14 @@ class MultiRunner:
                 info = self.trainer.update_a2c(self.args, batches, rewards, self.trainer.model, self.trainer.critic,
                                                discount=self.args.discount_factor, update_table=update_table)
         return info
+
+    def trainset_valid(self, i, batch_size, real_batch, ):
+        data = self.trainer.sample_data(i, batch_size, self.args, real_batch=real_batch, eval=True)
+        return data
+
+    def get_eval_dict(self, examples, strategies):
+        ret = self.trainer.get_eval_dict(examples, strategies)
+        return ret
 
     def valid(self, start, length):
         infos = self.trainer.validate(self.args, length, start=start)
@@ -372,16 +381,20 @@ class MultiManager():
         for j in range(2):
             self.writer.add_scalar('agent{}/dev_reward'.format(j), all_rewards[j], ii)
 
-    def dump_examples(self, examples, verbose_strs, epoch, mode='train'):
+    def dump_examples(self, examples, verbose_strs, epoch, mode='train', other_path=None):
         # Dump with details
         args = self.args
+        if other_path is None:
+            path = args.model_path
+        else:
+            path = other_path
         path_txt = '{root}/{model}_{mode}_example{epoch}.txt'.format(
-            root=args.model_path,
+            root=path,
             model=args.name,
             mode=mode,
             epoch=epoch)
         path_pkl = '{root}/{model}_{mode}_example{epoch}.pkl'.format(
-            root=args.model_path,
+            root=path,
             model=args.name,
             mode=mode,
             epoch=epoch)
@@ -394,6 +407,75 @@ class MultiManager():
                     f.write(s + '\n')
         with open(path_pkl, 'wb') as f:
             pkl.dump(examples, f)
+
+    def evaluate(self):
+        num_worker = self.update_worker_list()
+        worker = self.worker_conn[0]
+        args = self.args
+        sample_size = args.batch_size
+        max_epoch = args.epochs
+        last_time = time.time()
+        if args.debug:
+            sample_size = 2
+
+        eval_dict = {}
+        separate_edict = [{} for _ in range(10)]
+
+        # add dd to d
+        def update_edict(d, dd):
+            for k in dd:
+                if d.get(k) is None:
+                    d[k] = []
+                d[k] = d[k] + dd[k]
+
+        def get_result_dict(d):
+            ret = {}
+            if d.get('reward') is None:
+                num = 0
+            else:
+                num = len(d.get('reward'))
+            for k in d:
+                ret[k] = np.mean(d[k])
+                ret[k+'_std'] = np.std(d[k])
+            return ret, num
+
+        for epoch in range(max_epoch):
+            last_time = time.time()
+
+            info = worker.local_send(['trainset_valid', (epoch, sample_size, sample_size)])
+            _batch_iters, batch_info, example, v_str = info[1]
+            _rewards, strategies = batch_info
+
+            data_pkl = 'cache/{}/data_{}.pkl'.format(args.name, epoch)
+            with open(data_pkl, 'wb') as f:
+                pkl.dump(info[1], f)
+
+            self.dump_examples(example, v_str, epoch, other_path='logs/'+args.name)
+
+            info = worker.local_send(['get_eval_dict', (example, strategies[1])])
+            ed, sed = info[1]
+
+            # log eval table as json file
+            eval_json = 'logs/{}/eval_{}.json'.format(args.name, epoch)
+            update_edict(eval_dict, ed)
+            tmpd, _ = get_result_dict(eval_dict)
+            tmpd['number'] = (epoch+1) * sample_size
+            with open(eval_json, 'w') as f:
+                json.dump(tmpd, f)
+
+            eval_json = 'logs/{}/eval_separate_{}.json'.format(args.name, epoch)
+            tmpds = []
+            for i in range(len(sed)):
+                update_edict(separate_edict[i], sed[i])
+                tmpd, num = get_result_dict(separate_edict[i])
+                tmpd['number'] = num
+                tmpd['strategy'] = i
+                tmpds.append(tmpd)
+            with open(eval_json, 'w') as f:
+                json.dump(tmpds, f)
+
+            print('=' * 5 + ' [Epoch {}/{}, {} dialogues for {:.3f}s.]'.
+                  format(epoch + 1, max_epoch, (epoch+1)*sample_size, time.time() - last_time))
 
     def learn_identity(self):
 

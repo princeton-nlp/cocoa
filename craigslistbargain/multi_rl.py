@@ -135,8 +135,8 @@ if __name__ == '__main__':
         manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
         manager.learn_identity()
     elif args.get_dialogues:
-        manager = MultiManager(args.num_cpus, args, MultiTrainer)
-        manager.get_dialogues()
+        manager = MultiManager_DEBUG(args.num_cpus, args, MultiTrainer_DEBUG)
+        manager.evaluate()
     else:
         # manager = MultiManager(args.num_cpus, args, MultiTrainer)
         # manager.run()
