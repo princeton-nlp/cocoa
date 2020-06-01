@@ -61,8 +61,12 @@ class PytorchNeuralSystem(System):
             print('sl model:', 'actor')
         else:
             # Load the model.
+            exclude = {}
+            if hasattr(args, 'load_identity_from') and args.load_identity_from is not None:
+                exclude['tom'] = True
+
             mappings, model, model_args = rl_model_builder.load_test_model(
-                model_path, args, dummy_args_dict, new_args, model_type=model_type, load_type='from_sl')
+                model_path, args, dummy_args_dict, new_args, model_type=model_type, load_type='from_sl', exclude=exclude)
 
             actor, critic, tom = model
             # Load critic from other model.
@@ -78,7 +82,8 @@ class PytorchNeuralSystem(System):
                 identity_path = args.load_identity_from
                 _, t_model, _ = rl_model_builder.load_test_model(
                     identity_path, args, dummy_args_dict, [], model_type=model_type)
-                tom.encoder.identity.load_state_dict(t_model[2].encoder.identity.state_dict())
+                # tom.encoder.identity.load_state_dict(t_model[2].encoder.identity.state_dict())
+                tom = t_model[2]
 
             if hasattr(args, 'ban_identity') and args.ban_identity:
                 print('[Info] Identity banned.')

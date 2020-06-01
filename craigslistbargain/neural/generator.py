@@ -170,8 +170,9 @@ class LFSampler(Sampler):
         for i in actions:
             if not i in self.price_actions:
                 all_actions.append([i, None])
-            for j in range(sample_num):
-                all_actions.append([i, mean])
+            else:
+                for j in range(sample_num):
+                    all_actions.append([i, mean])
         return all_actions
 
     _rl_actions = None

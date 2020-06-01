@@ -11,6 +11,7 @@ from cocoa.core.util import read_json
 from cocoa.core.schema import Schema
 from cocoa.core.scenario_db import ScenarioDB
 from cocoa.neural.loss import ReinforceLossCompute
+from .sessions.neural_session import NeuralSession
 import cocoa.options
 
 from core.scenario import Scenario
@@ -105,6 +106,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--seed', type=int, default=0)
 
+    parser.add_argument('--tom-beta', type=float, default=1)
+
     cocoa.options.add_scenario_arguments(parser)
     options.add_data_generator_arguments(parser)
     options.add_system_arguments(parser)
@@ -116,6 +119,9 @@ if __name__ == '__main__':
     random.seed(args.seed)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
+
+    # Set tom-beta
+    NeuralSession.tominf_beta = args.tom_beta
 
     dump_args()
 

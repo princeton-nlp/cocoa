@@ -211,17 +211,29 @@ class Dialogue(object):
         self._add_utterance(agent, utterance, lf=lf, price_act=price_act)
 
     def delete_last_utterance(self):
-
         # Always start in the middle and delete the utterance of another agent
-        self.price_actions.pop()
+        # self.price_actions.pop()
+        # self.agents.pop()
+        # self.roles.pop()
+        # self.token_turns.pop()
+        # self.entities.pop()
+        # self.lfs.pop()
+        # self.tokens.pop()
+        # self.lf_turns.pop()
+        # self.modified.pop()
         self.agents.pop()
         self.roles.pop()
         self.token_turns.pop()
         self.entities.pop()
-        self.lfs.pop()
-        self.tokens.pop()
         self.lf_turns.pop()
         self.modified.pop()
+        self.price_actions.pop()
+
+        # lf to int
+        l = len(self.agents)
+        self.rid = self.rid[:l]
+        self.lfs = self.lfs[:l]
+        self.tokens = self.tokens[:l]
 
     @classmethod
     def scale_price(cls, kb, utterance):

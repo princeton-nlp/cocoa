@@ -22,6 +22,7 @@ class NeuralSession(Session):
     # Number of types of price actions
     # in PytorchNeuralSession.generate()
     P_ACT_NUMBER = 4
+    tominf_beta = 1
 
     def __init__(self, agent, kb, env, tom_session=False):
         """
@@ -66,7 +67,7 @@ class NeuralSession(Session):
         # Tom
         self.tom = False
         self.controller = None
-        self.tominf_beta = 0
+        # self.tominf_beta = 1
         if hasattr(env, 'usetom') and env.usetom:
             self.tom = True
             self.critic = env.critic
@@ -194,24 +195,32 @@ class NeuralSession(Session):
         time_list = None
         a_r = [self.acc_idx, self.rej_idx]
         qt = [self.quit_idx]
-        if all_events[0][0] in a_r:
+        # print('alle', all_events)
+        # all_events = [(tokens, uttr)]
+        if all_events[0][0][0] in a_r:
             # print('a_r', a_r)
             # print('unknown: ', all_events, self.dialogue.token_turns[-1])
             price = None
             # get offer price
             # TODO: token_turns
-            if self.dialogue.lf_turns[-1][1] is not None:
-                price = self.builder.get_price_number(self.dialogue.lf_turns[-1][1], self.kb)
+            # print('lfturns', self.dialogue.lf_turns[-1])
+
+            if self.dialogue.lf_turns[-1].get('price') is not None:
+
+                price = self.builder.get_price_number(self.dialogue.lf_turns[-1].get('price') , self.kb)
+                # print('oprice', self.dialogue.lf_turns[-1].get('price'), price)
             values = []
             for e in all_events:
-                r = self.controller.get_margin_reward(price=price, agent=self.agent, is_agreed=e[0] == self.acc_idx)
+                r = self.controller.get_margin_reward(price=price, agent=self.agent, is_agreed=e[0][0] == self.acc_idx)
                 values.append(r)
 
             # print('value:', values, price)
+            # print('a/r:', values)
             return torch.tensor(values, device=next(self.critic.parameters()).device).view(-1,1)
 
-        if all_events[0][0] in qt:
-            is_agreed = ('accept' in self.dialogue.token_turns[-1])
+        # print('qt', qt) == 17
+        if all_events[0][0][0] in qt:
+            is_agreed = (self.acc_idx == self.dialogue.lf_turns[-1].get('intent'))
             # print(is_agreed)
             values = [self.controller.get_margin_reward(price=None, agent=self.agent, is_agreed=is_agreed)]
             # print('qt:', all_events, self.dialogue.token_turns[-1])
@@ -241,6 +250,7 @@ class NeuralSession(Session):
         rlbatch = RLBatch.from_raw(batch, None, None)
 
         values = self.critic(rlbatch.uttr, rlbatch.state)
+        # print('values', values)
         # values = self.critic(e_intent, e_price, e_pmask, batch.encoder_dianum)
         # print('inference: ', time.time() - last_time)
         return values
@@ -317,6 +327,7 @@ class NeuralSession(Session):
         p2 = torch.zeros(len(all_actions))
         tominf_p = torch.zeros(len(all_actions))
         tom_ev = torch.zeros(len(all_actions))
+        evs = torch.zeros(len(all_actions))
 
         for i, act in enumerate(all_actions):
             if output_data['policy'][0, act[0]].item() < 1e-7:
@@ -326,8 +337,9 @@ class NeuralSession(Session):
             p_act = None
 
             tmp_lf = self._raw_token_to_lf(tmp_tokens)
+            psl = self.controller.sessions[1-self.agent].price_strategy_label
             tmp_u, uid = self._lf_to_utterance(tmp_lf,
-                                               add_stra=self.env.vocab.to_word(self.env.vocab.size - 1 - self.price_strategy_label))
+                                               add_stra=self.env.vocab.to_word(self.env.vocab.size - 1 - psl))
             e = self._to_event(tmp_u, tmp_lf, output_data)
             tmp_u = self.env.preprocessor.process_event(e, self.kb)
             # tmp_u = self._add_strategy_in_uttr(tmp_u)
@@ -343,19 +355,31 @@ class NeuralSession(Session):
             avg_time.append(time.time() - tmp_time)
             self.dialogue.delete_last_utterance()
             self.controller.step_back(self.agent, self.tom_session)
+            evs[i] = (NeuralSession.tominf_beta * info).exp()
 
+        # print('old_evs', evs)
+        evs = evs / evs.sum()
+        # print('evs', evs)
+
+        for i, act in enumerate(all_actions):
+            if output_data['policy'][0, act[0]].item() < 1e-7:
+                continue
+            tmp_tokens = list(act)
             # pi = pi1 * pi2
-            tom_ev[i] = info.exp().data.item()
-            info = self.tominf_beta * info
+            ev = evs[i]
+            tom_ev[i] = ev
+            # ev = self.tominf_beta * ev
             tmp = output_data['policy'][0, act[0]]
             if act[1] is not None:
                 tmp = tmp * output_data['p_policy'][0, act[1]]
 
             p1[i] = tmp.cpu().data.item()
-            p2[i] = info.exp().data.item()
+            p2[i] = ev.cpu().item()
             tominf_p[i] = tmp.cpu().data.item()
 
-            tmp = tmp * info.exp()
+            # print('tmp,ev', i, tmp, ev )
+
+            tmp = tmp * ev
             # tmp = info.exp()*self.tom_alpha + output_data['policy'][0, act[0]]*(1-self.tom_alpha)
 
             # choice the best action
@@ -365,7 +389,7 @@ class NeuralSession(Session):
             tom_policy.append(tmp.item())
             tom_actions.append(tmp_tokens)
 
-            print_list.append((self.env.lfint_map.int_to_text([act[0]]), act, tmp.item(), info.exp().item(),
+            print_list.append((self.env.lfint_map.int_to_text([act[0]]), act, tmp.item(), ev.item(),
                                output_data['policy'][0, act[0]].item()))
 
         # print('fake_step costs {} time.'.format(np.mean(avg_time)))
@@ -374,24 +398,26 @@ class NeuralSession(Session):
         tominf_p = tominf_p / tominf_p.sum()
         policy_info = {'tominf_p1': p1, 'tominf_p2': p2, 'tominf_p': tominf_p, 'tom_ev': tom_ev}
 
+        # print('tom_policy', tom_policy)
+
         # Sample action from new policy
         final_action = torch.multinomial(torch.tensor(tom_policy, ), 1).item()
         tokens = list(tom_actions[final_action])
 
-        print('-'*5+'tom debug info: ', len(self.dialogue.lf_turns))
-        print('pi sum,', output_data['policy'].sum(), output_data['p_policy'].sum())
-        print('pi', output_data['policy'], output_data['p_policy'])
-        for s in print_list:
-            print('\t'+ str(s))
+        # print('-'*5+'tom debug info: ', len(self.dialogue.lf_turns))
+        # print('pi sum,', output_data['policy'].sum(), output_data['p_policy'].sum())
+        # print('pi', output_data['policy'], output_data['p_policy'])
+        # for s in print_list:
+        #     print('\t'+ str(s))
         self.dialogue.lf_to_int()
-        for s in self.dialogue.lfs:
-            print(s)
+        # for s in self.dialogue.lfs:
+        #     print(s)
 
         return tokens, policy_info
 
     def try_all_aa(self, tokens, output_data):
         # For the step of choosing U3
-        p_mean = output_data['price']
+        p_mean = output_data['p_policy'].item()
         # p_logstd = output_data['price_logstd']
         # get all
         num_price = 1
@@ -459,6 +485,7 @@ class NeuralSession(Session):
         maxone = torch.zeros_like(probs, device=probs.device)
         maxone[values.argmax().item(), 0] = 1
 
+        # print('info', self.tom_type, values.sum(), probs.sum(), (values*probs).sum())
         if self.tom_type == 'expectation':
             # If use expectation here
             return (values.mul(probs)).sum()
@@ -471,7 +498,7 @@ class NeuralSession(Session):
         else:
             print('Unknown tom type: ', self.tom_type)
             assert NotImplementedError()
-        return tokens
+        # return info
 
     def send(self, temperature=1, is_fake=False):
 

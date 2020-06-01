@@ -802,6 +802,7 @@ class RLTrainer(BaseTrainer):
         strategies = [[], []]
 
         dialogue_batch = [[], []]
+        last_t = time.time()
         for j in range(real_batch):
             # Rollout
             scenario, sid = self._get_scenario()
@@ -841,6 +842,9 @@ class RLTrainer(BaseTrainer):
                 for s in verbose_str:
                     print(s)
             verbose_strs.append(verbose_str)
+
+            # print('t: ', time.time() - last_t)
+            # last_t=time.time()
 
         return _batch_iters, (_rewards, strategies), examples, verbose_strs
 

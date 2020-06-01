@@ -93,7 +93,7 @@ def make_decoder(opt, encoder_size, intent_size, hidden_size, price_action=False
     # return PolicyDecoder(encoder_size=encoder_size, intent_size=intent_size)
 
 
-def load_test_model(model_path, opt, dummy_opt, new_opt, model_type='sl', load_type=None):
+def load_test_model(model_path, opt, dummy_opt, new_opt, model_type='sl', load_type=None, exclude={}):
     if model_path is not None:
         print('Load model from {}.'.format(model_path))
         checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
@@ -119,7 +119,7 @@ def load_test_model(model_path, opt, dummy_opt, new_opt, model_type='sl', load_t
 
         return mappings, model, model_opt
     else:
-        actor, critic, tom = make_rl_model(model_opt, mappings, use_gpu(opt), checkpoint, load_type)
+        actor, critic, tom = make_rl_model(model_opt, mappings, use_gpu(opt), checkpoint, load_type, exclude=exclude)
         actor.eval()
         critic.eval()
         tom.eval()
@@ -174,7 +174,7 @@ def init_model(model, checkpoint, model_opt, model_name='model'):
                 if p.requires_grad:
                     p.data.uniform_(-model_opt.param_init, model_opt.param_init)
 
-def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'):
+def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl', exclude={}):
     # print('rnn-type', model_opt.rnn_type)
     # print('h-size', model_opt.hidden_depth)
     # print('th-d', model_opt.tom_hidden_size)
@@ -243,7 +243,7 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
     else:
         init_model(actor_model, checkpoint, model_opt, 'model')
         init_model(critic_model, checkpoint, model_opt, 'critic')
-        init_model(tom_model, checkpoint, model_opt, 'tom')
+        init_model(tom_model, None if exclude.get('tom') else checkpoint, model_opt, 'tom')
 
     if gpu:
         actor_model.cuda()
