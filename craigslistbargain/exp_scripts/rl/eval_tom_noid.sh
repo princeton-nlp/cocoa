@@ -1,4 +1,4 @@
-EXP_NAME="eval_tom"$1
+EXP_NAME="eval_tom_noid"$1
 USE_GPU=$2
 SEED="0"
 BETA="1"
@@ -13,7 +13,7 @@ if [ $# -ge 5 ]; then
   RL_CHECK_POINT=$5
 fi
 
-TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_id_tom_history_7_4/model_best.pt"
+TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_history_tom_7_4/model_best.pt"
 
 echo "beta:"${BETA}
 

@@ -181,18 +181,18 @@ def draw_id_training_curve(tomid_dirs, args):
     max_epoch = 1800
     nums = 10
     plot_step = max_epoch // nums
-    plot_x = list(range(10))
+    plot_x = list(range(0, 10))
     print(plot_step)
     plot_y_dict = [{}, {}]
 
-    id_accu = "identity0/dev_accuracy"
+    id_accu = "identity0/dev_accuracy2"
 
     def aggregate_info0(dirs, plot_step, item_name='agent0/reward'):
         ret = []
         for d in dirs:
             scalars = load_from_tensorboard(d)
             xx, yy = get_xy(scalars.Items(item_name))
-            for i in range(len(yy)-plot_step, len(yy)):
+            for i in range(max(0, len(yy)-plot_step), len(yy)):
                 y = yy[i]
                 # if args.one_point and xx[i] % (args.train_step * args.plot_step) != 0:
                 #     continue
@@ -207,6 +207,7 @@ def draw_id_training_curve(tomid_dirs, args):
     # load rl data
     # aggregate_info(tom_dirs, plot_y_dict[1], plot_step, item_name=tom_loss)
     # aggregate_info(tomid_dirs, plot_y_dict[0], plot_step, item_name=tom_loss)
+    plot_y_dict[0][-1] = aggregate_info0(tomid_dirs, 200, item_name=id_accu)
     for i in range(10):
         tmpdir = [os.path.join(p, 'step_{}'.format(i)) for p in tomid_dirs]
         ret = aggregate_info0(tmpdir, 200, item_name=id_accu)
@@ -226,34 +227,38 @@ def draw_id_training_curve(tomid_dirs, args):
     plt.style.use('ggplot')
 
     # Draw train set
-    for i in range(1):
-        ymean = []
-        ystd = []
-        for x in range(10):
-            yylist = plot_y_dict[i][x]
-            mean = np.mean(yylist)
-            std = np.std(yylist)
-            ymean.append(mean)
-            ystd.append(std)
+    # for i in range(1):
+    ymean = []
+    ystd = []
+    for x in range(0, 10):
+        yylist = plot_y_dict[0][x]
+        mean = np.mean(yylist)
+        std = np.std(yylist)
+        ymean.append(mean)
+        ystd.append(std)
 
-        sup = [ymean[j] + ystd[j] for j in range(len(ymean))]
-        inf = [ymean[j] - ystd[j] for j in range(len(ymean))]
+    sup = [ymean[j] + ystd[j] for j in range(len(ymean))]
+    inf = [ymean[j] - ystd[j] for j in range(len(ymean))]
 
-        plt.bar(plot_x, ymean, label=labels[i], width=40)
+    plt.bar(plot_x, ymean, label="separate results", width=0.3)
+
+    mean = np.mean(plot_y_dict[0][-1])
+    # mean = 0.5
+    plt.bar([-1], mean, label="average result", width=0.3)
         # plt.plot(plot_x, ymean, label=labels[i], )
         # plt.fill_between(plot_x, inf, sup, alpha=0.3)
 
-    plt.axhline(y=0.4, ls=":", c='gray')
-    plt.axhline(y=0, ls=":", c='gray')
+    plt.axhline(y=1./7, ls=":", c='gray')
+    plt.axhline(y=mean, ls=":", c='gray')
 
-    plt.ylim(0.1, 0.6)
+    plt.ylim(0.1, 1.0)
 
-    plt.xlabel('Episode', fontsize=args.font_size)
+    plt.xlabel('Turns', fontsize=args.font_size)
     plt.ylabel('Accuracy', fontsize=args.font_size)
     # plt.title('ToM ', fontsize=args.font_size)
     plt.tick_params(labelsize=args.label_size)
     plt.subplots_adjust(bottom=edge, left=left_e, top=up_e, right=right_e)
-    # plt.legend(fontsize=args.font_size)
+    plt.legend(fontsize=args.font_size)
     if args.show:
         plt.show()
     else:
@@ -364,8 +369,8 @@ if __name__ == '__main__':
     dirs0 = [args.dir+i for i in args.agent0]
     dirs1 = [args.dir+i for i in args.agent1]
 
-    draw_sl_training_curve(dirs0, dirs1, args)
-    # draw_id_training_curve(dirs0, args)
+    # draw_sl_training_curve(dirs0, dirs1, args)
+    draw_id_training_curve(dirs0, args)
 
     # if args.draw_type == 'sl':
     #     # Draw sl curve
