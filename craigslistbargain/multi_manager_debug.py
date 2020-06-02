@@ -670,7 +670,7 @@ class MultiManager():
                                    'cache/{}/dev_pred_{}.pkl'.format(args.name, i))])
                 dev_loss, dev_accu, dev_step_info = info[1]
                 # draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
-                draw_dev_info(dev_loss, dev_accu, None, 'dev', self.writer, i)
+                # draw_dev_info(dev_loss, dev_accu, None, 'dev', self.writer, i)
                 draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
 
             # print('[DEBUG] {} time {}s.'.format('valid', time.time() - cur_t))

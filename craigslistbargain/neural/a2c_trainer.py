@@ -173,7 +173,8 @@ class RLTrainer(BaseTrainer):
                 s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=identity.device)
                 loss = self.tom_identity_loss(identity, s)
                 accu = torch.gather(torch.softmax(identity, dim=1), 1, s.reshape(-1, 1))
-                accu2 = torch.softmax(identity, dim=1).argmax() == s.reshape(-1,1)
+                accu2 = torch.softmax(identity, dim=1).argmax(dim=-1) == s.reshape(-1,1)
+                accu2 = accu2.to(dtype=torch.float32)
                 identity_loss.append(loss.reshape(-1))
                 identity_accu.append(accu.reshape(-1))
                 identity_accu2.append(accu2.reshape(-1))
@@ -201,7 +202,7 @@ class RLTrainer(BaseTrainer):
         # strategy = torch.tensor([strategy]*preds.shape[0], dtype=torch.int64, device=preds.device)
         # (-1,), (-1, 1) -> (-1,) *2
         # print('loss & accu:', loss, accu)
-        return {'id':[identity_loss], 'tom':[tom_intent_loss, tom_price_loss]}, {'id':[identity_accu], 'tom':[tom_intent_accu], 'id2':[identity_accu2]}, \
+        return {'id':[identity_loss], 'tom':[tom_intent_loss, tom_price_loss]}, {'id':[identity_accu, identity_accu2], 'tom':[tom_intent_accu], }, \
                (pred_identity, pred_intent, pred_price, strategies)
 
     def _sort_merge_batch(self, batch_iters, batch_size, device=None):
@@ -288,9 +289,9 @@ class RLTrainer(BaseTrainer):
 
         model.zero_grad()
         loss = {'id': [[]], 'tom': [[], []]}
-        accu = {'id': [[]], 'tom': [[]], 'id2': [[]]}
+        accu = {'id': [[], []], 'tom': [[]], }
         step_loss = {'id': [[]], 'tom': [[], []]}
-        step_accu = {'id': [[]], 'tom': [[]], 'id2': [[]]}
+        step_accu = {'id': [[], []], 'tom': [[]], }
         # step_loss = [[] for i in range(20)]
         # step_accu = [[] for i in range(20)]
         output_data = []
@@ -421,9 +422,9 @@ class RLTrainer(BaseTrainer):
         # print('udpate model: {}s.'.format(time.time() - cur_t))
         # cur_t = time.time()
         loss = loss['id'] + loss['tom']
-        accu = accu['id'] + accu['tom'] + accu['id2']
+        accu = accu['id'][:1] + accu['tom'] + accu['id'][1:]
         step_loss = step_loss['id'] + step_loss['tom']
-        step_accu = step_accu['id'] + step_accu['tom'] + step_accu['id2']
+        step_accu = step_accu['id'][:1] + step_accu['tom'] + step_accu['id'][1:]
 
         return loss, \
                accu, (step_loss, step_accu, step_num)
