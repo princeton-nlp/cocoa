@@ -42,7 +42,7 @@ class PytorchNeuralSystem(System):
         self.price_tracker = price_tracker
         self.timed_session = timed
 
-        model_type = 'sl' if name == 'pt-neural-r' else 'rl'
+        model_type = 'sl' if (name == 'pt-neural-r') or (name == 'pt-neural-s') else 'rl'
 
         # TODO: do we need the dummy parser?
         dummy_parser = argparse.ArgumentParser(description='duh')

@@ -746,8 +746,14 @@ class PytorchNeuralSession(NeuralSession):
             p = max(p, last_prices[1])
             p = min(p, last_prices[0])
             output_data['price'] = p
-            # print('after:', p, output_data['price'])
-        if self.env.name != 'pt-neural-r':
+
+        if self.env.name == 'pt-neural-s' and output_data.get('price') is not None:
+            p = output_data['price']
+            p = max(p, last_prices[1])
+            p = min(p, last_prices[0])
+            output_data['price'] = p
+
+        if self.env.name == 'pt-neural':
             # Using pact
             # 0: insist, 3: decay 0.1, 2: half of last price, 1: agree
             p_act = output_data['original_price']

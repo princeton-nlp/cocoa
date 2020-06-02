@@ -88,14 +88,15 @@ class MultiRunner:
         model = system.env.model
         loss = None
         # optim = build_optim(args, [model, system.env.critic], None)
-        optim = {'model': build_optim(args, model, None),
-                 'critic': build_optim(args, system.env.critic, None)}
+        optim = {'model': build_optim(args, model, None),}
+        if system.env.critic is not None:
+            optim['critic'] = build_optim(args, system.env.critic, None)
+            optim['critic']._set_rate(0.05)
         if system.env.tom_model is not None:
             optim['tom'] = build_optim(args, system.env.tom_model, None)
             if args.tom_model not in ['naive', 'history']:
                 optim['tom_identity'] = build_optim(args, system.env.tom_model.encoder.identity, None)
             # optim['tom']._set_rate(0.1)
-        optim['critic']._set_rate(0.05)
 
         scenarios = {'train': scenario_db.scenarios_list, 'dev': valid_scenario_db.scenarios_list}
         from neural.a2c_trainer import RLTrainer as A2CTrainer

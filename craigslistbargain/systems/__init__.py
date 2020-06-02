@@ -27,7 +27,7 @@ def get_system(name, args, schema=None, timed=False, model_path=None, id=0):
     elif name == 'cmd':
         from .cmd_system import CmdSystem
         return CmdSystem()
-    elif name in ['pt-neural', 'pt-neural-r']:
+    elif name in ['pt-neural', 'pt-neural-r', 'pt-neural-s']:
         from .neural_system import PytorchNeuralSystem
         # assert model_path
         return PytorchNeuralSystem(args, schema, lexicon, model_path, timed, name=name, id=id)
