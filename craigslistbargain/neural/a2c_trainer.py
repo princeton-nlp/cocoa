@@ -176,7 +176,7 @@ class RLTrainer(BaseTrainer):
                 id_p = torch.softmax(identity, dim=1)
                 accu = id_p.argmax(dim=-1).reshape(-1, 1) == s.reshape(-1, 1)
                 accu = accu.to(dtype=torch.float32)
-                accu2 = (id_p.topk(3, dim=-1) == s.reshape(-1, 1)).max(dim=-1).values.reshape(-1, 1)
+                accu2 = (id_p.topk(3, dim=-1).indcies == s.reshape(-1, 1)).max(dim=-1).values.reshape(-1, 1)
                 accu2 = accu2.to(dtype=torch.float32)
                 identity_loss.append(loss.reshape(-1))
                 identity_accu.append(accu.reshape(-1))
