@@ -583,6 +583,7 @@ class MultiManager():
             if ret_table['id']:
                 w.add_scalar('identity{}/{}_loss'.format(train_agent, name), loss[0], i)
                 w.add_scalar('identity{}/{}_accuracy'.format(train_agent, name), accu[0], i)
+                w.add_scalar('identity{}/{}_accuracy2'.format(train_agent, name), accu[2], i)
             if ret_table['tom']:
                 w.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), loss[1], i)
                 w.add_scalar('tom{}/{}_intent_accuracy'.format(train_agent, name), accu[1], i)
@@ -602,6 +603,7 @@ class MultiManager():
                 if ret_table['id']:
                     w.add_scalar('identity{}/{}_loss'.format(train_agent, name), step_info[0][0][j], i)
                     w.add_scalar('identity{}/{}_accuracy'.format(train_agent, name), step_info[1][0][j], i)
+                    w.add_scalar('identity{}/{}_accuracy2'.format(train_agent, name), step_info[1][2][j], i)
 
                 if ret_table['tom']:
                     w.add_scalar('tom{}/{}_intent_loss'.format(train_agent, name), step_info[0][1][j], i)
@@ -668,6 +670,7 @@ class MultiManager():
                 dev_loss, dev_accu, dev_step_info = info[1]
                 # draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
                 draw_dev_info(dev_loss, dev_accu, None, 'dev', self.writer, i)
+                draw_info(dev_loss, dev_accu, dev_step_info, 'dev', i)
 
             # print('[DEBUG] {} time {}s.'.format('valid', time.time() - cur_t))
             # cur_t = time.time()
