@@ -172,8 +172,11 @@ class RLTrainer(BaseTrainer):
             if ret_table['id']:
                 s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=identity.device)
                 loss = self.tom_identity_loss(identity, s)
-                accu = torch.gather(torch.softmax(identity, dim=1), 1, s.reshape(-1, 1))
-                accu2 = torch.softmax(identity, dim=1).argmax(dim=-1).reshape(-1, 1) == s.reshape(-1,1)
+                # accu = torch.gather(torch.softmax(identity, dim=1), 1, s.reshape(-1, 1))
+                id_p = torch.softmax(identity, dim=1)
+                accu = id_p.argmax(dim=-1).reshape(-1, 1) == s.reshape(-1, 1)
+                accu = accu.to(dtype=torch.float32)
+                accu2 = (id_p.topk(3, dim=-1) == s.reshape(-1, 1)).max(dim=-1).values.reshape(-1, 1)
                 accu2 = accu2.to(dtype=torch.float32)
                 identity_loss.append(loss.reshape(-1))
                 identity_accu.append(accu.reshape(-1))
