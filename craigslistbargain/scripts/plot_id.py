@@ -185,7 +185,8 @@ def draw_id_training_curve(tomid_dirs, args):
     print(plot_step)
     plot_y_dict = [{}, {}]
 
-    id_accu = "identity0/dev_accuracy2"
+    id_accu = ["identity0/dev_accuracy", "identity0/dev_accuracy2"]
+    # scalars = []
 
     def aggregate_info0(dirs, plot_step, item_name='agent0/reward'):
         ret = []
@@ -207,11 +208,12 @@ def draw_id_training_curve(tomid_dirs, args):
     # load rl data
     # aggregate_info(tom_dirs, plot_y_dict[1], plot_step, item_name=tom_loss)
     # aggregate_info(tomid_dirs, plot_y_dict[0], plot_step, item_name=tom_loss)
-    plot_y_dict[0][-1] = aggregate_info0(tomid_dirs, 20, item_name=id_accu)
-    for i in range(10):
-        tmpdir = [os.path.join(p, 'step_{}'.format(i)) for p in tomid_dirs]
-        ret = aggregate_info0(tmpdir, 20, item_name=id_accu)
-        plot_y_dict[0][i] = ret
+    for j in range(2):
+        plot_y_dict[j][-1] = aggregate_info0(tomid_dirs, 20, item_name=id_accu[j])
+        for i in range(10):
+            tmpdir = [os.path.join(p, 'step_{}'.format(i)) for p in tomid_dirs]
+            ret = aggregate_info0(tmpdir, 20, item_name=id_accu[j])
+            plot_y_dict[j][i] = ret
     # print(plot_y_dict[0].keys(), plot_x)
     # print(plot_y_dict)
 
@@ -227,34 +229,50 @@ def draw_id_training_curve(tomid_dirs, args):
     plt.style.use('ggplot')
 
     # Draw train set
-    # for i in range(1):
-    ymean = []
-    ystd = []
-    for x in range(0, 10):
-        yylist = plot_y_dict[0][x]
-        mean = np.mean(yylist)
-        std = np.std(yylist)
-        ymean.append(mean)
-        ystd.append(std)
+    for i in range(2):
+        ymean = []
+        ystd = []
+        for x in range(0, 10):
+            yylist = plot_y_dict[i][x]
+            mean = np.mean(yylist)
+            std = np.std(yylist)
+            ymean.append(mean)
+            ystd.append(std)
 
-    sup = [ymean[j] + ystd[j] for j in range(len(ymean))]
-    inf = [ymean[j] - ystd[j] for j in range(len(ymean))]
+        sup = [ymean[j] + ystd[j] for j in range(len(ymean))]
+        inf = [ymean[j] - ystd[j] for j in range(len(ymean))]
 
-    plt.bar([x+1 for x in plot_x], ymean, label="separate results", width=0.7, alpha=0.7)
-    plt.errorbar([x+1 for x in plot_x], ymean, ystd, label="", alpha=0.7, capsize=0.2, ecolor='gray', ls='')
+        if i == 0:
+            print('top1:', ymean)
+            plt.bar([x+1-0.2 for x in plot_x], ymean, label="separate results", width=0.4, alpha=0.7)
+            # plt.errorbar([x+1 for x in plot_x], ymean, ystd, label="", alpha=0.7, capsize=0.2, ecolor='gray', ls='')
+        else:
+            print('top3:', ymean)
+            plt.bar([x + 1+0.2 for x in plot_x], ymean, label="separate results", width=0.4, alpha=0.7)
+            # plt.errorbar([x + 1 for x in plot_x], ymean, ystd, label="", alpha=0.7, capsize=0.2, ecolor='gray', ls='')
 
     mean = np.mean(plot_y_dict[0][-1])
     std = np.std(plot_y_dict[0][-1])
     # mean = 0.5
-    plt.bar([-1], mean, label="average result", width=0.7, alpha=0.7)
-    plt.errorbar([-1], mean, std, label="", alpha=0.7, capsize=0.2, ecolor='gray', ls='')
+
+    print('top1_mean:', mean)
+    plt.bar([-1-0.2], mean, label="average result", width=0.4, alpha=0.7)
+    # plt.errorbar([-1], mean, std, label="", alpha=0.7, capsize=0.2, ecolor='gray', ls='')
+
+    mean = np.mean(plot_y_dict[1][-1])
+    std = np.std(plot_y_dict[1][-1])
+    print('top3_mean:', mean)
+    plt.bar([-1+0.2], mean, label="average result", width=0.4, alpha=0.7)
+    # plt.errorbar([-1], mean, std, label="", alpha=0.7, capsize=0.2, ecolor='gray', ls='')
         # plt.plot(plot_x, ymean, label=labels[i], )
         # plt.fill_between(plot_x, inf, sup, alpha=0.3)
 
     plt.axhline(y=1./7, ls="-.", c='black')
     plt.axhline(y=mean, ls=":", c='gray')
 
-    plt.ylim(0.1, 0.8)
+    plt.xticks([x+1 for x in plot_x], [x+1 for x in plot_x])
+
+    plt.ylim(0.1, 1)
 
     plt.xlabel('Turns', fontsize=args.font_size)
     plt.ylabel('Accuracy', fontsize=args.font_size)
