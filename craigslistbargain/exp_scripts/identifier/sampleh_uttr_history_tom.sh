@@ -1,4 +1,4 @@
-EXP_NAME="uttr_history_tom_7"$1
+EXP_NAME="sampleh_uttr_history_tom_7"$1
 USE_GPU=$2
 SEED="0"
 LR="0.001"
