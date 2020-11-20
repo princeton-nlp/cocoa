@@ -12,6 +12,12 @@ LOAD_SAMPLE="--load-sample cache/hard_pmask_7_${SEED}/data.pkl"
 if [ $# -ge 5 ]; then
   LOAD_SAMPLE="--load-sample cache/$5/data.pkl"
 fi
+
+TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_id_tom_history_7_0/model_best.pt"
+if [ $# -ge 6 ]; then
+  TOM_CHECK_POINT="--load-identity-from $6"
+fi
+
 echo "load sample from ${LOAD_SAMPLE}"
 MODEL_NAME="uttr_id_history_tom"
 
@@ -26,7 +32,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --agents pt-neural pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 20 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
---dia-num 20 --state-length 4 --epochs 2000 --use-utterance \
+--dia-num 20 --state-length 4 --epochs 10 --use-utterance \
 --model lf2lf --model-type a2c --tom-test ${LOAD_SAMPLE} \
 --learning-rate ${LR} --name ${EXP_NAME} --seed ${SEED} \
 --tom-hidden-size 128 --tom-hidden-depth 2 --id-hidden-size 128 --id-hidden-depth 2 \
