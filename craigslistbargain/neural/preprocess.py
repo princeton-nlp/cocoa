@@ -794,6 +794,7 @@ class DataGenerator(object):
 
     def generator(self, name, shuffle=True, cuda=True):
         dialogue_batches = self.batches[name]
+        #print('total number:', sum([len(b) for b in dialogue_batches]))
         yield sum([len(b) for b in dialogue_batches])
         inds = list(range(len(dialogue_batches)))
         if shuffle:

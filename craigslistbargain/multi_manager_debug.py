@@ -513,6 +513,9 @@ class MultiManager():
         if args.fix_id:
             update_table['id'] = False
 
+        if args.only_run:
+            update_table = {'id': False, 'tom': False}
+
         num_worker = self.update_worker_list()
         worker = self.worker_conn[0]
         train_agent = 0
@@ -622,6 +625,16 @@ class MultiManager():
                                train_strategy, update_table, ret_table,
                                'cache/{}/train_pred_{}.pkl'.format(args.name, i))])
             train_loss, train_accu, train_step_info = info[1]
+
+            if args.only_run:
+                save_dir = 'logs/{}/step_{}'.format(args.name, i)
+                if i == 0:
+                    print(worker.trainer.hidden_vec, worker.trainer.hidden_stra)
+                with open(save_dir, "wb") as f:
+                    pkl.dump([worker.trainer.hidden_vec, worker.trainer.hidden_stra], f)
+                print('[run{}/{}]\t time:{:.2f}s.'.format(i+1, args.epochs, time.time()-cur_t))
+                continue
+
             draw_info(train_loss, train_accu, train_step_info, 'train', i)
 
             # print('[DEBUG] {} time {}s.'.format('train', time.time()-cur_t))

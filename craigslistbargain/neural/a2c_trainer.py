@@ -115,6 +115,7 @@ class RLTrainer(BaseTrainer):
         self.model_type = args.model_type
         self.use_utterance = False
         self.tom_identity_loss = torch.nn.CrossEntropyLoss(reduction='none')
+        self.hidden_vec = None
 
     def _run_batch_a2c(self, batch):
         value = self._run_batch_critic(batch)
@@ -309,9 +310,15 @@ class RLTrainer(BaseTrainer):
                 else:
                     step[j].append(o)
 
+        self.hidden_vec = []
+        self.hidden_stra = []
+
         for i, b in enumerate(batch_iters):
             stra = [strategy[j] for j in sorted_id[i]]
             l, a, logs = self._tom_gradient_accumulation(b, stra, model, ret_table=ret_table, id_gt=args.idgt)
+
+            self.hidden_vec.append(self.tom.hidden_vec)
+            self.hidden_stra.append(stra)
 
             # print('[DEBUG] {} time {}s.'.format('grad_accu', time.time() - cur_t))
             # cur_t = time.time()

@@ -442,11 +442,15 @@ class HistoryModel(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
         self.fix_encoder = fix_encoder
+        self.hidden_vec = None
+        self.hidden_stra = None
 
     def forward(self, *input):
         with torch.set_grad_enabled(not self.fix_encoder):
             # return emb, next_hidden, (identity)
             e_output = self.encoder(*input)
+
+        self.hidden_vec = e_output[0].cpu().numpy()
 
         d_output = self.decoder(e_output[0])
         return (d_output,) + e_output[1:]
