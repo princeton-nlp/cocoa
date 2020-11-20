@@ -35,7 +35,7 @@ elif [ $# -eq 2 ];then
   SD_END=$2
 fi
 
-CHECK_POINT="checkpoint/a2c_0.001_0/model_reward-0.3950_e350.pt"
+CHECK_POINT="checkpoint/language/model_best.pt"
 
 for i in $(seq $SD_START $SD_END)
 do

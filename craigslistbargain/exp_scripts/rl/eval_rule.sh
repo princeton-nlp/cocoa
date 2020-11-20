@@ -8,7 +8,7 @@ fi
 if [ $# -ge 4 ]; then
   BETA=$4
 fi
-RL_CHECK_POINT="checkpoint/language/model_best.pt"
+CHECK_POINT="checkpoint/language/model_best.pt"
 if [ $# -ge 5 ]; then
   CHECK_POINT=$5
 fi
@@ -20,7 +20,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --scenarios-path data/train-scenarios.json \
 --valid-scenarios-path data/dev-scenarios.json \
 --price-tracker data/price_tracker.pkl \
---agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
+--agent-checkpoints ${CHECK_POINT} checkpoint/language/model_best.pt \
 --model-path checkpoint/${EXP_NAME} --mappings mappings/language \
 --optim adam --tom-beta ${BETA} \
 --agents pt-neural-r pt-neural-r \

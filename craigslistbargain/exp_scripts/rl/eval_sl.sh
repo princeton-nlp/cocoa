@@ -8,7 +8,7 @@ fi
 if [ $# -ge 4 ]; then
   BETA=$4
 fi
-RL_CHECK_POINT="checkpoint/language/model_best.pt"
+CHECK_POINT="checkpoint/language/model_best.pt"
 if [ $# -ge 5 ]; then
   CHECK_POINT=$5
 fi
