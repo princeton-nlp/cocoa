@@ -13,7 +13,11 @@ if [ $# -ge 5 ]; then
   RL_CHECK_POINT=$5
 fi
 
-TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_id_tom_history_7_4/model_best.pt"
+TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_history_tom_7_4/model_best.pt"
+if [ $# -ge 6 ]; then
+  TOM_CHECK_POINT="--load-identity-from $6"
+fi
+MODEL_NAME="uttr_id_history_tom"
 
 echo "beta:"${BETA}
 
@@ -30,7 +34,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
 --model lf2lf --model-type a2c --name ${EXP_NAME} --num-cpus 5 \
---epochs 100 ${USE_GPU} --batch-size 128 --seed ${SEED} --get-dialogues
+--epochs 100 ${USE_GPU} --batch-size 128 --seed ${SEED} --get-dialogues --tom-model ${MODEL_NAME}
 
 #PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 #--scenarios-path data/train-scenarios.json \

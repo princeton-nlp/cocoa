@@ -12,8 +12,7 @@ RL_CHECK_POINT="checkpoint/language/model_best.pt"
 if [ $# -ge 5 ]; then
   CHECK_POINT=$5
 fi
-
-TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_id_tom_history_7_4/model_best.pt"
+#TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_id_tom_history_7_4/model_best.pt"
 
 echo "beta:"${BETA}
 
@@ -25,7 +24,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
 --model-path checkpoint/${EXP_NAME} --mappings mappings/language \
 --optim adam --tom-beta ${BETA} \
---agents pt-neural-s pt-neural-r ${TOM_CHECK_POINT} \
+--agents pt-neural-s pt-neural-r \
 --report-every 50 --max-turns 20 --num-dialogues 10000 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
