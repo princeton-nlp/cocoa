@@ -450,7 +450,7 @@ class HistoryModel(nn.Module):
             # return emb, next_hidden, (identity)
             e_output = self.encoder(*input)
 
-        self.hidden_vec = e_output[0].cpu().numpy()
+        self.hidden_vec = e_output[0].cpu().data.numpy()
 
         d_output = self.decoder(e_output[0])
         return (d_output,) + e_output[1:]

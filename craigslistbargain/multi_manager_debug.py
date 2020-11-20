@@ -627,12 +627,16 @@ class MultiManager():
             train_loss, train_accu, train_step_info = info[1]
 
             if args.only_run:
-                save_dir = 'logs/{}/step_{}'.format(args.name, i)
-                if i == 0:
-                    print(worker.trainer.hidden_vec, worker.trainer.hidden_stra)
+                save_dir = 'logs/{}/hidden_vec_{}.pkl'.format(args.name, i)
+                total_num = 0
+                for j in range(len(worker.trainer.hidden_vec)):
+                    assert worker.trainer.hidden_vec[j].shape[0] == len(worker.trainer.hidden_stra[j]) , \
+                        "miss match at {}, {} of {}".format(worker.trainer.hidden_vec[j].shape, len(worker.trainer.hidden_stra[j]), j)
+                    total_num = total_num + len(worker.trainer.hidden_stra[j])
+
                 with open(save_dir, "wb") as f:
                     pkl.dump([worker.trainer.hidden_vec, worker.trainer.hidden_stra], f)
-                print('[run{}/{}]\t time:{:.2f}s.'.format(i+1, args.epochs, time.time()-cur_t))
+                print('[run{}/{}]\t num:{} \t time:{:.2f}s.'.format(i+1, args.epochs, total_num, time.time()-cur_t))
                 continue
 
             draw_info(train_loss, train_accu, train_step_info, 'train', i)
