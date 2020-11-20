@@ -169,6 +169,9 @@ class RLTrainer(BaseTrainer):
             pred, h, identity = self._run_batch_tom_identity(tom_batch, hidden_state=h,
                                                              only_identity=(not ret_table['tom']), id_gt=id_gt)
 
+            self.hidden_vec.append(self.tom.hidden_vec)
+            self.hidden_stra.append(strategy[:batch.size])
+
             # Identity Loss
             if ret_table['id']:
                 s = torch.tensor(strategy[:batch.size], dtype=torch.int64, device=identity.device)
@@ -316,9 +319,6 @@ class RLTrainer(BaseTrainer):
         for i, b in enumerate(batch_iters):
             stra = [strategy[j] for j in sorted_id[i]]
             l, a, logs = self._tom_gradient_accumulation(b, stra, model, ret_table=ret_table, id_gt=args.idgt)
-
-            self.hidden_vec.append(self.tom.hidden_vec)
-            self.hidden_stra.append(stra)
 
             # print('[DEBUG] {} time {}s.'.format('grad_accu', time.time() - cur_t))
             # cur_t = time.time()
