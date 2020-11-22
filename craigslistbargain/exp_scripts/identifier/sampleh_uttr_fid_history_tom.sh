@@ -1,4 +1,4 @@
-EXP_NAME="sampleh_uttr_id_tom_history_7"$1
+EXP_NAME="sampleh_uttr_fid_tom_history_7"$1
 USE_GPU=$2
 SEED="0"
 LR="0.001"
@@ -13,13 +13,13 @@ if [ $# -ge 5 ]; then
   LOAD_SAMPLE="--load-sample cache/$5/data.pkl"
 fi
 
-TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_id_tom_history_7_0/model_best.pt"
+TOM_CHECK_POINT="--load-identity-from checkpoint/uttr_fid_tom_history_7_0/model_best.pt"
 if [ $# -ge 6 ]; then
   TOM_CHECK_POINT="--load-identity-from $6"
 fi
 
 echo "load sample from ${LOAD_SAMPLE}"
-MODEL_NAME="uttr_id_history_tom"
+MODEL_NAME="uttr_fid_history_tom"
 
 mkdir checkpoint/${EXP_NAME}
 PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
