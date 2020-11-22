@@ -1,4 +1,4 @@
-EXP_NAME="eval_tom"$1
+EXP_NAME="eval_tom_fid"$1
 USE_GPU=$2
 SEED="0"
 BETA="1"
