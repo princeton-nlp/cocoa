@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="price round to integer">
+    <list default="true" id="8705e663-0a14-41c9-b9c8-55f61f0cde88" name="Default" comment="udpate r">
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cocoa/core/controller.py" beforeDir="false" afterPath="$PROJECT_DIR$/cocoa/core/controller.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/command" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/command" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/neural/rl_model_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/neural/rl_model_builder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/craigslistbargain/sessions/neural_session.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -15,6 +12,20 @@
   </component>
   <component name="CoverageDataManager">
     <SUITE FILE_PATH="coverage/cocoa$main.coverage" NAME="main Coverage Results" MODIFIED="1553403762154" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/craigslistbargain" />
+  </component>
+  <component name="DatabaseView">
+    <option name="SHOW_INTERMEDIATE" value="true" />
+    <option name="GROUP_DATA_SOURCES" value="true" />
+    <option name="GROUP_SCHEMA" value="true" />
+    <option name="GROUP_CONTENTS" value="false" />
+    <option name="SORT_POSITIONED" value="false" />
+    <option name="SHOW_EMPTY_GROUPS" value="false" />
+    <option name="AUTO_SCROLL_FROM_SOURCE" value="false" />
+    <option name="HIDDEN_KINDS">
+      <set />
+    </option>
+    <expand />
+    <select />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -26,11 +37,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="JsBuildToolGruntFileManager" detection-done="true" sorting="DEFINITION_ORDER" />
-  <component name="JsBuildToolPackageJson" detection-done="true" sorting="DEFINITION_ORDER" />
-  <component name="JsGulpfileManager">
-    <detection-done>true</detection-done>
-    <sorting>DEFINITION_ORDER</sorting>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/onmt/RLModels.py" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/craigslistbargain/neural/a2c_trainer.py" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectId" id="1OYVgEmR2xyziK0PrMGMmhnv6Qa" />
   <component name="ProjectViewState">
@@ -43,24 +52,104 @@
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="SearchEverywhereHistoryKey" value="xrange&#9;null&#9;null" />
     <property name="TODO_SCOPE" value="Current File" />
-    <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="settings.editor.selected.configurable" value="preferences.lookFeel" />
+    <property name="WebServerToolWindowFactoryState" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.highlight.mappings" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.highlight.symlinks" value="true" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.date" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.permissions" value="false" />
+    <property name="WebServerToolWindowPanel.toolwindow.show.size" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/craigslistbargain/exp_scripts/rl" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.detected.package.tslint" value="true" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.path.for.package.tslint" value="project" />
+    <property name="node.js.selected.package.eslint" value="(autodetect)" />
+    <property name="node.js.selected.package.tslint" value="(autodetect)" />
+    <property name="settings.editor.selected.configurable" value="MTConfigurable" />
   </component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/craigslistbargain" />
-      <recent name="$PROJECT_DIR$/craigslistbargain/neural" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/scripts/old" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/scripts" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/slurm/identifier" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/slurm/identifier/old" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/identifier" />
     </key>
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/craigslistbargain/neural" />
-      <recent name="$PROJECT_DIR$/craigslistbargain/onmt" />
-      <recent name="$PROJECT_DIR$/craigslistbargain" />
-      <recent name="$PROJECT_DIR$/craigslistbargain/systems" />
-      <recent name="$PROJECT_DIR$/mutualfriends/systems" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/rl" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/identifier" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/slurm/rl" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/scripts" />
+      <recent name="$PROJECT_DIR$/craigslistbargain/exp_scripts/slurm/identifier" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.generator">
+    <configuration name="RLModels" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="cocoa" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/onmt" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/onmt/RLModels.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="PythonConfigurationType" factoryName="Python">
+      <module name="cocoa" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="generator" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="cocoa" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/craigslistbargain/neural" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/craigslistbargain/neural/generator.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="cocoa" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -73,7 +162,7 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" enabled="false" sample_coverage="true" runner="coverage.py" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/craigslistbargain/main.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -85,6 +174,8 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.generator" />
+        <item itemvalue="Python.RLModels" />
         <item itemvalue="Python.main" />
       </list>
     </recent_temporary>
@@ -111,152 +202,387 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1553403282783</updated>
+      <workItem from="1583507805155" duration="10139000" />
+      <workItem from="1583669172509" duration="3611000" />
+      <workItem from="1583674370520" duration="13242000" />
+      <workItem from="1583923879064" duration="9687000" />
+      <workItem from="1583988935500" duration="85200000" />
+      <workItem from="1584854333507" duration="16606000" />
+      <workItem from="1584972487965" duration="63702000" />
+      <workItem from="1586273631074" duration="217000" />
+      <workItem from="1586314298919" duration="13716000" />
+      <workItem from="1589030343534" duration="3110000" />
+      <workItem from="1589083344475" duration="54810000" />
+      <workItem from="1589304858356" duration="30838000" />
+      <workItem from="1589483321214" duration="9303000" />
+      <workItem from="1589882577550" duration="15286000" />
+      <workItem from="1589944717977" duration="6258000" />
+      <workItem from="1590074311110" duration="1038000" />
+      <workItem from="1590311560498" duration="1444000" />
+      <workItem from="1590318320566" duration="76201000" />
+      <workItem from="1590559406222" duration="182269000" />
+      <workItem from="1602839352988" duration="7149000" />
+      <workItem from="1603199015750" duration="3860000" />
+      <workItem from="1605257610066" duration="49581000" />
     </task>
-    <task id="LOCAL-00001" summary="RL Training finished.">
-      <created>1566594894508</created>
-      <option name="number" value="00001" />
-      <option name="presentableId" value="LOCAL-00001" />
+    <task id="LOCAL-00048" summary="7 different populations">
+      <created>1589492712721</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
       <option name="project" value="LOCAL" />
-      <updated>1566594894508</updated>
+      <updated>1589492712721</updated>
     </task>
-    <task id="LOCAL-00002" summary="Old version ToM">
-      <created>1568757146541</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
+    <task id="LOCAL-00049" summary="slurm files">
+      <created>1589493001713</created>
+      <option name="number" value="00049" />
+      <option name="presentableId" value="LOCAL-00049" />
       <option name="project" value="LOCAL" />
-      <updated>1568757146541</updated>
+      <updated>1589493001713</updated>
     </task>
-    <task id="LOCAL-00003" summary="New ToM on A2C">
-      <created>1569023410972</created>
-      <option name="number" value="00003" />
-      <option name="presentableId" value="LOCAL-00003" />
+    <task id="LOCAL-00050" summary="correct config">
+      <created>1589493829301</created>
+      <option name="number" value="00050" />
+      <option name="presentableId" value="LOCAL-00050" />
       <option name="project" value="LOCAL" />
-      <updated>1569023410972</updated>
+      <updated>1589493829302</updated>
     </task>
-    <task id="LOCAL-00004" summary="optimize infer phase in tom">
-      <created>1569122962455</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
+    <task id="LOCAL-00051" summary="add strategy in language">
+      <created>1589912925119</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
       <option name="project" value="LOCAL" />
-      <updated>1569122962455</updated>
+      <updated>1589912925120</updated>
     </task>
-    <task id="LOCAL-00005" summary="Finish the multiprocessing version">
-      <created>1569228596072</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
+    <task id="LOCAL-00052" summary="fixed bug: prevent init pretrained emb &amp; fix emb">
+      <created>1589949767474</created>
+      <option name="number" value="00052" />
+      <option name="presentableId" value="LOCAL-00052" />
       <option name="project" value="LOCAL" />
-      <updated>1569228596072</updated>
+      <updated>1589949767474</updated>
     </task>
-    <task id="LOCAL-00006" summary="Add example logs and value function pre-training">
-      <created>1569276954000</created>
-      <option name="number" value="00006" />
-      <option name="presentableId" value="LOCAL-00006" />
+    <task id="LOCAL-00053" summary="bugs in config">
+      <created>1589950592676</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
       <option name="project" value="LOCAL" />
-      <updated>1569276954000</updated>
+      <updated>1589950592676</updated>
     </task>
-    <task id="LOCAL-00007" summary="using torch1.0.1 &amp; training with fixed policy/value">
-      <created>1570286789598</created>
-      <option name="number" value="00007" />
-      <option name="presentableId" value="LOCAL-00007" />
+    <task id="LOCAL-00054" summary="rl training">
+      <created>1590531343766</created>
+      <option name="number" value="00054" />
+      <option name="presentableId" value="LOCAL-00054" />
       <option name="project" value="LOCAL" />
-      <updated>1570286789598</updated>
+      <updated>1590531343766</updated>
     </task>
-    <task id="LOCAL-00008" summary="no-training mode">
-      <created>1570676469872</created>
-      <option name="number" value="00008" />
-      <option name="presentableId" value="LOCAL-00008" />
+    <task id="LOCAL-00055" summary="enlarge ratio on dev">
+      <created>1590578066093</created>
+      <option name="number" value="00055" />
+      <option name="presentableId" value="LOCAL-00055" />
       <option name="project" value="LOCAL" />
-      <updated>1570676469872</updated>
+      <updated>1590578066093</updated>
     </task>
-    <task id="LOCAL-00009" summary="New ToM on A2C">
-      <created>1571671712696</created>
-      <option name="number" value="00009" />
-      <option name="presentableId" value="LOCAL-00009" />
+    <task id="LOCAL-00056" summary="revise run files">
+      <created>1590578593712</created>
+      <option name="number" value="00056" />
+      <option name="presentableId" value="LOCAL-00056" />
       <option name="project" value="LOCAL" />
-      <updated>1571671712696</updated>
+      <updated>1590578593712</updated>
     </task>
-    <task id="LOCAL-00010" summary="price round to integer">
-      <created>1574772970926</created>
-      <option name="number" value="00010" />
-      <option name="presentableId" value="LOCAL-00010" />
+    <task id="LOCAL-00057" summary="multi-run in one task">
+      <created>1590579132931</created>
+      <option name="number" value="00057" />
+      <option name="presentableId" value="LOCAL-00057" />
       <option name="project" value="LOCAL" />
-      <updated>1574772970926</updated>
+      <updated>1590579132931</updated>
     </task>
-    <task id="LOCAL-00011" summary="update requirements info">
-      <created>1574852448529</created>
-      <option name="number" value="00011" />
-      <option name="presentableId" value="LOCAL-00011" />
+    <task id="LOCAL-00058" summary="add tom &amp; fix bug&#10;+ tom done.&#10;+ fix reversed strategy.">
+      <created>1590876036761</created>
+      <option name="number" value="00058" />
+      <option name="presentableId" value="LOCAL-00058" />
       <option name="project" value="LOCAL" />
-      <updated>1574852448529</updated>
+      <updated>1590876036763</updated>
     </task>
-    <task id="LOCAL-00012" summary="update requirements with specific version">
-      <created>1574918314791</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
+    <task id="LOCAL-00059" summary="revise identifier config files">
+      <created>1590876569506</created>
+      <option name="number" value="00059" />
+      <option name="presentableId" value="LOCAL-00059" />
       <option name="project" value="LOCAL" />
-      <updated>1574918314791</updated>
+      <updated>1590876569506</updated>
     </task>
-    <task id="LOCAL-00013" summary="price round to integer">
-      <created>1574945308401</created>
-      <option name="number" value="00013" />
-      <option name="presentableId" value="LOCAL-00013" />
+    <task id="LOCAL-00060" summary="enlarge ratio on dev">
+      <created>1590878482752</created>
+      <option name="number" value="00060" />
+      <option name="presentableId" value="LOCAL-00060" />
       <option name="project" value="LOCAL" />
-      <updated>1574945308402</updated>
+      <updated>1590878482752</updated>
     </task>
-    <task id="LOCAL-00014" summary="Using semi-event for tom search process&#10;  * time consuming -&gt; 1/3 old version">
-      <created>1575036444495</created>
-      <option name="number" value="00014" />
-      <option name="presentableId" value="LOCAL-00014" />
+    <task id="LOCAL-00061" summary="revise config files">
+      <created>1590878937471</created>
+      <option name="number" value="00061" />
+      <option name="presentableId" value="LOCAL-00061" />
       <option name="project" value="LOCAL" />
-      <updated>1575036444495</updated>
+      <updated>1590878937471</updated>
     </task>
-    <task id="LOCAL-00015" summary="optimize get_value()">
-      <created>1575115859769</created>
-      <option name="number" value="00015" />
-      <option name="presentableId" value="LOCAL-00015" />
+    <task id="LOCAL-00062" summary="bug fixed + change setting + new feature&#10;+ fix entropy nan&#10;* adjust adding-strategy-rate to 1&#10;+ load rl model possible&#10;* change failed reward to 0.5 &#10;* epoch number revised">
+      <created>1590941381775</created>
+      <option name="number" value="00062" />
+      <option name="presentableId" value="LOCAL-00062" />
       <option name="project" value="LOCAL" />
-      <updated>1575115859769</updated>
+      <updated>1590941381775</updated>
     </task>
-    <task id="LOCAL-00016" summary="new argument: --start-epoch">
-      <created>1575116312838</created>
-      <option name="number" value="00016" />
-      <option name="presentableId" value="LOCAL-00016" />
+    <task id="LOCAL-00063" summary="enlarge ratio on dev">
+      <created>1590943460639</created>
+      <option name="number" value="00063" />
+      <option name="presentableId" value="LOCAL-00063" />
       <option name="project" value="LOCAL" />
-      <updated>1575116312838</updated>
+      <updated>1590943460640</updated>
     </task>
-    <task id="LOCAL-00017" summary="add argument: epoch number of warming up">
-      <created>1575189677156</created>
-      <option name="number" value="00017" />
-      <option name="presentableId" value="LOCAL-00017" />
+    <task id="LOCAL-00064" summary="update config file">
+      <created>1590943639507</created>
+      <option name="number" value="00064" />
+      <option name="presentableId" value="LOCAL-00064" />
       <option name="project" value="LOCAL" />
-      <updated>1575189677156</updated>
+      <updated>1590943639507</updated>
     </task>
-    <task id="LOCAL-00018" summary="feature: dump args in checkpoint folder">
-      <created>1575265632861</created>
-      <option name="number" value="00018" />
-      <option name="presentableId" value="LOCAL-00018" />
+    <task id="LOCAL-00065" summary="enlarge ratio on dev">
+      <created>1590944220722</created>
+      <option name="number" value="00065" />
+      <option name="presentableId" value="LOCAL-00065" />
       <option name="project" value="LOCAL" />
-      <updated>1575265632861</updated>
+      <updated>1590944220723</updated>
     </task>
-    <task id="LOCAL-00019" summary="new argument: --start-port">
-      <created>1575271050758</created>
-      <option name="number" value="00019" />
-      <option name="presentableId" value="LOCAL-00019" />
+    <task id="LOCAL-00066" summary="add s rate -&gt; 1/5">
+      <created>1590951318688</created>
+      <option name="number" value="00066" />
+      <option name="presentableId" value="LOCAL-00066" />
       <option name="project" value="LOCAL" />
-      <updated>1575271050758</updated>
+      <updated>1590951318688</updated>
     </task>
-    <task id="LOCAL-00020" summary="add utterance on sl">
-      <created>1575599428554</created>
-      <option name="number" value="00020" />
-      <option name="presentableId" value="LOCAL-00020" />
+    <task id="LOCAL-00067" summary="save buffer">
+      <created>1590957881152</created>
+      <option name="number" value="00067" />
+      <option name="presentableId" value="LOCAL-00067" />
       <option name="project" value="LOCAL" />
-      <updated>1575599428554</updated>
+      <updated>1590957881152</updated>
     </task>
-    <option name="localTasksCounter" value="21" />
+    <task id="LOCAL-00068" summary="config">
+      <created>1590957950862</created>
+      <option name="number" value="00068" />
+      <option name="presentableId" value="LOCAL-00068" />
+      <option name="project" value="LOCAL" />
+      <updated>1590957950862</updated>
+    </task>
+    <task id="LOCAL-00069" summary="a2c large lr">
+      <created>1590996179900</created>
+      <option name="number" value="00069" />
+      <option name="presentableId" value="LOCAL-00069" />
+      <option name="project" value="LOCAL" />
+      <updated>1590996179900</updated>
+    </task>
+    <task id="LOCAL-00070" summary="small sample step">
+      <created>1590997482125</created>
+      <option name="number" value="00070" />
+      <option name="presentableId" value="LOCAL-00070" />
+      <option name="project" value="LOCAL" />
+      <updated>1590997482126</updated>
+    </task>
+    <task id="LOCAL-00071" summary="fix tom bugs and plot script">
+      <created>1591043238435</created>
+      <option name="number" value="00071" />
+      <option name="presentableId" value="LOCAL-00071" />
+      <option name="project" value="LOCAL" />
+      <updated>1591043238435</updated>
+    </task>
+    <task id="LOCAL-00072" summary="bug">
+      <created>1591043349561</created>
+      <option name="number" value="00072" />
+      <option name="presentableId" value="LOCAL-00072" />
+      <option name="project" value="LOCAL" />
+      <updated>1591043349562</updated>
+    </task>
+    <task id="LOCAL-00073" summary="eval rl &amp; tom">
+      <created>1591053943168</created>
+      <option name="number" value="00073" />
+      <option name="presentableId" value="LOCAL-00073" />
+      <option name="project" value="LOCAL" />
+      <updated>1591053943171</updated>
+    </task>
+    <task id="LOCAL-00074" summary="bugs again">
+      <created>1591054258441</created>
+      <option name="number" value="00074" />
+      <option name="presentableId" value="LOCAL-00074" />
+      <option name="project" value="LOCAL" />
+      <updated>1591054258441</updated>
+    </task>
+    <task id="LOCAL-00075" summary="update config">
+      <created>1591055374650</created>
+      <option name="number" value="00075" />
+      <option name="presentableId" value="LOCAL-00075" />
+      <option name="project" value="LOCAL" />
+      <updated>1591055374650</updated>
+    </task>
+    <task id="LOCAL-00076" summary="eval rule, plot more info on tom curve">
+      <created>1591063257158</created>
+      <option name="number" value="00076" />
+      <option name="presentableId" value="LOCAL-00076" />
+      <option name="project" value="LOCAL" />
+      <updated>1591063257158</updated>
+    </task>
+    <task id="LOCAL-00077" summary="add a2c config">
+      <created>1591065973166</created>
+      <option name="number" value="00077" />
+      <option name="presentableId" value="LOCAL-00077" />
+      <option name="project" value="LOCAL" />
+      <updated>1591065973166</updated>
+    </task>
+    <task id="LOCAL-00078" summary="add a2c config">
+      <created>1591068023055</created>
+      <option name="number" value="00078" />
+      <option name="presentableId" value="LOCAL-00078" />
+      <option name="project" value="LOCAL" />
+      <updated>1591068023056</updated>
+    </task>
+    <task id="LOCAL-00079" summary="add a2c config">
+      <created>1591108806112</created>
+      <option name="number" value="00079" />
+      <option name="presentableId" value="LOCAL-00079" />
+      <option name="project" value="LOCAL" />
+      <updated>1591108806113</updated>
+    </task>
+    <task id="LOCAL-00080" summary="top3 hit ratio">
+      <created>1591121089225</created>
+      <option name="number" value="00080" />
+      <option name="presentableId" value="LOCAL-00080" />
+      <option name="project" value="LOCAL" />
+      <updated>1591121089226</updated>
+    </task>
+    <task id="LOCAL-00081" summary="add a2c config">
+      <created>1591122469911</created>
+      <option name="number" value="00081" />
+      <option name="presentableId" value="LOCAL-00081" />
+      <option name="project" value="LOCAL" />
+      <updated>1591122469911</updated>
+    </task>
+    <task id="LOCAL-00082" summary="bug">
+      <created>1591124348203</created>
+      <option name="number" value="00082" />
+      <option name="presentableId" value="LOCAL-00082" />
+      <option name="project" value="LOCAL" />
+      <updated>1591124348203</updated>
+    </task>
+    <task id="LOCAL-00083" summary="config noid">
+      <created>1591164832555</created>
+      <option name="number" value="00083" />
+      <option name="presentableId" value="LOCAL-00083" />
+      <option name="project" value="LOCAL" />
+      <updated>1591164832555</updated>
+    </task>
+    <task id="LOCAL-00084" summary="add a2c config">
+      <created>1605869091823</created>
+      <option name="number" value="00084" />
+      <option name="presentableId" value="LOCAL-00084" />
+      <option name="project" value="LOCAL" />
+      <updated>1605869091823</updated>
+    </task>
+    <task id="LOCAL-00085" summary="add a2c config">
+      <created>1605897586583</created>
+      <option name="number" value="00085" />
+      <option name="presentableId" value="LOCAL-00085" />
+      <option name="project" value="LOCAL" />
+      <updated>1605897586584</updated>
+    </task>
+    <task id="LOCAL-00086" summary="update hidden vec analysis">
+      <created>1605912579695</created>
+      <option name="number" value="00086" />
+      <option name="presentableId" value="LOCAL-00086" />
+      <option name="project" value="LOCAL" />
+      <updated>1605912579695</updated>
+    </task>
+    <task id="LOCAL-00087" summary="revise sampleh shell files">
+      <created>1605912985625</created>
+      <option name="number" value="00087" />
+      <option name="presentableId" value="LOCAL-00087" />
+      <option name="project" value="LOCAL" />
+      <updated>1605912985626</updated>
+    </task>
+    <task id="LOCAL-00088" summary="revise sampleh">
+      <created>1605913150813</created>
+      <option name="number" value="00088" />
+      <option name="presentableId" value="LOCAL-00088" />
+      <option name="project" value="LOCAL" />
+      <updated>1605913150813</updated>
+    </task>
+    <task id="LOCAL-00089" summary="num assertion">
+      <created>1605914069316</created>
+      <option name="number" value="00089" />
+      <option name="presentableId" value="LOCAL-00089" />
+      <option name="project" value="LOCAL" />
+      <updated>1605914069316</updated>
+    </task>
+    <task id="LOCAL-00090" summary="add a2c config">
+      <created>1605916010765</created>
+      <option name="number" value="00090" />
+      <option name="presentableId" value="LOCAL-00090" />
+      <option name="project" value="LOCAL" />
+      <updated>1605916010765</updated>
+    </task>
+    <task id="LOCAL-00091" summary="id gradient from later part">
+      <created>1606024986656</created>
+      <option name="number" value="00091" />
+      <option name="presentableId" value="LOCAL-00091" />
+      <option name="project" value="LOCAL" />
+      <updated>1606024986656</updated>
+    </task>
+    <task id="LOCAL-00092" summary="update sampleh">
+      <created>1606030291690</created>
+      <option name="number" value="00092" />
+      <option name="presentableId" value="LOCAL-00092" />
+      <option name="project" value="LOCAL" />
+      <updated>1606030291690</updated>
+    </task>
+    <task id="LOCAL-00093" summary="udpate sampleh">
+      <created>1606030474909</created>
+      <option name="number" value="00093" />
+      <option name="presentableId" value="LOCAL-00093" />
+      <option name="project" value="LOCAL" />
+      <updated>1606030474909</updated>
+    </task>
+    <task id="LOCAL-00094" summary="eval fid">
+      <created>1606031188838</created>
+      <option name="number" value="00094" />
+      <option name="presentableId" value="LOCAL-00094" />
+      <option name="project" value="LOCAL" />
+      <updated>1606031188838</updated>
+    </task>
+    <task id="LOCAL-00095" summary="debug accu calc">
+      <created>1606034626743</created>
+      <option name="number" value="00095" />
+      <option name="presentableId" value="LOCAL-00095" />
+      <option name="project" value="LOCAL" />
+      <updated>1606034626743</updated>
+    </task>
+    <task id="LOCAL-00096" summary="load correct tom model">
+      <created>1606034835210</created>
+      <option name="number" value="00096" />
+      <option name="presentableId" value="LOCAL-00096" />
+      <option name="project" value="LOCAL" />
+      <updated>1606034835210</updated>
+    </task>
+    <option name="localTasksCounter" value="97" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
+  </component>
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ORDER">
+      <list>
+        <option value="0" />
+        <option value="2" />
+        <option value="3" />
+        <option value="1" />
+      </list>
+    </option>
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
@@ -272,43 +598,80 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="RL Training finished." />
-    <MESSAGE value="Old version ToM" />
-    <MESSAGE value="optimize infer phase in tom" />
-    <MESSAGE value="Finish the multiprocessing version" />
-    <MESSAGE value="Add example logs and value function pre-training" />
-    <MESSAGE value="using torch1.0.1 &amp; training with fixed policy/value" />
-    <MESSAGE value="no-training mode" />
-    <MESSAGE value="New ToM on A2C" />
-    <MESSAGE value="update requirements info" />
-    <MESSAGE value="update requirements with specific version" />
-    <MESSAGE value="price round to integer" />
-    <MESSAGE value="Using semi-event for tom search process&#10;  * time consuming -&gt; 1/3 old version" />
-    <MESSAGE value="optimize get_value()" />
-    <MESSAGE value="new argument: --start-epoch" />
-    <MESSAGE value="add argument: epoch number of warming up" />
-    <MESSAGE value="feature: dump args in checkpoint folder" />
-    <MESSAGE value="new argument: --start-port" />
-    <MESSAGE value="add utterance on sl" />
-    <option name="LAST_COMMIT_MESSAGE" value="add utterance on sl" />
+    <MESSAGE value="change 2 strategies" />
+    <MESSAGE value="add s rate -&gt; 1/5" />
+    <MESSAGE value="save buffer" />
+    <MESSAGE value="config" />
+    <MESSAGE value="a2c large lr" />
+    <MESSAGE value="small sample step" />
+    <MESSAGE value="fix tom bugs and plot script" />
+    <MESSAGE value="eval rl &amp; tom" />
+    <MESSAGE value="bugs again" />
+    <MESSAGE value="update config" />
+    <MESSAGE value="eval rule, plot more info on tom curve" />
+    <MESSAGE value="top3 hit ratio" />
+    <MESSAGE value="bug" />
+    <MESSAGE value="config noid" />
+    <MESSAGE value="update hidden vec analysis" />
+    <MESSAGE value="revise sampleh shell files" />
+    <MESSAGE value="revise sampleh" />
+    <MESSAGE value="num assertion" />
+    <MESSAGE value="add a2c config" />
+    <MESSAGE value="id gradient from later part" />
+    <MESSAGE value="update sampleh" />
+    <MESSAGE value="udpate sampleh" />
+    <MESSAGE value="eval fid" />
+    <MESSAGE value="debug accu calc" />
+    <MESSAGE value="load correct tom model" />
+    <option name="LAST_COMMIT_MESSAGE" value="load correct tom model" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="516" y="108" key="CommitChangelistDialog2" timestamp="1575599428366">
-      <screen x="0" y="23" width="1792" height="1097" />
+    <state x="-461" y="-1057" key="CommitChangelistDialog2" timestamp="1606036620650">
+      <screen x="-1000" y="-1057" width="1920" height="1057" />
     </state>
-    <state x="516" y="108" key="CommitChangelistDialog2/262.-1057.2560.1057/0.23.1792.1097@0.23.1792.1097" timestamp="1575599428366" />
-    <state x="179" y="122" key="DiffContextDialog" timestamp="1575599346270">
-      <screen x="0" y="23" width="1792" height="1097" />
+    <state x="1805" y="-1057" key="CommitChangelistDialog2/523.-1057.2560.1057/0.23.1792.1097@523.-1057.2560.1057" timestamp="1605922557111" />
+    <state x="-461" y="-1057" key="CommitChangelistDialog2/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@-1000.-1057.1920.1057" timestamp="1606036620650" />
+    <state x="1459" y="-1057" key="CommitChangelistDialog2/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@920.-1057.1920.1057" timestamp="1605869091636" />
+    <state x="1164" y="-978" key="DiffContextDialog" timestamp="1605862727311">
+      <screen x="920" y="-1057" width="1920" height="1057" />
     </state>
-    <state x="179" y="122" key="DiffContextDialog/262.-1057.2560.1057/0.23.1792.1097@0.23.1792.1097" timestamp="1575599346270" />
-    <state x="504" y="367" key="com.intellij.ide.util.TipDialog" timestamp="1575544928449">
-      <screen x="0" y="23" width="1792" height="1097" />
+    <state x="1164" y="-978" key="DiffContextDialog/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@920.-1057.1920.1057" timestamp="1605862727311" />
+    <state x="-540" y="-873" key="Vcs.Push.Dialog.v2" timestamp="1606034837158">
+      <screen x="-1000" y="-1057" width="1920" height="1057" />
     </state>
-    <state x="504" y="367" key="com.intellij.ide.util.TipDialog/0.23.1792.1097@0.23.1792.1097" timestamp="1575544928449" />
-    <state x="511" y="297" width="769" height="548" key="find.popup" timestamp="1575602063556">
-      <screen x="0" y="23" width="1792" height="1097" />
+    <state x="1136" y="-873" key="Vcs.Push.Dialog.v2/523.-1057.2560.1057/0.23.1792.1097@523.-1057.2560.1057" timestamp="1605916012175" />
+    <state x="-540" y="-873" key="Vcs.Push.Dialog.v2/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@-1000.-1057.1920.1057" timestamp="1606034837158" />
+    <state x="1380" y="-873" key="Vcs.Push.Dialog.v2/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@920.-1057.1920.1057" timestamp="1605869095640" />
+    <state x="-487" y="-727" key="com.intellij.ide.util.TipDialog" timestamp="1605257612833">
+      <screen x="-1000" y="-1057" width="1920" height="1057" />
     </state>
-    <state x="511" y="297" width="769" height="548" key="find.popup/0.23.1792.1097@0.23.1792.1097" timestamp="1575602063556" />
-    <state x="511" y="297" width="769" height="548" key="find.popup/1792.572.960.681/0.23.1792.1097@0.23.1792.1097" timestamp="1575584013151" />
+    <state x="479" y="365" key="com.intellij.ide.util.TipDialog/0.23.1792.1097@0.23.1792.1097" timestamp="1602839355457" />
+    <state x="479" y="365" key="com.intellij.ide.util.TipDialog/523.-1057.2560.1057/0.23.1792.1097@0.23.1792.1097" timestamp="1603447650477" />
+    <state x="-487" y="-727" key="com.intellij.ide.util.TipDialog/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@-1000.-1057.1920.1057" timestamp="1605257612833" />
+    <state x="-449" y="-826" width="819" height="616" key="find.popup" timestamp="1606034151340">
+      <screen x="-1000" y="-1057" width="1920" height="1057" />
+    </state>
+    <state x="514" y="263" width="764" height="616" key="find.popup/0.23.1792.1097@0.23.1792.1097" timestamp="1605663280820" />
+    <state x="1258" y="-826" width="1092" height="616" key="find.popup/523.-1057.2560.1057/0.23.1792.1097@523.-1057.2560.1057" timestamp="1605921858537" />
+    <state x="-449" y="-826" width="819" height="616" key="find.popup/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@-1000.-1057.1920.1057" timestamp="1606034151340" />
+    <state x="1471" y="-826" width="819" height="616" key="find.popup/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@920.-1057.1920.1057" timestamp="1605781514475" />
+    <state x="-489" y="-994" width="899" height="995" key="search.everywhere.popup" timestamp="1606034128239">
+      <screen x="-1000" y="-1057" width="1920" height="1057" />
+    </state>
+    <state x="477" y="88" width="838" height="1032" key="search.everywhere.popup/0.23.1792.1097@0.23.1792.1097" timestamp="1605803693257" />
+    <state x="1204" y="-994" width="1198" height="995" key="search.everywhere.popup/523.-1057.2560.1057/0.23.1792.1097@523.-1057.2560.1057" timestamp="1605913803363" />
+    <state x="-489" y="-994" width="899" height="995" key="search.everywhere.popup/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@-1000.-1057.1920.1057" timestamp="1606034128239" />
+    <state x="1431" y="-994" width="898" height="995" key="search.everywhere.popup/920.-1057.1920.1057/-1000.-1057.1920.1057/0.23.1792.1097@920.-1057.1920.1057" timestamp="1605860194790" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/craigslistbargain/multi_manager_debug.py</url>
+          <line>909</line>
+          <option name="timeStamp" value="2" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

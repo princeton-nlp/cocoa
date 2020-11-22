@@ -28,7 +28,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 \
 --model lf2lf --model-type a2c --name ${EXP_NAME} --num-cpus 5 \
---epochs 100 ${USE_GPU} --batch-size 128 --seed ${SEED} --get-dialogues
+--epochs 10 ${USE_GPU} --batch-size 128 --seed ${SEED} --get-dialogues
 
 #PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 #--scenarios-path data/train-scenarios.json \
