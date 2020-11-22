@@ -639,6 +639,8 @@ class MultiManager():
 
                 with open(save_dir, "wb") as f:
                     pkl.dump([worker.trainer.hidden_vec, worker.trainer.hidden_stra], f)
+
+                print("accu:", train_accu)
                 print('[run{}/{}]\t num:{} \t time:{:.2f}s.'.format(i+1, args.epochs, total_num, time.time()-cur_t))
                 continue
 
