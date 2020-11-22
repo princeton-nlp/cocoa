@@ -464,6 +464,9 @@ class MultiManager():
             with open(eval_json, 'w') as f:
                 json.dump(tmpd, f)
 
+            print('=' * 5 + ' [reward: {:.3f}\t utility: {:.3f}\t success_rate: {:.3f}]'.
+                  format(tmpd['reward'], tmpd['utility'], tmpd["success_rate"]))
+
             eval_json = 'logs/{}/eval_separate_{}.json'.format(args.name, epoch)
             tmpds = []
             for i in range(len(sed)):
@@ -477,6 +480,7 @@ class MultiManager():
 
             print('=' * 5 + ' [Epoch {}/{}, {} dialogues for {:.3f}s.]'.
                   format(epoch + 1, max_epoch, (epoch+1)*sample_size, time.time() - last_time))
+
 
     def learn_identity(self):
 
