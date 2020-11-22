@@ -29,7 +29,7 @@ PYTHONPATH=. python multi_rl.py --schema-path data/craigslist-schema.json \
 --agent-checkpoints checkpoint/language/model_best.pt checkpoint/language/model_best.pt \
 --model-path checkpoint/${EXP_NAME} --mappings mappings/language \
 --optim adam --rnn-type RNN --rnn-size 300 --max-grad-norm -1 \
---agents pt-neural pt-neural-r \
+--agents pt-neural pt-neural-r ${TOM_CHECK_POINT} \
 --report-every 50 --max-turns 20 --num-dialogues 20 \
 --sample --temperature 0.5 --max-length 20 --reward margin \
 --dia-num 20 --state-length 4 --epochs 1 --use-utterance \
