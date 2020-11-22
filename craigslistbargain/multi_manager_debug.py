@@ -498,6 +498,9 @@ class MultiManager():
         if args.tom_model in ['id', 'uttr_id']:
             update_table = {'id': True, 'tom': False}
             ret_table = {'id': True, 'tom': False}
+        elif args.tom_model in ['uttr_fid_history_tom']:
+            update_table = {'id': False, 'tom': True}
+            ret_table = {'id': True, 'tom': True}
         elif args.tom_model in ['uttr_id_history_tom', 'id_tom', 'id_history_tom']:
             update_table = {'id': True, 'tom': True}
             ret_table = {'id': True, 'tom': True}

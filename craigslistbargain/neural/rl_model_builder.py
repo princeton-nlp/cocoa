@@ -194,7 +194,7 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
                                    identity=None, hidden_size=model_opt.tom_hidden_size)
     else:
         id_emb, tom_emb = None, src_embeddings
-        if model_opt.tom_model in ['uttr_id_history_tom', 'uttr_id']:
+        if model_opt.tom_model in ['uttr_id_history_tom', 'uttr_fid_history_tom', 'uttr_id']:
             id_emb, tom_emb = src_embeddings, None
 
         tom_identity = make_identity(model_opt, intent_size, model_opt.id_hidden_size,
@@ -202,6 +202,9 @@ def make_rl_model(model_opt, mappings, gpu, checkpoint=None, load_type='from_sl'
         tom_encoder = make_encoder(model_opt, tom_emb, intent_size, model_opt.tom_hidden_size,
                                    use_history=('history' in model_opt.tom_model), hidden_depth=model_opt.tom_hidden_depth,
                                    identity=tom_identity, hidden_size=model_opt.tom_hidden_size)
+        if model_opt.tom_model == 'uttr_fid_history_tom':
+            tom_encoder.fix_identity = False
+
     rl_encoder.fix_emb = True
     tom_encoder.fix_emb = True
     if tom_encoder.identity is not None:
