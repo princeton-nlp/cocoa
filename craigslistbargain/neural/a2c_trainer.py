@@ -170,7 +170,9 @@ class RLTrainer(BaseTrainer):
                                                              only_identity=(not ret_table['tom']), id_gt=id_gt)
 
             self.hidden_vec.append(self.tom.hidden_vec)
-            self.hidden_stra.append(strategy[:batch.size])
+            s = np.array([strategy[:batch.size]]).T
+            s = np.concatenate([s, batch.identity_state, batch.extra,], axis=1)
+            self.hidden_stra.append(s)
 
             # Identity Loss
             if ret_table['id']:

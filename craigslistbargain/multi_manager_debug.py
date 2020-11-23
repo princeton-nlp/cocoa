@@ -637,8 +637,8 @@ class MultiManager():
                 save_dir = 'logs/{}/hidden_vec_{}.pkl'.format(args.name, i)
                 total_num = 0
                 for j in range(len(worker.trainer.hidden_vec)):
-                    assert worker.trainer.hidden_vec[j].shape[0] == len(worker.trainer.hidden_stra[j]) , \
-                        "miss match at {}, {} of {}".format(worker.trainer.hidden_vec[j].shape, len(worker.trainer.hidden_stra[j]), j)
+                    assert worker.trainer.hidden_vec[j].shape[0] == worker.trainer.hidden_stra[j].shape[0], \
+                        "miss match at {}, {} of {}".format(worker.trainer.hidden_vec[j].shape, worker.trainer.hidden_stra[j].shape, j)
                     total_num = total_num + len(worker.trainer.hidden_stra[j])
 
                 with open(save_dir, "wb") as f:
