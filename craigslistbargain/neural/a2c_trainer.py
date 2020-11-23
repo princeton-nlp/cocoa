@@ -171,7 +171,7 @@ class RLTrainer(BaseTrainer):
 
             self.hidden_vec.append(self.tom.hidden_vec)
             s = np.array([strategy[:batch.size]]).T
-            s = np.concatenate([s, tom_batch.identity_state, tom_batch.extra,], axis=1)
+            s = np.concatenate([s, tom_batch.identity_state.cpu().data.numpy(), tom_batch.extra.cpu().data.numpy(),], axis=1)
             self.hidden_stra.append(s)
 
             # Identity Loss
